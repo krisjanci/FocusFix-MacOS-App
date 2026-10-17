@@ -2,6 +2,9 @@ import SwiftUI
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        ActivityTracker.shared.configureNotifications()
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
@@ -26,8 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarExtra {
             RecordingMenu(tracker: tracker)
         } label: {
-            Label(tracker.isRecording ? "FocusFix recording" : "FocusFix",
-                  systemImage: tracker.isRecording ? "record.circle.fill" : "pause.circle")
+            Label(tracker.breakPhase != .work && tracker.isRecording ? "FocusFix on break" : tracker.isRecording ? "FocusFix recording" : "FocusFix",
+                  systemImage: tracker.breakPhase != .work && tracker.isRecording ? "leaf.fill" : tracker.isRecording ? "record.circle.fill" : "pause.circle")
         }
     }
 }
@@ -36,7 +39,7 @@ private struct RecordingMenu: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.openWindow) private var openWindow
     var body: some View {
-        Text(tracker.isRecording ? "Recording · \(tracker.formattedTime)" : "FocusFix · Idle")
+        Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
         Button("Show FocusFix") {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
@@ -47,6 +50,22 @@ private struct RecordingMenu: View {
                 if !tracker.isRecording {
                     openWindow(id: "collector")
                     NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        }
+        if tracker.isRecording {
+            Divider()
+            if tracker.breakPhase != .work {
+                Button("I'm back") { tracker.returnFromBreak() }
+            } else {
+                Button(tracker.breakPromptPending ? "Break suggested — take a break" : "Take a break") {
+                    tracker.chooseBreak()
+                    openWindow(id: "collector")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                if tracker.breakPromptPending {
+                    Button("Skip — wait 25 min") { tracker.deferBreak(snooze: false) }
+                    Button("Snooze 10 min") { tracker.deferBreak(snooze: true) }
                 }
             }
         }

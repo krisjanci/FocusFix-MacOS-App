@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("appearance") private var appearance = "system"
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
+    private var onBreak: Bool { tracker.isRecording && tracker.breakPhase != .work }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
@@ -19,19 +20,56 @@ struct ContentView: View {
                         .tracking(2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label(tracker.isRecording ? "Recording" : "Idle", systemImage: "circle.fill")
+                Label(onBreak ? "On break" : tracker.isRecording ? "Recording" : "Idle", systemImage: onBreak ? "leaf.fill" : "circle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(tracker.isRecording ? teal : Color.secondary)
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(teal.opacity(0.08), in: Capsule())
             }
             VStack(spacing: 16) {
-                Text("SESSION TIME").font(.caption2.weight(.medium)).tracking(2).foregroundStyle(.secondary)
-                Text(tracker.formattedTime)
-                    .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
+                if onBreak, let record = tracker.currentBreak {
+                    Image(systemName: "leaf").font(.system(size: 28, weight: .light)).foregroundStyle(teal)
+                    Text(tracker.breakPhase == .resting ? "TIME TO UNWIND" : "TAKE YOUR TIME")
+                        .font(.caption2.weight(.medium)).tracking(2).foregroundStyle(.secondary)
+                    Text(durationText(max(0, record.deadline - tracker.elapsed)))
+                        .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
+                    Text(record.plannedActivity).font(.headline)
+                    Text("Break time · \(durationText(tracker.elapsed - record.start))")
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    Text(tracker.breakPhase == .resting ? "Activity logging paused" : "Tracking resumed · waiting for your return")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("SESSION TIME").font(.caption2.weight(.medium)).tracking(2).foregroundStyle(.secondary)
+                    Text(tracker.formattedTime)
+                        .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
+                }
             }
             .frame(maxWidth: .infinity).padding(26)
-            .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+            .background(LinearGradient(colors: [teal.opacity(onBreak ? 0.16 : 0.06),
+                Color.mint.opacity(onBreak ? 0.12 : 0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 18))
+
+            if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
+
+            if tracker.notificationPermission.needsAttention && !onBreak {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Turn on break notifications", systemImage: "bell.badge")
+                        .font(.callout.weight(.medium))
+                    Text(tracker.notificationPermission.opensSettings
+                         ? "In System Settings → Notifications → FocusFix, allow notifications and choose Banners or Alerts."
+                         : "Get a gentle reminder when it's time for a break and when your break timer ends. You can still use FocusFix without notifications.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(tracker.notificationPermission.opensSettings ? "Open notification settings" : "Enable notifications") {
+                        if tracker.notificationPermission.opensSettings { tracker.openNotificationSettings() }
+                        else { tracker.enableNotifications() }
+                    }.disabled(tracker.notificationPermissionBusy)
+                    if let notice = tracker.notificationNotice {
+                        Text(notice).font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            }
 
             // Only actionable problems belong on the main recording screen.
             if tracker.hasError || tracker.needsPermission {
@@ -43,13 +81,17 @@ struct ContentView: View {
                 Button("Allow Accessibility Access") { tracker.requestPermission() }.buttonStyle(.bordered)
             }
             HStack(spacing: 12) {
+                if onBreak {
+                    Button("I'm back") { tracker.returnFromBreak() }
+                        .buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                }
                 Button {
                     if tracker.isRecording { tracker.stop() } else { tracker.start() }
                 } label: {
                     Label(tracker.isRecording ? "Stop & save" : "Start session",
                           systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
                         .frame(minWidth: 124)
-                }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                }.buttonStyle(.bordered).tint(teal).controlSize(.large)
                 Button { openWindow(id: "sessions") } label: {
                     Label("Sessions", systemImage: "folder")
                 }.controlSize(.large)
@@ -68,6 +110,17 @@ struct ContentView: View {
         }
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true } }
+        .sheet(isPresented: $tracker.breakSetupPresented) { BreakSetupView(tracker: tracker).tint(teal) }
+        .onAppear {
+            tracker.refreshNotificationPermission()
+            NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true }
+            tracker.openMainWindow = {
+                openWindow(id: "collector")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            tracker.refreshNotificationPermission()
+        }
     }
 }

@@ -37,7 +37,7 @@ struct SessionLibraryView: View {
                             Text(session.startedAt.formatted(date: .abbreviated, time: .standard))
                                 .font(.headline)
                             Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
-                                ?? (tracker.isActive(session) ? "Recording now" : "Unfinished session"))
+                                ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -91,7 +91,7 @@ struct SessionLibraryView: View {
         return String(format: "%02d:%02d:%02d", value / 3600, value / 60 % 60, value % 60)
     }
     private func statusLabel(_ session: SavedSession) -> String {
-        if tracker.isActive(session) { return "Recording" }
+        if tracker.isActive(session) { return tracker.breakPhase == .work ? "Recording" : "On break" }
         if session.endedAt == nil { return "Incomplete" }
         switch session.status {
         case "user_stop": return "Saved"
@@ -115,7 +115,7 @@ struct TrackingTestView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Label("Test tracking", systemImage: "waveform.path.ecg").font(.title2.weight(.semibold))
-            Text(tracker.isRecording ? "Use your keyboard and mouse to check that the counts update. These events are part of the current session."
+            Text(tracker.isRecording ? (tracker.breakPhase == .resting ? "Detailed tracking is paused for your break. Counts resume when you return or the timer finishes." : "Use your keyboard and mouse to check that the counts update. These events are part of the current session.")
                 : "Start a session in the main window to check live tracking. Counts below are from the latest session in this app run.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 32) {
