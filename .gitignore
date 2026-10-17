@@ -5,6 +5,7 @@ xcuserdata/
 
 # Participant recordings belong outside this repository.
 FocusFix-*/
+FocusFix Session */
 events.csv
 mouse_movement.csv
 session.json
