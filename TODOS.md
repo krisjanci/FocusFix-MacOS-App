@@ -29,3 +29,9 @@
 - On github, create a project to put all this stuff in and have it organised.
 
 - Add a sign in page where it can remember name/ habbits for the Apple intelligence local model to personalise when giving recommendations/feedback.
+
+
+
+Pre release todo (later stage)
+
+- Add a data usage contract
