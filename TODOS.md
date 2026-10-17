@@ -23,3 +23,5 @@
 - have the export name to be editable
 
 - Add the survey to track how the person is feeling. Perhaps have a audio recording of an overview of the session that's transcribed and summarised using apple intelligence.
+
+- The two 5 second inactivity in a minute window did not interapt me for another 12 minutes after the 25 minute mark even when i felt like i was getting stuck. However I was still productive (reading text and writing note). It succeeded in not disturbing me and only when i looked at my friend to tell him something, I got the notification. Think about this.
