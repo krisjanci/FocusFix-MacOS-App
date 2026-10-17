@@ -17,3 +17,7 @@
 - Build a website where you can download this app with a tutorial on how to use this. (if possible)
 
 - include an export all option
+
+- what is the json file for?
+
+- have the export name to be editable
