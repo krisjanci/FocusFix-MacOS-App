@@ -21,3 +21,5 @@
 - what is the json file for?
 
 - have the export name to be editable
+
+- Add the survey to track how the person is feeling. Perhaps have a audio recording of an overview of the session that's transcribed and summarised using apple intelligence.
