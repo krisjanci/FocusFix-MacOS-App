@@ -51,8 +51,14 @@ be delayed; six decimal places do not imply microsecond measurement accuracy.
 | `event_type` | `key_down`, `key_up`, `delete_down`, `delete_up`, `modifier_change`, `left_click_down/up`, `right_click_down/up`, `other_click_down/up`, `scroll`, `app_switch`, `session_start`, or `session_stop`. |
 | `is_repeat` | 1 for auto-repeated key-down events, 0 for an initial down; blank for other events. |
 | `key_hold_seconds` | Down-to-up duration, only on key release when its initial press was observed. |
-| `scroll_delta_x`, `scroll_delta_y` | Signed native scroll deltas, including delivered momentum events. Not comparable across devices without validation. |
-| `scroll_precise` | 1 when macOS reports precise scroll deltas; 0 otherwise; blank on other events. |
+| `scroll_delta_x` | Amount of sideways scrolling in this event. The sign distinguishes opposite directions. |
+| `scroll_delta_y` | Amount of vertical scrolling in this event. The sign distinguishes opposite directions. |
+| `scroll_precise` | 1 for fine-grained scrolling deltas, often from a trackpad; 0 for coarse scrolling deltas; blank on other events. Not a measure of the user's accuracy. |
+
+Scrolling is already recorded as individual `scroll` rows, including delivered
+momentum events. Scroll amounts are native deltas, not a count of pages read, and
+should not be compared across devices without validation. Scrolling alongside
+pauses and low typing activity could be a clue to reading, not proof of it.
 
 Delete events replace, rather than duplicate, generic key events. Total key-downs
 include `key_down` plus `delete_down`; exclude repeat rows if you want physical
@@ -67,7 +73,6 @@ process identities in memory; switching windows within one app is not counted.
 | Column | Meaning |
 | --- | --- |
 | `start_seconds`, `end_seconds` | Interval boundaries; intervals are `[start, end)`. |
-| `duration_seconds` | Actual interval duration, including a short final interval. |
 | `distance_screen_points` | Sum of distances between consecutive observed cursor positions, including dragging. |
 | `movement_events` | Number of observed move/drag callbacks in the interval. |
 | `seconds_since_last_movement` | Time since the last observed nonzero movement, measured at interval end. Blank if none has occurred since Start. |
@@ -79,6 +84,10 @@ crossing a boundary is assigned to the interval containing its ending callback.
 Distance is screen-coordinate points, not physical mouse travel. Display geometry,
 pointer speed, device type and cursor warps affect interpretation. Exact trajectories,
 movement efficiency, or exact within-second idle time cannot be recovered later.
+
+There is no separate mouse duration column: subtract `start_seconds` from
+`end_seconds` if needed. The final partial interval can be excluded when analysing
+full seconds. New sessions use schema version 2; older files are left unchanged.
 
 **session.json** stores the random session ID, UTC start, schema version, time/unit
 definitions, and final duration/stop reason. It contains no participant identity or
@@ -129,8 +138,8 @@ back, close the collector window, then stop from the menu bar. Inspect the two C
 Confirm capture continues with the window closed and repeated Start/Stop creates
 distinct sessions. Test sleep and permission revocation before a participant study.
 
-Build/synthetic checks and the permission-denied UI are tested during development;
-permission-granted, real-input recording still requires the manual check above.
+Build and synthetic checks have passed. Use the manual checks above to verify
+real-input recording before a participant study.
 
 ## Future ML workflow (not implemented in this collector)
 
