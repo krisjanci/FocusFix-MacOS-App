@@ -16,3 +16,4 @@
 
 - Build a website where you can download this app with a tutorial on how to use this. (if possible)
 
+- include an export all option
