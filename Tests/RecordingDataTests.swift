@@ -57,8 +57,12 @@ struct RecordingDataTests {
         precondition(!events.contains("keyCode") && !events.contains("characters"))
         let summaries = try String(contentsOf: writer.folder.appendingPathComponent("mouse_movement.csv"), encoding: .utf8)
         precondition(summaries.split(separator: "\n").count == 3)
+        precondition(summaries.split(separator: "\n").allSatisfy { $0.split(separator: ",", omittingEmptySubsequences: false).count == 5 })
+        precondition(!summaries.contains("duration_seconds"))
+        precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
+        precondition(info["schema_version"] as? Int == 2)
         near(info["duration_seconds"] as! Double, 1.4)
         do {
             _ = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date())

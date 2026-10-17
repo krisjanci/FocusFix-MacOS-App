@@ -13,7 +13,7 @@ struct MouseSummary {
     let events: Int
     let secondsSinceMovement: Double?
     var csv: String {
-        [csvNumber(start), csvNumber(end), csvNumber(end - start),
+        [csvNumber(start), csvNumber(end),
          csvNumber(distance), String(events), secondsSinceMovement.map(csvNumber) ?? ""]
             .joined(separator: ",") + "\n"
     }
@@ -87,7 +87,7 @@ final class RecordingWriter {
         let eventURL = folder.appendingPathComponent("events.csv")
         let mouseURL = folder.appendingPathComponent("mouse_movement.csv")
         try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise\n".utf8).write(to: eventURL)
-        try Data("start_seconds,end_seconds,duration_seconds,distance_screen_points,movement_events,seconds_since_last_movement\n".utf8).write(to: mouseURL)
+        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement\n".utf8).write(to: mouseURL)
         events = try FileHandle(forWritingTo: eventURL)
         mouse = try FileHandle(forWritingTo: mouseURL)
         try events.seekToEnd()
@@ -120,7 +120,7 @@ final class RecordingWriter {
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 1, "session_id": folder.lastPathComponent,
+            "schema_version": 2, "session_id": folder.lastPathComponent,
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
             "timestamp_basis": "monotonic callback receipt time, relative to session start",
             "mouse_interval_seconds": 1,
