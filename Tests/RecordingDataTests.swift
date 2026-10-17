@@ -64,10 +64,59 @@ struct RecordingDataTests {
         precondition(info["status"] as? String == "user_stop")
         precondition(info["schema_version"] as? Int == 2)
         near(info["duration_seconds"] as! Double, 1.4)
+        precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
             _ = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date())
             preconditionFailure("Existing session must never be overwritten")
         } catch { /* Expected. */ }
-        print("PASS: path distance, boundaries, idle intervals, partial stop, key timing, CSV schema, metadata, overwrite protection.")
+
+        // Saved sessions survive reopening; exports are named and never replace earlier copies.
+        let saved = try SavedSession(folder: writer.folder)
+        precondition(saved.exportName(timeZone: TimeZone(secondsFromGMT: 0)!) ==
+            "FocusFix Session [1970-01-01 00-00-00-1970-01-01 00-00-01]")
+        let initialSessions = try SessionFiles.list(in: root)
+        precondition(initialSessions.count == 1)
+        let exports = root.deletingLastPathComponent().appendingPathComponent("focusfix-exports-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: exports) }
+        let copy = try SessionFiles.export(saved, to: exports, root: root, active: nil)
+        let secondCopy = try SessionFiles.export(saved, to: exports, root: root, active: nil)
+        precondition(copy != secondCopy && secondCopy.lastPathComponent.hasSuffix(" (2)"))
+        let exported = try String(contentsOf: copy.appendingPathComponent("events.csv"), encoding: .utf8)
+        precondition(exported == events)
+        do {
+            try SessionFiles.validate(saved.folder, in: root, active: saved.folder)
+            preconditionFailure("Active sessions must be protected")
+        } catch { /* Expected. */ }
+        do {
+            try SessionFiles.validate(root, in: root, active: nil)
+            preconditionFailure("The storage root must be protected")
+        } catch { /* Expected. */ }
+        do {
+            _ = try SessionFiles.export(saved, to: saved.folder, root: root, active: nil)
+            preconditionFailure("Cannot export into session storage")
+        } catch { /* Expected. */ }
+
+        let oldFolder = root.appendingPathComponent("legacy")
+        try FileManager.default.createDirectory(at: oldFolder, withIntermediateDirectories: true)
+        let legacy: [String: Any] = ["started_at_utc": "2026-10-17T23:59:30Z", "duration_seconds": 90,
+                                   "status": "user_stop", "schema_version": 1]
+        try JSONSerialization.data(withJSONObject: legacy).write(to: oldFolder.appendingPathComponent("session.json"))
+        let old = try SavedSession(folder: oldFolder)
+        precondition(old.exportName(timeZone: TimeZone(secondsFromGMT: 0)!) ==
+            "FocusFix Session [2026-10-17 23-59-30-2026-10-18 00-01-00]")
+        let unfinishedFolder = root.appendingPathComponent("unfinished")
+        try FileManager.default.createDirectory(at: unfinishedFolder, withIntermediateDirectories: true)
+        let unfinished = try SavedSession(folder: unfinishedFolder)
+        precondition(unfinished.endedAt == nil && unfinished.exportName().hasSuffix("-unfinished]"))
+        let link = root.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: exports)
+        do {
+            try SessionFiles.validate(link, in: root, active: nil)
+            preconditionFailure("Symlinks must not be treated as sessions")
+        } catch { /* Expected. */ }
+        let all = try SessionFiles.list(in: root)
+        precondition(all.count == 3 && !all.contains { $0.folder == link })
+        print("PASS: recording schema and timing, session reload, dated exports, duplicate protection, legacy and unfinished sessions, active-session and path guards.")
     }
 }

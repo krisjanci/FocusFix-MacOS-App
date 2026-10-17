@@ -128,7 +128,10 @@ final class RecordingWriter {
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
         ]
-        if let duration { fields["duration_seconds"] = duration }
+        if let duration {
+            fields["duration_seconds"] = duration
+            fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration))
+        }
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
