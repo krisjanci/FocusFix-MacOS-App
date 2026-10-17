@@ -27,3 +27,5 @@
 - The two 5 second inactivity in a minute window did not interapt me for another 12 minutes after the 25 minute mark even when i felt like i was getting stuck. However I was still productive (reading text and writing note). It succeeded in not disturbing me and only when i looked at my friend to tell him something, I got the notification. Think about this.
 
 - On github, create a project to put all this stuff in and have it organised.
+
+- Add a sign in page where it can remember name/ habbits for the Apple intelligence local model to personalise when giving recommendations/feedback.
