@@ -16,26 +16,51 @@ recommend breaks or send data anywhere. Survey collection is still undecided.
    Then press Start again. If macOS does not recognize a rebuilt app, quit and relaunch it.
 3. Work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
-4. Choose **Stop & save**. **Export CSVs** copies that session into a new folder at
-   your chosen destination. The folder button opens the original local files.
+4. Choose **Stop & save**. Sessions are saved automatically; you don't need to export
+   after every recording. Open **Sessions** to browse previous recordings, select one,
+   then choose **Export…**, **Show in Finder**, or **Delete…**.
+5. **Test tracking** opens a separate window with live individual-event and
+   mouse-interval counts. It doesn't start a separate recording; testing during a
+   session adds events to that session. Close it when you're done checking.
+6. Use the appearance menu in the main window to choose **System**, **Light**, or
+   **Dark**. The choice is remembered and applies to all FocusFix windows.
 
 Sessions are automatically saved under
 `~/Library/Application Support/FocusFix/Sessions/<session-id>/`.
 Each session has two CSVs and `session.json`. A new session never replaces an old
-one. Old sessions remain in the parent Sessions folder after relaunching the app.
+one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
+
+### Session library and exports
+
+- The library shows start/end dates, duration and status, newest first. Use Refresh
+  after changing files outside the app. An unfinished session is shown as incomplete
+  rather than silently treated as a complete recording.
+- Export copies the two CSV files and metadata together into a folder named like
+  `FocusFix Session [2026-10-17 09-00-00-2026-10-17 10-30-00]`.
+  Times use the Mac's current local time zone; hyphens replace colons in filenames.
+  The metadata keeps UTC times. Old sessions without an end date use start + duration.
+  Incomplete sessions use `unfinished` rather than an invented end time.
+- Exporting again adds `(2)`, `(3)`, etc. if needed. Original recordings and existing
+  exports are not overwritten. Exports cannot be placed inside session storage.
+- Delete asks for confirmation and moves the selected local session to the Mac's
+  Trash, not permanent deletion. Restore it to its original location and refresh the
+  library to recover it. Exported copies are unaffected.
+- A session currently recording cannot be exported or deleted. Stop it first.
 
 ### What each file does
 
 | Source | Purpose |
 | --- | --- |
 | `ContentView.swift` | Minimal timer, status, Start/Stop and export interface. |
-| `ActivityTracker.swift` | Permission checks, input monitors, clock, menu-bar state and session lifecycle. |
+| `ActivityTracker.swift` | Permission checks, input monitors, clock, session lifecycle and library actions. |
 | `RecordingData.swift` | Mouse aggregation, private in-memory key timing and buffered CSV writing. |
-| `MyApp.swift` | Single window and menu-bar controls; closing the window does not quit. |
-| `Tests/RecordingDataTests.swift` | Synthetic checks without capturing anyone's real input. |
+| `SavedSession.swift` | Reads saved-session metadata, validates file targets and names exports safely. |
+| `SessionViews.swift` | Saved-session browser and separate Test tracking window. |
+| `MyApp.swift` | App windows, shared appearance setting and menu-bar controls. |
+| `Tests/RecordingDataTests.swift` | Synthetic recording, session reload and export-safety checks. |
 
 ### Data dictionary
 
@@ -89,7 +114,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. New sessions use schema version 2; older files are left unchanged.
 
-**session.json** stores the random session ID, UTC start, schema version, time/unit
+**session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, and final duration/stop reason. It contains no participant identity or
 survey scores. If needed, keep a consented participant-to-session mapping separately.
 
@@ -128,6 +153,7 @@ Run the synthetic tests:
 ```sh
 xcrun swiftc -module-cache-path /tmp/focusfix-swift-module-cache \
   FocusFix/FocusFix/RecordingData.swift Tests/RecordingDataTests.swift \
+  FocusFix/FocusFix/SavedSession.swift \
   -o /tmp/focusfix-recording-tests
 /tmp/focusfix-recording-tests
 ```
@@ -137,6 +163,11 @@ and Delete in another app, click and scroll, switch apps, move the pointer out a
 back, close the collector window, then stop from the menu bar. Inspect the two CSVs.
 Confirm capture continues with the window closed and repeated Start/Stop creates
 distinct sessions. Test sleep and permission revocation before a participant study.
+
+For the session library, restart the app and check that saved sessions still appear.
+Export the same session twice and confirm both copies exist. Check that active-session
+export/delete controls are disabled. Test deletion only on a disposable session and
+confirm it is recoverable in Trash. Switch appearance and check each app window.
 
 Build and synthetic checks have passed. Use the manual checks above to verify
 real-input recording before a participant study.
