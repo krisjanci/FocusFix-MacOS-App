@@ -8,4 +8,5 @@ FocusFix-*/
 FocusFix Session */
 events.csv
 mouse_movement.csv
+breaks.csv
 session.json

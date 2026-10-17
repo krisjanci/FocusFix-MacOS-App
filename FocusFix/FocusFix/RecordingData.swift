@@ -12,9 +12,12 @@ struct MouseSummary {
     let distance: Double
     let events: Int
     let secondsSinceMovement: Double?
+    var activityPhase = "work"
+    var secondsSinceLastBreak: Double? = nil
     var csv: String {
         [csvNumber(start), csvNumber(end),
-         csvNumber(distance), String(events), secondsSinceMovement.map(csvNumber) ?? ""]
+         csvNumber(distance), String(events), secondsSinceMovement.map(csvNumber) ?? "", activityPhase,
+         secondsSinceLastBreak.map(csvNumber) ?? ""]
             .joined(separator: ",") + "\n"
     }
 }
@@ -27,7 +30,14 @@ struct MouseAccumulator {
     private var distance: Double = 0
     private var events = 0
     private var lastMovement: Double?
-    init(initialPosition: CGPoint) { previous = initialPosition }
+    private let activityPhase: String
+    private let workReference: Double?
+    init(initialPosition: CGPoint, start: Double = 0, activityPhase: String = "work", workReference: Double? = 0) {
+        previous = initialPosition
+        self.start = start
+        self.activityPhase = activityPhase
+        self.workReference = workReference
+    }
 
     mutating func advance(to time: Double) -> [MouseSummary] {
         var rows: [MouseSummary] = []
@@ -50,7 +60,8 @@ struct MouseAccumulator {
     }
     private mutating func finish(at end: Double) -> MouseSummary {
         let row = MouseSummary(start: start, end: end, distance: distance, events: events,
-            secondsSinceMovement: lastMovement.map { max(0, end - $0) })
+            secondsSinceMovement: lastMovement.map { max(0, end - $0) }, activityPhase: activityPhase,
+            secondsSinceLastBreak: workReference.map { max(0, end - $0) })
         start = end
         distance = 0
         events = 0
@@ -75,8 +86,10 @@ final class RecordingWriter {
     let folder: URL
     private let events: FileHandle
     private let mouse: FileHandle
+    private let breaks: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
+    private var breakBuffer = ""
     init(root: URL, id: String, startedAt: Date) throws {
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
@@ -86,22 +99,34 @@ final class RecordingWriter {
             attributes: [.posixPermissions: 0o700])
         let eventURL = folder.appendingPathComponent("events.csv")
         let mouseURL = folder.appendingPathComponent("mouse_movement.csv")
-        try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise\n".utf8).write(to: eventURL)
-        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement\n".utf8).write(to: mouseURL)
+        let breakURL = folder.appendingPathComponent("breaks.csv")
+        try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
+        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
+        try Data(BreakLogEntry.header.utf8).write(to: breakURL)
         events = try FileHandle(forWritingTo: eventURL)
         mouse = try FileHandle(forWritingTo: mouseURL)
+        breaks = try FileHandle(forWritingTo: breakURL)
         try events.seekToEnd()
         try mouse.seekToEnd()
+        try breaks.seekToEnd()
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
     }
     func event(time: Double, type: String, repeated: Bool? = nil, hold: Double? = nil,
-               scrollX: Double? = nil, scrollY: Double? = nil, precise: Bool? = nil) throws {
+               scrollX: Double? = nil, scrollY: Double? = nil, precise: Bool? = nil,
+               activityPhase: String = "work", secondsSinceLastBreak: Double? = nil) throws {
         eventBuffer += [csvNumber(time), type, repeated.map { $0 ? "1" : "0" } ?? "",
             hold.map(csvNumber) ?? "", scrollX.map(csvNumber) ?? "", scrollY.map(csvNumber) ?? "",
-            precise.map { $0 ? "1" : "0" } ?? ""].joined(separator: ",") + "\n"
+            precise.map { $0 ? "1" : "0" } ?? "", activityPhase,
+            secondsSinceLastBreak.map(csvNumber) ?? ""].joined(separator: ",") + "\n"
         if eventBuffer.utf8.count >= 64_000 { try flush() }
     }
     func append(_ summaries: [MouseSummary]) { mouseBuffer += summaries.map(\.csv).joined() }
+    func logBreak(_ entry: BreakLogEntry) throws {
+        breakBuffer += entry.csv
+        // Lifecycle decisions are persisted immediately, not just on session Stop.
+        try flush()
+        try breaks.synchronize()
+    }
     func flush() throws {
         if !eventBuffer.isEmpty {
             try events.write(contentsOf: Data(eventBuffer.utf8))
@@ -111,19 +136,26 @@ final class RecordingWriter {
             try mouse.write(contentsOf: Data(mouseBuffer.utf8))
             mouseBuffer = ""
         }
+        if !breakBuffer.isEmpty {
+            try breaks.write(contentsOf: Data(breakBuffer.utf8))
+            breakBuffer = ""
+        }
     }
     func finish(startedAt: Date, duration: Double, reason: String) throws {
         try flush()
         try events.synchronize()
         try mouse.synchronize()
+        try breaks.synchronize()
         try metadata(startedAt: startedAt, duration: duration, reason: reason)
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 2, "session_id": folder.lastPathComponent,
+            "schema_version": 3, "session_id": folder.lastPathComponent,
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
-            "timestamp_basis": "monotonic callback receipt time, relative to session start",
+            "timestamp_basis": "continuous monotonic callback receipt time including sleep, relative to session start",
             "mouse_interval_seconds": 1,
+            "break_policy": "25 work minutes, two distinct >=5-second idle stretches in the past 60 seconds; prompt only while idle; skip 25 minutes; snooze 10 minutes",
+            "break_logging": "Detailed activity paused during planned break. At timer expiry activity resumes as awaiting_return until outside-app input or explicit return. breaks.csv is append-only; use latest activity_updated per break_id.",
             "mouse_distance_units": "screen-coordinate points; not physical distance",
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
@@ -135,5 +167,5 @@ final class RecordingWriter {
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
-    deinit { try? events.close(); try? mouse.close() }
+    deinit { try? events.close(); try? mouse.close(); try? breaks.close() }
 }

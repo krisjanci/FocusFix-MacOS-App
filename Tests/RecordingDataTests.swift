@@ -53,16 +53,16 @@ struct RecordingDataTests {
         try writer.finish(startedAt: Date(timeIntervalSince1970: 0), duration: 1.4, reason: "user_stop")
         let events = try String(contentsOf: writer.folder.appendingPathComponent("events.csv"), encoding: .utf8)
         precondition(events.split(separator: "\n").count == 4)
-        precondition(events.split(separator: "\n").allSatisfy { $0.split(separator: ",", omittingEmptySubsequences: false).count == 7 })
+        precondition(events.split(separator: "\n").allSatisfy { $0.split(separator: ",", omittingEmptySubsequences: false).count == 9 })
         precondition(!events.contains("keyCode") && !events.contains("characters"))
         let summaries = try String(contentsOf: writer.folder.appendingPathComponent("mouse_movement.csv"), encoding: .utf8)
         precondition(summaries.split(separator: "\n").count == 3)
-        precondition(summaries.split(separator: "\n").allSatisfy { $0.split(separator: ",", omittingEmptySubsequences: false).count == 5 })
+        precondition(summaries.split(separator: "\n").allSatisfy { $0.split(separator: ",", omittingEmptySubsequences: false).count == 7 })
         precondition(!summaries.contains("duration_seconds"))
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 2)
+        precondition(info["schema_version"] as? Int == 3)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
@@ -84,6 +84,8 @@ struct RecordingDataTests {
         precondition(copy != secondCopy && secondCopy.lastPathComponent.hasSuffix(" (2)"))
         let exported = try String(contentsOf: copy.appendingPathComponent("events.csv"), encoding: .utf8)
         precondition(exported == events)
+        let breakCSV = try String(contentsOf: copy.appendingPathComponent("breaks.csv"), encoding: .utf8)
+        precondition(breakCSV == BreakLogEntry.header)
         do {
             try SessionFiles.validate(saved.folder, in: root, active: saved.folder)
             preconditionFailure("Active sessions must be protected")
