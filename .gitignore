@@ -1,0 +1,10 @@
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Participant recordings belong outside this repository.
+FocusFix-*/
+events.csv
+mouse_movement.csv
+session.json
