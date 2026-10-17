@@ -3,6 +3,8 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
+    @Environment(\.openWindow) private var openWindow
+    @AppStorage("appearance") private var appearance = "system"
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -27,25 +29,16 @@ struct ContentView: View {
                 Text("SESSION TIME").font(.caption2.weight(.medium)).tracking(2).foregroundStyle(.secondary)
                 Text(tracker.formattedTime)
                     .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
-                HStack(spacing: 0) {
-                    metric("Individual events", value: tracker.eventCount)
-                    Divider().frame(height: 32)
-                    metric("Mouse intervals", value: tracker.movementRows)
-                }
             }
             .frame(maxWidth: .infinity).padding(26)
             .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
 
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Keyboard, clicks, scrolls & app switches", systemImage: "keyboard")
-                Label("Mouse movement summarized every second", systemImage: "cursorarrow.motionlines")
-                Label("Local files. No typed text or cursor paths saved.", systemImage: "lock.shield")
-            }.font(.callout).foregroundStyle(.secondary)
-            Text(tracker.message).font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(tracker.hasError ? Color.red : Color.secondary)
-                .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-                .accessibilityLabel("Status: \(tracker.message)")
+            // Only actionable problems belong on the main recording screen.
+            if tracker.hasError || tracker.needsPermission {
+                Text(tracker.message).font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(tracker.hasError ? Color.red : Color.secondary)
+            }
             if tracker.needsPermission {
                 Button("Allow Accessibility Access") { tracker.requestPermission() }.buttonStyle(.bordered)
             }
@@ -57,25 +50,24 @@ struct ContentView: View {
                           systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
                         .frame(minWidth: 124)
                 }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                Button("Export CSVs") { tracker.exportSession() }
-                    .disabled(tracker.isRecording || tracker.sessionFolder == nil).controlSize(.large)
+                Button { openWindow(id: "sessions") } label: {
+                    Label("Sessions", systemImage: "folder")
+                }.controlSize(.large)
                 Spacer()
-                Button { tracker.showFiles() } label: { Image(systemName: "folder") }
-                    .help("Open local session files").accessibilityLabel("Open session files")
-                    .disabled(tracker.sessionFolder == nil)
             }
-            Text("No surveys, reminders, or predictions. Control recording from the menu bar when this window is closed.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Test tracking") { openWindow(id: "tracking") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                Spacer()
+                Picker("Appearance", selection: $appearance) {
+                    Label("System", systemImage: "circle.lefthalf.filled").tag("system")
+                    Label("Light", systemImage: "sun.max").tag("light")
+                    Label("Dark", systemImage: "moon").tag("dark")
+                }.labelsHidden().frame(width: 120).help("Appearance")
+            }
         }
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true } }
-    }
-    private func metric(_ title: String, value: Int) -> some View {
-        VStack(spacing: 5) {
-            Text(value, format: .number).font(.title3.weight(.semibold)).monospacedDigit()
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity)
     }
 }

@@ -13,6 +13,8 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var message = "Ready when you are."
     @Published private(set) var needsPermission = false
     @Published private(set) var hasError = false
+    @Published private(set) var sessions: [SavedSession] = []
+    @Published private(set) var libraryError: String?
     private var writer: RecordingWriter?
     private var mouse = MouseAccumulator(initialPosition: .zero)
     private var keys = KeyTiming()
@@ -34,6 +36,7 @@ final class ActivityTracker: ObservableObject {
     }
     private var now: Double { max(0, ProcessInfo.processInfo.systemUptime - startUptime) }
     private init() {
+        refreshSessions()
         quitObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -56,9 +59,7 @@ final class ActivityTracker: ObservableObject {
         needsPermission = false
         hasError = false
         do {
-            let support = try FileManager.default.url(for: .applicationSupportDirectory,
-                in: .userDomainMask, appropriateFor: nil, create: true)
-            let root = support.appendingPathComponent("FocusFix/Sessions", isDirectory: true)
+            let root = try SessionFiles.root()
             startedAt = Date()
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt)
             writer = newWriter
@@ -73,6 +74,7 @@ final class ActivityTracker: ObservableObject {
             mouse = MouseAccumulator(initialPosition: CGEvent(source: nil)?.location ?? .zero)
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
             isRecording = true
+            refreshSessions()
             // Avoid App Nap while collecting; do not prevent system sleep.
             backgroundActivity = ProcessInfo.processInfo.beginActivity(
                 options: .userInitiatedAllowingIdleSystemSleep, reason: "Recording a FocusFix session")
@@ -110,6 +112,7 @@ final class ActivityTracker: ObservableObject {
         eventCount = eventsRecorded
         movementRows = rowsRecorded
         writer = nil
+        refreshSessions()
     }
     private func tick() {
         guard isRecording else { return }
@@ -213,11 +216,25 @@ final class ActivityTracker: ObservableObject {
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         workspaceObservers.removeAll()
     }
-    func showFiles() {
-        if let sessionFolder { NSWorkspace.shared.open(sessionFolder) }
+    func refreshSessions() {
+        do {
+            sessions = try SessionFiles.list(in: SessionFiles.root())
+            libraryError = nil
+        } catch { libraryError = error.localizedDescription }
     }
-    func exportSession() {
-        guard !isRecording, let sessionFolder else { return }
+    func isActive(_ session: SavedSession) -> Bool {
+        isRecording && session.folder == sessionFolder
+    }
+    func deleteSession(_ session: SavedSession) throws {
+        try SessionFiles.validate(session.folder, in: SessionFiles.root(),
+            active: isRecording ? sessionFolder : nil)
+        try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
+        if sessionFolder == session.folder { sessionFolder = nil }
+        refreshSessions()
+    }
+    func exportSavedSession(_ session: SavedSession) throws -> URL? {
+        try SessionFiles.validate(session.folder, in: SessionFiles.root(),
+            active: isRecording ? sessionFolder : nil)
         let panel = NSOpenPanel()
         panel.title = "Export session CSV files"
         panel.prompt = "Export here"
@@ -225,15 +242,8 @@ final class ActivityTracker: ObservableObject {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-        do {
-            let copy = destination.appendingPathComponent("FocusFix-\(sessionFolder.lastPathComponent)")
-            try FileManager.default.copyItem(at: sessionFolder, to: copy)
-            hasError = false
-            message = "Session exported. The original local recording is also kept."
-        } catch {
-            hasError = true
-            message = "Export failed: \(error.localizedDescription). Your original recording is safe."
-        }
+        guard panel.runModal() == .OK, let destination = panel.url else { return nil }
+        return try SessionFiles.export(session, to: destination, root: SessionFiles.root(),
+            active: isRecording ? sessionFolder : nil)
     }
 }

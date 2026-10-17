@@ -8,9 +8,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main struct MyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var tracker = ActivityTracker.shared
+    @AppStorage("appearance") private var appearance = "system"
+    private var colorScheme: ColorScheme? {
+        appearance == "dark" ? .dark : appearance == "light" ? .light : nil
+    }
     var body: some Scene {
         Window("FocusFix", id: "collector") {
             ContentView(tracker: tracker)
+                .preferredColorScheme(colorScheme)
+        }.windowResizability(.contentSize)
+        Window("Sessions — FocusFix", id: "sessions") {
+            SessionLibraryView(tracker: tracker).preferredColorScheme(colorScheme)
+        }.defaultSize(width: 760, height: 520)
+        Window("Test tracking — FocusFix", id: "tracking") {
+            TrackingTestView(tracker: tracker).preferredColorScheme(colorScheme)
         }.windowResizability(.contentSize)
         MenuBarExtra {
             RecordingMenu(tracker: tracker)
@@ -39,7 +50,10 @@ private struct RecordingMenu: View {
                 }
             }
         }
-        Button("Open session files") { tracker.showFiles() }.disabled(tracker.sessionFolder == nil)
+        Button("Sessions") {
+            openWindow(id: "sessions")
+            NSApp.activate(ignoringOtherApps: true)
+        }
         Divider()
         Button("Quit FocusFix") {
             tracker.stop(reason: "app_quit")
