@@ -25,6 +25,10 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var notificationPermission: NotificationPermission = .checking
     @Published private(set) var notificationPermissionBusy = false
     @Published var breakSetupPresented = false
+    @Published var sessionCheckInPresented = false
+    private var sessionCheckIn: CheckInPrompt?
+    private var breakCheckIn: CheckInPrompt?
+    private var activityPhase: String { breakCheckIn == nil ? breakPolicy.activityPhase : "check_in" }
     var openMainWindow: (() -> Void)?
     private var breakPolicy = BreakPolicy()
     private let breakNotifications = BreakNotifications()
@@ -96,7 +100,25 @@ final class ActivityTracker: ObservableObject {
         needsPermission = !AXIsProcessTrusted()
         message = "Enable FocusFix in System Settings → Privacy & Security → Accessibility, then press Start."
     }
-    func start() {
+    func requestStart() {
+        guard !isRecording, !sessionCheckInPresented else { return }
+        guard AXIsProcessTrusted() else {
+            needsPermission = true
+            message = "Keyboard recording needs Accessibility access. Allow access, then start again."
+            return
+        }
+        needsPermission = false
+        sessionCheckIn = CheckInPrompt(elapsed: 0)
+        sessionCheckInPresented = true
+    }
+    func cancelSessionCheckIn() { sessionCheckIn = nil }
+    func completeSessionCheckIn(fatigue: Int?) {
+        guard let prompt = sessionCheckIn, fatigue.map({ (0...10).contains($0) }) ?? true else { return }
+        sessionCheckIn = nil
+        sessionCheckInPresented = false
+        start(fatigue: fatigue, prompt: prompt)
+    }
+    private func start(fatigue: Int?, prompt: CheckInPrompt) {
         guard !isRecording else { return }
         guard AXIsProcessTrusted() else {
             needsPermission = true
@@ -112,6 +134,12 @@ final class ActivityTracker: ObservableObject {
             writer = newWriter
             sessionFolder = newWriter.folder
             startInstant = clock.now
+            let beforeStart = prompt.instant.duration(to: startInstant).components
+            let checkInDuration = Double(beforeStart.seconds) + Double(beforeStart.attoseconds) / 1e18
+            try newWriter.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
+                status: fatigue == nil ? .skipped : .answered, breakID: "", shownAt: prompt.shownAt,
+                answeredAt: startedAt, shownElapsed: -checkInDuration, answeredElapsed: 0,
+                fatigue: fatigue, workload: nil))
             suspendedBy = []
             elapsed = 0
             eventsRecorded = 0
@@ -150,6 +178,10 @@ final class ActivityTracker: ObservableObject {
     func stop(reason: String = "user_stop") {
         guard isRecording else { return }
         let end = now
+        // Close an abandoned break setup before finishing the recording.
+        var checkInSaveError: Error?
+        do { try finishBreakCheckIn(status: .cancelled, at: end) }
+        catch { checkInSaveError = error }
         isRecording = false
         removeMonitors()
         breakNotifications.clear()
@@ -164,6 +196,10 @@ final class ActivityTracker: ObservableObject {
             try record(type: "session_stop", at: end)
             try writer?.finish(startedAt: startedAt, duration: end, reason: reason)
             message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
+            if let checkInSaveError {
+                hasError = true
+                message = "Session stopped, but the check-in could not be saved: \(checkInSaveError.localizedDescription)"
+            }
         } catch {
             hasError = true
             message = "Saving failed: \(error.localizedDescription). Existing files have been kept."
@@ -186,7 +222,7 @@ final class ActivityTracker: ObservableObject {
         do {
             elapsed = now
             if suspendedBy.isEmpty {
-                try advanceBreakClock(at: elapsed)
+                if breakCheckIn == nil { try advanceBreakClock(at: elapsed) }
                 if breakPolicy.phase != .resting { append(mouse.advance(to: elapsed)) }
             }
             try writer?.flush()
@@ -276,7 +312,7 @@ final class ActivityTracker: ObservableObject {
             case .scrollWheel:
                 try writer?.event(time: time, type: "scroll", scrollX: event.scrollingDeltaX,
                     scrollY: event.scrollingDeltaY, precise: event.hasPreciseScrollingDeltas,
-                    activityPhase: breakPolicy.activityPhase,
+                    activityPhase: activityPhase,
                     secondsSinceLastBreak: breakPolicy.phase == .work ? breakPolicy.sinceLastBreak(at: time) : nil)
                 eventsRecorded += 1
             default: break
@@ -286,7 +322,7 @@ final class ActivityTracker: ObservableObject {
     private func isDelete(_ event: NSEvent) -> Bool { event.keyCode == 51 || event.keyCode == 117 }
     private func record(type: String, at time: Double, repeated: Bool? = nil, hold: Double? = nil) throws {
         try writer?.event(time: time, type: type, repeated: repeated, hold: hold,
-            activityPhase: breakPolicy.activityPhase,
+            activityPhase: activityPhase,
             secondsSinceLastBreak: breakPolicy.phase == .work ? breakPolicy.sinceLastBreak(at: time) : nil)
         eventsRecorded += 1
     }
@@ -343,16 +379,47 @@ final class ActivityTracker: ObservableObject {
         updateBreakUI(at: time)
     }
     func chooseBreak() {
-        guard isRecording, breakPolicy.phase == .work else { return }
-        breakSetupPresented = true
+        guard isRecording, breakPolicy.phase == .work, breakCheckIn == nil else { return }
+        let time = now
+        do {
+            append(mouse.stop(at: time))
+            breakCheckIn = CheckInPrompt(elapsed: time)
+            resetMouse(at: time, phase: "check_in")
+            try record(type: "check_in_start", at: time)
+            breakSetupPresented = true
+        } catch { fail(error) }
     }
-    func beginBreak(minutes: Double, activity: String) {
-        guard isRecording else { return }
+    func cancelBreakCheckIn() {
+        guard isRecording else { breakCheckIn = nil; return }
+        do { try finishBreakCheckIn(status: .cancelled, at: now) }
+        catch { fail(error) }
+    }
+    private func finishBreakCheckIn(status: CheckInStatus, at time: Double,
+                                    breakID: String = "", fatigue: Int? = nil, workload: Int? = nil) throws {
+        guard let prompt = breakCheckIn else { return }
+        append(mouse.stop(at: time))
+        // Clear before writing so an I/O failure cannot recursively try the same check-in.
+        breakCheckIn = nil
+        try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .beforeBreak, status: status,
+            breakID: breakID, shownAt: prompt.shownAt, answeredAt: Date(),
+            shownElapsed: prompt.elapsed, answeredElapsed: time, fatigue: fatigue, workload: workload))
+        try record(type: "check_in_end", at: time)
+        if breakPolicy.phase == .work {
+            resetMouse(at: time, phase: "work")
+            breakPolicy.input(at: time)
+        }
+    }
+    func beginBreak(minutes: Double, activity: String, fatigue: Int?, workload: Int?) {
+        guard isRecording, breakCheckIn != nil,
+              (fatigue == nil && workload == nil) ||
+                (fatigue.map({ (0...10).contains($0) }) == true && workload.map({ (0...10).contains($0) }) == true)
+        else { return }
         let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let time = now
         guard let entry = breakPolicy.begin(at: time, seconds: minutes * 60, activity: label) else { return }
         do {
-            append(mouse.stop(at: time))
+            try finishBreakCheckIn(status: fatigue == nil ? .skipped : .answered, at: time,
+                breakID: entry.record?.id ?? "", fatigue: fatigue, workload: workload)
             try writer?.logBreak(entry)
             keys = KeyTiming()
             returnPoint = CGEvent(source: nil)?.location ?? .zero
@@ -367,6 +434,7 @@ final class ActivityTracker: ObservableObject {
     func deferBreak(snooze: Bool) {
         guard isRecording, let entry = breakPolicy.deferPrompt(at: now, snooze: snooze) else { return }
         do {
+            try finishBreakCheckIn(status: .cancelled, at: now)
             try writer?.logBreak(entry)
             breakNotifications.clear()
             breakSetupPresented = false
