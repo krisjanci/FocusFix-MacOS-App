@@ -30,10 +30,13 @@
 
 - Add a sign in page where it can remember name/ habbits for the Apple intelligence local model to personalise when giving recommendations/feedback.
 
+- using multiple devices intergration (ipad drawing while working)
+
+- adding white/brown etc. noise functional
 
 
 Pre release todo (later stage)
 
 - Add a data usage contract
 
-- using multiple devices intergration (ipad drawing while working)
+
