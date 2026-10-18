@@ -6,7 +6,8 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 ## Current app: activity collector and rule-based breaks
 
 This version collects local behavior data and recommends breaks using a timing/idle
-rule. It does not predict fatigue with ML, collect fatigue surveys or upload data.
+rule. It collects brief fatigue/workload check-ins. It does not predict fatigue with
+ML or upload data.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
 ### Run it
@@ -15,7 +16,8 @@ The reminder rule is a prototype to evaluate, not evidence that fatigue is reduc
 2. Press **Start session**. If prompted in the app, choose **Allow Accessibility
    Access** and enable FocusFix in System Settings → Privacy & Security → Accessibility.
    Then press Start again. If macOS does not recognize a rebuilt app, quit and relaunch it.
-3. Work normally. Close the window if you like: recording continues, with controls
+3. Rate how mentally tired you feel before starting, or choose **Skip & start**.
+   Then work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
 4. Choose **Stop & save**. Sessions are saved automatically; you don't need to export
    after every recording. Open **Sessions** to browse previous recordings, select one,
@@ -35,7 +37,7 @@ The reminder rule is a prototype to evaluate, not evidence that fatigue is reduc
 
 Sessions are automatically saved under
 `~/Library/Application Support/FocusFix/Sessions/<session-id>/`.
-Each new session has three CSVs and `session.json`. A new session never replaces an old
+Each new session has four CSVs and `session.json`. A new session never replaces an old
 one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
@@ -64,7 +66,8 @@ but renamed data could still be staged accidentally.
    each within the last 60 seconds**. Only prompt while currently idle for at least
    5 seconds. A continuous 10-second pause counts once, not twice. Without a qualifying
    moment, keep waiting; 25 minutes is a minimum, not a guaranteed prompt time.
-2. **Take a break** opens a setup sheet. Choose **5 minutes** (default), **10**, **15**,
+2. **Take a break** opens a setup sheet with fatigue and workload sliders. Rate both,
+   or choose **Skip ratings & start break**. Choose **5 minutes** (default), **10**, **15**,
    or a custom duration from **1–120 minutes**. Choose Stretch, Walk, Water / snack,
    Rest my eyes, Breathing or Other (custom text). **Start break** begins the timer.
    Cancelling setup doesn't start a break or count as Skip. A manual Take a break
@@ -134,7 +137,7 @@ be delayed; six decimal places do not imply microsecond measurement accuracy.
 | `scroll_delta_x` | Amount of sideways scrolling in this event. The sign distinguishes opposite directions. |
 | `scroll_delta_y` | Amount of vertical scrolling in this event. The sign distinguishes opposite directions. |
 | `scroll_precise` | 1 for fine-grained scrolling deltas, often from a trackpad; 0 for coarse scrolling deltas; blank on other events. Not a measure of the user's accuracy. |
-| `activity_phase` | `work` or `awaiting_return`. Detailed events are not recorded during the planned break. |
+| `activity_phase` | `work`, `check_in` (break setup), or `awaiting_return`. Detailed events are not recorded during the planned break. |
 | `seconds_since_last_break` | Elapsed time since the last actual return (or session start before the first break); blank while awaiting return. |
 
 Scrolling is already recorded as individual `scroll` rows, including delivered
@@ -158,7 +161,7 @@ process identities in memory; switching windows within one app is not counted.
 | `distance_screen_points` | Sum of distances between consecutive observed cursor positions, including dragging. |
 | `movement_events` | Number of observed move/drag callbacks in the interval. |
 | `seconds_since_last_movement` | Time since the last observed nonzero movement, measured at interval end. Blank if none since tracking started/resumed. |
-| `activity_phase` | `work` or `awaiting_return`; no rows during planned breaks or suspended sampling. |
+| `activity_phase` | `work`, `check_in` (break setup), or `awaiting_return`; no rows during planned breaks or suspended sampling. |
 | `seconds_since_last_break` | Measured at interval end; blank while awaiting return. |
 
 Cursor positions are discarded after updating totals. Returning to the starting
@@ -173,7 +176,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. Break boundaries can also create partial intervals. Position and key
 hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. New sessions use **schema version 3**; older files are left
+or a very long key hold. New sessions use **schema version 4**; older files are left
 unchanged and remain available in the library.
 
 **breaks.csv — append-only decisions and break lifecycle**
@@ -199,8 +202,38 @@ break. Custom activity text is intentional user-provided data, not captured typi
 banner. Permission settings and Focus can prevent delivery; an unanswered prompt
 doesn't establish that the user saw or deliberately ignored it.
 
+**surveys.csv — short check-ins**
+
+- Before a session I ask only **How mentally tired do you feel right now?**
+  The scale is 0 (Not tired) to 10 (Extremely tired).
+- Before each break I ask that again, plus **How mentally demanding was your work
+  in the last 5 minutes?** The scale is 0 (Not demanding) to 10 (Extremely demanding).
+  Fatigue means a tired mind; workload means the thinking/focus/effort the task needed.
+- Move a slider, tap an endpoint, or press **Select 5 / 10** to deliberately select
+  the midpoint. The initial thumb position is not an answer. Every check-in starts fresh.
+- Skip saves blank ratings with `status=skipped`, not zero. Cancelling break setup
+  saves `cancelled`, discards any draft answers and doesn't start a break. Cancelling
+  the initial check-in doesn't create a session or recording.
+- Rows contain `session_id`, `check_in_id`, `question_version`, `context`, `status`,
+  `break_id`, UTC shown/answered times, session-relative shown/answered seconds,
+  `fatigue_0_10` and `workload_0_10`. `context` is `session_start` or `before_break`.
+  The break ID joins to `breaks.csv`; it is blank for cancelled setup or session start.
+  For skipped/cancelled rows, the answered time is the decision time, not a rating.
+- The initial check-in happens before recording, so its shown elapsed time is negative
+  and its completion is zero. Break setup stays in total session time, but not break
+  duration. Its activity is marked `check_in` with `check_in_start`/`check_in_end` events.
+  Exclude that interval from work predictors, even if someone uses another app while
+  the sheet is open. Use behavior before the check-in, not clicks made answering it.
+- Responses are saved immediately and export with the session. Nothing is uploaded.
+  Old recordings without this file still work. An interrupted session may have an
+  unmatched `check_in_start`; don't invent an answer or a completion time for it.
+- These are custom ratings, not a validated NASA-TLX score, diagnosis or objective
+  productivity measurement. This version asks at session start and breaks only—not
+  every 30 minutes or after breaks. Break-triggered answers alone aren't a balanced
+  sample of all work states. I still need to finalize the research protocol/IRB plan.
+
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
-definitions, reminder-policy description, and final duration/stop reason. It contains no participant identity or
+definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason. It contains no participant identity or
 survey scores. If needed, keep a consented participant-to-session mapping separately.
 
 ### Background behavior and limitations
@@ -213,7 +246,8 @@ survey scores. If needed, keep a consented participant-to-session mapping separa
   not proof of inactivity. Mouse events may be coalesced by macOS: this is not a
   hardware-level trace. Accessibility permission alone does not guarantee completeness.
 - Break notifications have no sound and don't force the app to the foreground.
-  Permission/setup/export dialogs follow explicit actions. No fatigue surveys are shown.
+  Permission/setup/export dialogs and check-ins follow explicit actions; there are
+  no extra scheduled survey notifications.
   Errors appear in the window; a recording error stops
   collection rather than silently continuing. The menu-bar indicator returns to idle.
 - Files are buffered and flushed approximately every second (earlier for a large
@@ -240,12 +274,14 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs three small Swift test programs. A failed assertion
+The script compiles and runs four small Swift test programs. A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
 - `RecordingDataTests`: timing, CSV schemas, saving/reloading, export names and guards.
 - `BreakPolicyTests`: separate idle gaps, Skip/Snooze, early/late return and break records.
+- `SurveyDataTests`: rating validation, skipped/cancelled answers, timestamps,
+  immediate saving, question metadata and the check-in activity phase.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
 
@@ -254,7 +290,15 @@ requests using [GitHub Actions](https://docs.github.com/en/actions/reference/wor
 Check the Actions tab for the remote result. This workflow tests logic and file
 handling, not the full Xcode app or UI. Build the app locally using the command above.
 
-Manual check after granting Accessibility: start a short session, type five keys
+Manual check after granting Accessibility: start a short session and complete the
+fatigue check-in first. Also try Cancel (no session starts), Skip
+(blank score), selecting 0 and 10, and starting from the menu bar with the main window
+closed. Take two manual breaks and check that both ratings start unselected each time.
+Try cancelling setup, skipping ratings, and exporting the session to inspect surveys.csv.
+Check that answered break rows join to the correct break ID and setup activity is
+marked `check_in`. These UI checks aren't covered by the synthetic test programs.
+
+For activity tracking, type five keys
 and Delete in another app, click and scroll, switch apps, move the pointer out and
 back, close the collector window, then stop from the menu bar. Inspect the activity CSVs.
 Confirm capture continues with the window closed and repeated Start/Stop creates
