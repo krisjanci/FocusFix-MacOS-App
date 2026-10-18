@@ -86,7 +86,7 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
                 }
                 Button {
-                    if tracker.isRecording { tracker.stop() } else { tracker.start() }
+                    if tracker.isRecording { tracker.stop() } else { tracker.requestStart() }
                 } label: {
                     Label(tracker.isRecording ? "Stop & save" : "Start session",
                           systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
@@ -110,7 +110,12 @@ struct ContentView: View {
         }
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
-        .sheet(isPresented: $tracker.breakSetupPresented) { BreakSetupView(tracker: tracker).tint(teal) }
+        .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
+            BreakSetupView(tracker: tracker).tint(teal)
+        }
+        .sheet(isPresented: $tracker.sessionCheckInPresented, onDismiss: { tracker.cancelSessionCheckIn() }) {
+            SessionCheckInView(tracker: tracker).tint(teal)
+        }
         .onAppear {
             tracker.refreshNotificationPermission()
             NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true }
