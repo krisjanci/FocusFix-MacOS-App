@@ -16,7 +16,8 @@ run_test() {
 }
 
 run_test RecordingDataTests "$source_dir/RecordingData.swift" \
-    "$source_dir/BreakPolicy.swift" "$source_dir/SavedSession.swift"
-run_test BreakPolicyTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift"
+    "$source_dir/BreakPolicy.swift" "$source_dir/SavedSession.swift" "$source_dir/SurveyData.swift"
+run_test BreakPolicyTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift"
+run_test SurveyDataTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift"
 run_test NotificationAccessTests "$source_dir/NotificationAccess.swift"
 echo "All FocusFix tests passed."
