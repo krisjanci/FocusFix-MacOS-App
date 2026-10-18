@@ -35,3 +35,5 @@
 Pre release todo (later stage)
 
 - Add a data usage contract
+
+- using multiple devices intergration (ipad drawing while working)
