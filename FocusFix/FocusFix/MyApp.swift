@@ -46,7 +46,7 @@ private struct RecordingMenu: View {
         }
         Button(tracker.isRecording ? "Stop & save" : "Start session") {
             if tracker.isRecording { tracker.stop() } else {
-                tracker.start()
+                tracker.requestStart()
                 if !tracker.isRecording {
                     openWindow(id: "collector")
                     NSApp.activate(ignoringOtherApps: true)
