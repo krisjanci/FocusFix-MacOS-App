@@ -46,6 +46,11 @@ struct RecordingDataTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("focusfix-tests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0))
+        let initialRating = SurveyEntry(id: "synthetic-check-in", context: .sessionStart,
+            status: .answered, breakID: "", shownAt: Date(timeIntervalSince1970: -2),
+            answeredAt: Date(timeIntervalSince1970: 0), shownElapsed: -2, answeredElapsed: 0,
+            fatigue: 4, workload: nil)
+        try writer.logSurvey(initialRating)
         try writer.event(time: 0.1, type: "key_down", repeated: false)
         try writer.event(time: 0.6, type: "key_up", hold: 0.5)
         try writer.event(time: 0.7, type: "scroll", scrollX: -1, scrollY: 2, precise: true)
@@ -62,7 +67,7 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 3)
+        precondition(info["schema_version"] as? Int == 4)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
@@ -86,6 +91,9 @@ struct RecordingDataTests {
         precondition(exported == events)
         let breakCSV = try String(contentsOf: copy.appendingPathComponent("breaks.csv"), encoding: .utf8)
         precondition(breakCSV == BreakLogEntry.header)
+        let surveys = try String(contentsOf: copy.appendingPathComponent("surveys.csv"), encoding: .utf8)
+        let expectedSurveys = SurveyEntry.header + (try initialRating.csv(sessionID: "synthetic-session"))
+        precondition(surveys == expectedSurveys)
         do {
             try SessionFiles.validate(saved.folder, in: root, active: saved.folder)
             preconditionFailure("Active sessions must be protected")
