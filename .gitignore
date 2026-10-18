@@ -9,4 +9,5 @@ FocusFix Session */
 events.csv
 mouse_movement.csv
 breaks.csv
+surveys.csv
 session.json
