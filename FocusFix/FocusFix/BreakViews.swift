@@ -28,13 +28,24 @@ struct BreakSetupView: View {
     @State private var customMinutes = "5"
     @State private var activity = "Stretch"
     @State private var customActivity = ""
+    @State private var fatigue: Int?
+    @State private var workload: Int?
     private var minutes: Double? { preset == 0 ? Double(customMinutes.replacingOccurrences(of: ",", with: ".")) : Double(preset) }
     private var label: String { (activity == "Other" ? customActivity : activity).trimmingCharacters(in: .whitespacesAndNewlines) }
     private var valid: Bool { minutes.map { $0.isFinite && (1...120).contains($0) } == true && !label.isEmpty }
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 22) {
             Label("Make time for a break", systemImage: "leaf").font(.title2.weight(.semibold))
+            Text("Before you step away, a quick check-in.").foregroundStyle(.secondary)
+            FatigueSlider(rating: $fatigue)
+            RatingSlider(title: "Mental workload", question: SurveyEntry.workloadQuestion,
+                explanation: "Think about how much thinking, focus or effort your work needed—not how tired you feel.",
+                low: "Not demanding", high: "Extremely demanding", rating: $workload)
+            Text("Move each slider or select a number. There is no right or wrong answer.")
+                .font(.caption).foregroundStyle(.secondary)
+            Divider()
             Text("Choose a duration and what you feel like doing.").foregroundStyle(.secondary)
             Picker("Duration", selection: $preset) {
                 Text("5 min").tag(5)
@@ -56,10 +67,15 @@ struct BreakSetupView: View {
                 Spacer()
                 Button("Start break") {
                     guard let minutes, valid else { return }
-                    tracker.beginBreak(minutes: minutes, activity: label)
-                }.buttonStyle(.borderedProminent).disabled(!valid)
+                    tracker.beginBreak(minutes: minutes, activity: label, fatigue: fatigue, workload: workload)
+                }.buttonStyle(.borderedProminent).disabled(!valid || fatigue == nil || workload == nil)
             }
-        }.padding(28).frame(width: 420)
+            Button("Skip ratings & start break") {
+                guard let minutes, valid else { return }
+                tracker.beginBreak(minutes: minutes, activity: label, fatigue: nil, workload: nil)
+            }.disabled(!valid).font(.callout)
+        }.padding(28)
+        }.frame(width: 480, height: 650)
     }
 }
 
