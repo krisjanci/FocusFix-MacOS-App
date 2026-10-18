@@ -87,6 +87,7 @@ final class RecordingWriter {
     private let events: FileHandle
     private let mouse: FileHandle
     private let breaks: FileHandle
+    private let surveys: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
@@ -100,15 +101,19 @@ final class RecordingWriter {
         let eventURL = folder.appendingPathComponent("events.csv")
         let mouseURL = folder.appendingPathComponent("mouse_movement.csv")
         let breakURL = folder.appendingPathComponent("breaks.csv")
+        let surveyURL = folder.appendingPathComponent("surveys.csv")
         try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
         try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
         try Data(BreakLogEntry.header.utf8).write(to: breakURL)
+        try Data(SurveyEntry.header.utf8).write(to: surveyURL)
         events = try FileHandle(forWritingTo: eventURL)
         mouse = try FileHandle(forWritingTo: mouseURL)
         breaks = try FileHandle(forWritingTo: breakURL)
+        surveys = try FileHandle(forWritingTo: surveyURL)
         try events.seekToEnd()
         try mouse.seekToEnd()
         try breaks.seekToEnd()
+        try surveys.seekToEnd()
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
     }
     func event(time: Double, type: String, repeated: Bool? = nil, hold: Double? = nil,
@@ -141,16 +146,28 @@ final class RecordingWriter {
             breakBuffer = ""
         }
     }
+    func logSurvey(_ entry: SurveyEntry) throws {
+        let row = try entry.csv(sessionID: folder.lastPathComponent)
+        try surveys.write(contentsOf: Data(row.utf8))
+        try surveys.synchronize()
+    }
     func finish(startedAt: Date, duration: Double, reason: String) throws {
         try flush()
         try events.synchronize()
         try mouse.synchronize()
         try breaks.synchronize()
+        try surveys.synchronize()
         try metadata(startedAt: startedAt, duration: duration, reason: reason)
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 3, "session_id": folder.lastPathComponent,
+            "schema_version": 4, "session_id": folder.lastPathComponent,
+            "check_in_version": SurveyEntry.version,
+            "fatigue_question": SurveyEntry.fatigueQuestion,
+            "fatigue_scale": "0 = Not tired; 10 = Extremely tired",
+            "workload_question": SurveyEntry.workloadQuestion,
+            "workload_scale": "0 = Not demanding; 10 = Extremely demanding",
+            "survey_logging": "Optional custom ratings, not NASA-TLX. Fatigue before session; fatigue and workload before breaks. Negative shown_elapsed_seconds means before recording. Break setup activity is marked check_in; exclude it from work predictors. Skipped/cancelled ratings are blank, not zero.",
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
             "timestamp_basis": "continuous monotonic callback receipt time including sleep, relative to session start",
             "mouse_interval_seconds": 1,
@@ -167,5 +184,5 @@ final class RecordingWriter {
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
-    deinit { try? events.close(); try? mouse.close(); try? breaks.close() }
+    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close() }
 }
