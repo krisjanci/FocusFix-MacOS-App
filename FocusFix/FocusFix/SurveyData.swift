@@ -1,3 +1,6 @@
+// MARK: - FF: SURVEYS
+// Defines custom fatigue/productivity ratings and their CSV format; these are not objective productivity or NASA-TLX measurements.
+
 import Foundation
 
 // These are custom self-report items, not a NASA-TLX score or an ML prediction.
@@ -30,6 +33,7 @@ struct SurveyEntry {
     let fatigue: Int?
     let productivity: Int?
 
+    // Validate ratings and timing, then write blanks for unanswered questions instead of fake zeroes.
     func csv(sessionID: String) throws -> String {
         let values = [fatigue, productivity].compactMap { $0 }
         guard values.allSatisfy({ (0...10).contains($0) }),
