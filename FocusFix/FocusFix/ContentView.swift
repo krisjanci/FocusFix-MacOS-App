@@ -1,3 +1,6 @@
+// MARK: - FF: UI
+// Builds the main recording screen, appearance controls and sheets; recording logic stays in ActivityTracker.
+
 import SwiftUI
 import AppKit
 
@@ -7,8 +10,10 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
+    // Choose the break appearance only while recording a break or waiting for return.
     private var onBreak: Bool { tracker.isRecording && tracker.breakPhase != .work }
 
+    // Arrange the main UI and route buttons/sheets to the tracker rather than duplicating recording logic.
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             HStack(spacing: 14) {
