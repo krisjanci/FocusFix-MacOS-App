@@ -1,8 +1,12 @@
+// MARK: - FF: NOTIFICATIONS
+// Creates quiet macOS reminders and routes their buttons back to FocusFix. The OS can still delay or hide banners.
+
 import Foundation
 import UserNotifications
 
 @MainActor
 struct SystemNotificationPermissionClient: NotificationPermissionClient {
+    // Translate macOS notification settings into the app's permission states.
     func status() async -> NotificationPermission {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
@@ -13,6 +17,7 @@ struct SystemNotificationPermissionClient: NotificationPermissionClient {
         @unknown default: return .unavailable
         }
     }
+    // Ask macOS to allow notification alerts.
     func request() async throws {
         _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
     }
@@ -29,6 +34,7 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
     private var checkInID: String?
     private var checkInGeneration = 0
 
+    // Register break/check-in action buttons and remove stale notifications from earlier runs.
     func configure() {
         center.delegate = self
         let take = UNNotificationAction(identifier: "take", title: "Take a break", options: [.foreground])
@@ -44,6 +50,7 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         ])
         clear()
     }
+    // Show either a break suggestion or a break-timer-finished banner for the current prompt.
     func send(session: String, token: String, finished: Bool) {
         let version = generation
         let id = "focusfix-\(session)-\(token)-\(finished ? "end" : "prompt")"
@@ -64,6 +71,7 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
             } catch { onStatus?("Couldn't deliver the notification. The break controls are still available in FocusFix.") }
         }
     }
+    // Remove both kinds of reminders and invalidate pending notification callbacks.
     func clear() {
         clearBreaks()
         clearCheckIn()
@@ -71,12 +79,14 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
     }
+    // Remove break reminders without clearing a separate survey reminder.
     func clearBreaks() {
         generation += 1
         center.removePendingNotificationRequests(withIdentifiers: Array(breakIDs))
         center.removeDeliveredNotifications(withIdentifiers: Array(breakIDs))
         breakIDs.removeAll()
     }
+    // Show an Answer/Skip notification; the sliders themselves open in the app.
     func sendCheckIn(session: String, token: String) {
         clearCheckIn()
         let version = checkInGeneration
@@ -99,6 +109,7 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
             }
         }
     }
+    // Remove only the check-in notification and invalidate its pending callbacks.
     func clearCheckIn() {
         checkInGeneration += 1
         if let checkInID {
@@ -107,10 +118,12 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         }
         checkInID = nil
     }
+    // Allow a banner/list entry even while FocusFix is the foreground app.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .list])
     }
+    // Forward a clicked notification action to the main thread with its session and prompt IDs.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
