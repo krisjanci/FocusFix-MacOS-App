@@ -23,6 +23,8 @@ struct SurveyDataTests {
         rejects(entry(fatigue: nil))
         rejects(entry(productivity: nil))
         rejects(entry(context: .sessionStart)) // No productivity at session start.
+        rejects(entry(context: .duringWork, productivity: nil))
+        rejects(entry(context: .duringWork, fatigue: nil))
         rejects(entry(status: .skipped)) // Skipping must never silently submit defaults.
         rejects(entry(status: .cancelled))
         rejects(entry(shown: 21))
