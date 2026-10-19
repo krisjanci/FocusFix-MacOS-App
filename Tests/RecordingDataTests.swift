@@ -49,7 +49,7 @@ struct RecordingDataTests {
         let initialRating = SurveyEntry(id: "synthetic-check-in", context: .sessionStart,
             status: .answered, breakID: "", shownAt: Date(timeIntervalSince1970: -2),
             answeredAt: Date(timeIntervalSince1970: 0), shownElapsed: -2, answeredElapsed: 0,
-            fatigue: 4, workload: nil)
+            fatigue: 4, productivity: nil)
         try writer.logSurvey(initialRating)
         try writer.event(time: 0.1, type: "key_down", repeated: false)
         try writer.event(time: 0.6, type: "key_up", hold: 0.5)
@@ -67,7 +67,7 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 4)
+        precondition(info["schema_version"] as? Int == 5)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
