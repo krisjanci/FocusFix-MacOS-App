@@ -5,12 +5,17 @@ struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.openWindow) private var openWindow
     @AppStorage("appearance") private var appearance = "system"
+    @State private var sharingPresented = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
     private var onBreak: Bool { tracker.isRecording && tracker.breakPhase != .work }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             HStack(spacing: 14) {
+                Button { sharingPresented = true } label: {
+                    Image(systemName: "person.crop.circle").font(.title2)
+                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help("Research profile and data sharing").accessibilityLabel("Research profile and data sharing")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable().scaledToFit().frame(width: 54, height: 54)
                     .accessibilityHidden(true)
@@ -119,6 +124,7 @@ struct ContentView: View {
         }
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(isPresented: $sharingPresented) { SharingView() }
         .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
             BreakSetupView(tracker: tracker).tint(teal)
         }
@@ -129,6 +135,7 @@ struct ContentView: View {
             WorkCheckInView(tracker: tracker).tint(teal)
         }
         .onAppear {
+            SharingController.shared.resume()
             tracker.refreshNotificationPermission()
             NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true }
             tracker.openMainWindow = {
