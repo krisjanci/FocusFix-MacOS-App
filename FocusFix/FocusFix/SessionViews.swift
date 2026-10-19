@@ -3,6 +3,7 @@ import AppKit
 
 struct SessionLibraryView: View {
     @ObservedObject var tracker: ActivityTracker
+    @ObservedObject private var sharing = SharingController.shared
     @State private var selection: SavedSession.ID?
     @State private var pendingDeletion: SavedSession?
     @State private var confirmDeletion = false
@@ -44,6 +45,7 @@ struct SessionLibraryView: View {
                         VStack(alignment: .trailing, spacing: 5) {
                             Text(durationLabel(session)).monospacedDigit()
                             Text(statusLabel(session)).font(.caption).foregroundStyle(.secondary)
+                            Text(sharing.status(for: session.id)).font(.caption2).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 10).tag(session.id)
                 }.listStyle(.inset)
@@ -79,7 +81,7 @@ struct SessionLibraryView: View {
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: {
-            Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to the Mac's Trash, where you can recover it. Any exported copies stay unchanged.")
+            Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to Trash. Pending uploads will be cancelled, but already uploaded or exported copies stay unchanged. Contact the researcher to request deletion from cloud storage.")
         }
         .alert("FocusFix", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
