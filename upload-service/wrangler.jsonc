@@ -1,4 +1,5 @@
 {
+  // FF: UPLOAD_CONFIG — these are public resource names/IDs, not passwords.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "focusfix-uploads",
   "main": "src/worker.mjs",
@@ -6,12 +7,16 @@
   "workers_dev": true,
   "observability": { "enabled": false },
   "vars": {
+    // Server-wide upload switch. A change takes effect only after deploying again.
+    // This is NOT a billing cap: existing storage can still incur charges.
     "UPLOADS_ENABLED": "false"
   },
   "r2_buckets": [
+    // Let the Worker access this PRIVATE bucket through env.RECORDINGS.
     { "binding": "RECORDINGS", "bucket_name": "focusfix-mldata" }
   ],
   "d1_databases": [
+    // Let the Worker access enrollment/quota tables through env.DB.
     {
       "binding": "DB",
       "database_name": "focusfix-upload-control",
