@@ -56,3 +56,26 @@ struct SessionCheckInView: View {
         }.padding(28).frame(width: 440)
     }
 }
+
+struct WorkCheckInView: View {
+    @ObservedObject var tracker: ActivityTracker
+    @State private var fatigue: Int?
+    @State private var productivity: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Text("Check-in").font(.title2.weight(.semibold))
+            FatigueSlider(rating: $fatigue)
+            RatingSlider(title: SurveyEntry.productivityQuestion,
+                low: "Not productive", high: "Extremely productive", rating: $productivity)
+            HStack {
+                Button("Skip") { tracker.skipTimedCheckIn() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") {
+                    guard let fatigue, let productivity else { return }
+                    tracker.completeTimedCheckIn(fatigue: fatigue, productivity: productivity)
+                }.buttonStyle(.borderedProminent).disabled(fatigue == nil || productivity == nil)
+            }
+        }.padding(28).frame(width: 440)
+    }
+}
