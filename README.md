@@ -12,8 +12,10 @@ The reminder rule is a prototype to evaluate, not evidence that fatigue is reduc
 
 ### Run it
 
-On launch, a short logo animation goes from a muted play symbol to the full-color
-pause logo with a press, bounce and clockwise quarter-turn of the ring. It only
+On launch, the muted play logo holds for 0.9 seconds before a pronounced press,
+bounce and clockwise quarter-turn into the full-color pause logo. The pause symbol
+presses again and shrinks away while the four ring pieces grow, spread outward and
+fade to reveal the app underneath. The full sequence takes about 3.7 seconds and
 plays once per app launch. Click to skip; Reduce Motion skips it automatically.
 Reopening the main window doesn't replay it. This is visual only, not a loading
 operation, and it doesn't start recording or change any session timers.
