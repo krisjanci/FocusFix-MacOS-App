@@ -161,13 +161,13 @@ final class RecordingWriter {
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 4, "session_id": folder.lastPathComponent,
+            "schema_version": 5, "session_id": folder.lastPathComponent,
             "check_in_version": SurveyEntry.version,
             "fatigue_question": SurveyEntry.fatigueQuestion,
             "fatigue_scale": "0 = Not tired; 10 = Extremely tired",
-            "workload_question": SurveyEntry.workloadQuestion,
-            "workload_scale": "0 = Not demanding; 10 = Extremely demanding",
-            "survey_logging": "Optional custom ratings, not NASA-TLX. Fatigue before session; fatigue and workload before breaks. Negative shown_elapsed_seconds means before recording. Break setup activity is marked check_in; exclude it from work predictors. Skipped/cancelled ratings are blank, not zero.",
+            "productivity_question": SurveyEntry.productivityQuestion,
+            "productivity_scale": "0 = Not productive; 10 = Extremely productive",
+            "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Break setup activity is marked check_in; exclude it from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores are a different measure and must not be relabelled as productivity.",
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
             "timestamp_basis": "continuous monotonic callback receipt time including sleep, relative to session start",
             "mouse_interval_seconds": 1,
