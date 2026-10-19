@@ -1,3 +1,6 @@
+// MARK: - FF: SHARING
+// Manages explicit opt-in, the persistent upload queue and retries. Original local sessions are never deleted after upload.
+
 import Foundation
 import Combine
 
@@ -16,11 +19,16 @@ final class SharingController: ObservableObject {
     private var generation = UUID()
     private let environment: SharingEnvironment
 
+    // Whether a sharing opt-in is saved.
     var enabled: Bool { settings.consentID != nil }
+    // Expose the consent marker only while all upload prerequisites are available.
     var consentID: String? { canEnable ? settings.consentID : nil }
+    // Whether this build contains a valid HTTPS receiver origin.
     var configured: Bool { UploadPolicy.endpoint(environment.serviceURL) != nil }
+    // Require working storage, enrollment, identity and configuration before allowing sharing.
     var canEnable: Bool { storageReady && configured && hasCredential && !participantID.isEmpty }
 
+    // Load identity and queue state; fail closed on invalid state or a changed service URL.
     init(environment: SharingEnvironment) {
         self.environment = environment
         do {
@@ -55,6 +63,7 @@ final class SharingController: ObservableObject {
         }
     }
 
+    // Start the retry timer and resume eligible pending uploads while the app is running.
     func resume() {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -63,6 +72,7 @@ final class SharingController: ObservableObject {
         retryPending()
     }
 
+    // Validate and store the enrollment credential in Keychain, resetting sharing before replacing it.
     func saveCredential(_ input: String) {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         // The researcher issues ID.secret. This catches a token for the wrong Mac
@@ -81,6 +91,7 @@ final class SharingController: ObservableObject {
         } catch { notice = error.localizedDescription }
     }
 
+    // Create a fresh consent marker on opt-in, or cancel pending work and discard its cached ZIPs on opt-out.
     func setEnabled(_ value: Bool) {
         if value {
             guard canEnable else { notice = "The upload service and enrollment must be configured first."; return }
@@ -107,10 +118,12 @@ final class SharingController: ObservableObject {
         }
     }
 
+    // Return a session's sharing status for display in the session library.
     func status(for sessionID: String) -> String {
         settings.items.first { $0.id == sessionID }?.message ?? "Local only"
     }
 
+    // Cancel pending sharing for a deleted local session without claiming cloud copies were deleted.
     func cancelSession(_ id: String) {
         if let index = settings.items.firstIndex(where: { $0.id == id }), settings.items[index].uploadedAt == nil {
             if settings.items[index].state == "uploading" { task?.cancel() }
@@ -122,6 +135,7 @@ final class SharingController: ObservableObject {
 
     // Called after Stop and at relaunch. Only sessions explicitly eligible at START
     // under the current consent are considered. This is not a historical backfill.
+    // Discover newly eligible sessions and start one queue worker, without backfilling older consent periods.
     @discardableResult func retryPending() -> Task<Void, Never>? {
         guard enabled, canEnable else { return nil }
         if let task { return task }
@@ -159,6 +173,7 @@ final class SharingController: ObservableObject {
         return task
     }
 
+    // Prepare and send waiting sessions, verify receipts, and delay retries or mark permanent problems.
     private func processQueue(generation currentGeneration: UUID) async {
         guard let root, let endpoint = UploadPolicy.endpoint(environment.serviceURL) else { return }
         let candidates = settings.items.filter { $0.state == "waiting" && $0.retryAfter <= Date() }
@@ -243,6 +258,7 @@ final class SharingController: ObservableObject {
         }
     }
 
+    // Save queue/settings atomically; stop sharing if this state cannot be safely saved.
     @discardableResult private func persist() -> Bool {
         guard let root, storageReady else { return false }
         do {
@@ -259,6 +275,7 @@ final class SharingController: ObservableObject {
         }
     }
 
+    // Remove cached ZIPs for cancelled/local-only items, not the original recording folders.
     private func removeCancelledArchives() {
         guard let root else { return }
         for item in settings.items where item.state == "cancelled" || item.state == "local" {
