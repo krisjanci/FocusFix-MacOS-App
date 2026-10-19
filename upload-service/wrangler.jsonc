@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "focusfix-uploads",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": {
+    "UPLOADS_ENABLED": "false"
+  },
+  "r2_buckets": [
+    { "binding": "RECORDINGS", "bucket_name": "focusfix-mldata" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "focusfix-upload-control",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ]
+}
