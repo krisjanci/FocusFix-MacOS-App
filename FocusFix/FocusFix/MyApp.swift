@@ -19,12 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var body: some Scene {
         Window("FocusFix", id: "collector") {
             ContentView(tracker: tracker)
-                .opacity(launchFinished ? 1 : 0)
+                // Keep the app rendered beneath the splash for the expanding-ring reveal.
                 .allowsHitTesting(launchFinished)
                 .accessibilityHidden(!launchFinished)
                 .overlay {
                     if !launchFinished {
-                        LaunchScreen { launchFinished = true }.transition(.opacity)
+                        LaunchScreen { launchFinished = true }.transition(.identity)
                     }
                 }
                 .preferredColorScheme(colorScheme)
