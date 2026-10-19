@@ -1,3 +1,6 @@
+// MARK: - FF: TRACKING
+// Coordinates recording, breaks, check-ins and the session library. Nothing starts recording until the user chooses Start.
+
 import AppKit
 import ApplicationServices
 import Combine
@@ -32,7 +35,9 @@ final class ActivityTracker: ObservableObject {
     private var breakCheckIn: CheckInPrompt?
     private var timedCheckInSheet: CheckInPrompt?
     private var timedCheckInPolicy = TimedCheckInPolicy()
+    // Whether a survey sheet is currently taking attention away from work.
     private var checkInOpen: Bool { breakCheckIn != nil || timedCheckInSheet != nil }
+    // Keep survey interactions distinct from work and post-timer return waiting.
     private var activityPhase: String { checkInOpen ? "check_in" : breakPolicy.activityPhase }
     var openMainWindow: (() -> Void)?
     private var breakPolicy = BreakPolicy()
@@ -58,14 +63,17 @@ final class ActivityTracker: ObservableObject {
     private var workspaceObservers: [NSObjectProtocol] = []
     private var quitObserver: NSObjectProtocol?
 
+    // Format the session's elapsed time for the main timer.
     var formattedTime: String {
         let s = Int(elapsed)
         return String(format: "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
     }
+    // Use a monotonic clock for elapsed time, so wall-clock edits do not change durations.
     private var now: Double {
         let duration = startInstant.duration(to: clock.now).components
         return max(0, Double(duration.seconds) + Double(duration.attoseconds) / 1e18)
     }
+    // Load the saved-session list and arrange to finish a recording when the app quits.
     private init() {
         refreshSessions()
         quitObserver = NotificationCenter.default.addObserver(
@@ -74,6 +82,7 @@ final class ActivityTracker: ObservableObject {
             MainActor.assumeIsolated { self?.stop(reason: "app_quit") }
         }
     }
+    // Connect macOS notification actions to the same controls used by the app.
     func configureNotifications() {
         notificationAccess.onChange = { [weak self] state, busy in
             self?.notificationPermission = state
@@ -86,12 +95,15 @@ final class ActivityTracker: ObservableObject {
         breakNotifications.configure()
         refreshNotificationPermission()
     }
+    // Check the current notification setting without asking for permission again.
     func refreshNotificationPermission() {
         Task { await notificationAccess.refresh() }
     }
+    // Ask macOS for notification permission after the user chooses to enable it.
     func enableNotifications() {
         Task { await notificationAccess.enable() }
     }
+    // Open the system notification settings so the user can change banner permissions.
     func openNotificationSettings() {
         // Opens settings only; FocusFix never changes system permissions itself.
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
@@ -99,12 +111,14 @@ final class ActivityTracker: ObservableObject {
             notificationNotice = "Open System Settings → Notifications → FocusFix and turn on Allow Notifications and Banners."
         }
     }
+    // Ask for Accessibility access, which is needed to observe activity outside FocusFix.
     func requestPermission() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
         needsPermission = !AXIsProcessTrusted()
         message = "Enable FocusFix in System Settings → Privacy & Security → Accessibility, then press Start."
     }
+    // Check permission and open the fatigue check-in before starting a new session.
     func requestStart() {
         guard !isRecording, !sessionCheckInPresented else { return }
         guard AXIsProcessTrusted() else {
@@ -116,13 +130,16 @@ final class ActivityTracker: ObservableObject {
         sessionCheckIn = CheckInPrompt(elapsed: 0)
         sessionCheckInPresented = true
     }
+    // Close the starting check-in without recording a session or an answer.
     func cancelSessionCheckIn() { sessionCheckIn = nil }
+    // Accept a selected fatigue score, or an explicit skip, then start the session.
     func completeSessionCheckIn(fatigue: Int?) {
         guard let prompt = sessionCheckIn, fatigue.map({ (0...10).contains($0) }) ?? true else { return }
         sessionCheckIn = nil
         sessionCheckInPresented = false
         start(fatigue: fatigue, prompt: prompt)
     }
+    // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
     private func start(fatigue: Int?, prompt: CheckInPrompt) {
         guard !isRecording else { return }
         guard AXIsProcessTrusted() else {
@@ -188,6 +205,7 @@ final class ActivityTracker: ObservableObject {
             refreshNotificationPermission()
         } catch { fail(error) }
     }
+    // Finish local files and any open break/check-in, remove monitors, then offer eligible data to the upload queue.
     func stop(reason: String = "user_stop") {
         guard isRecording else { return }
         let end = now
@@ -228,6 +246,7 @@ final class ActivityTracker: ObservableObject {
         refreshSessions()
         SharingController.shared.retryPending()
     }
+    // Update the clock, mouse summaries and reminder rules once per timer tick.
     private func tick() {
         guard isRecording else { return }
         guard AXIsProcessTrusted() else {
@@ -253,6 +272,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: elapsed)
         } catch { fail(error) }
     }
+    // Listen for local/global input, app switches and sleep/login changes while recording.
     private func installMonitors() {
         let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp, .flagsChanged,
             .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
@@ -299,6 +319,7 @@ final class ActivityTracker: ObservableObject {
             })
         }
     }
+    // Turn an input event into a generic activity record; never store typed text or a cursor path.
     private func receive(_ event: NSEvent, outsideApp: Bool) {
         guard isRecording, suspendedBy.isEmpty else { return }
         let time = now
@@ -341,23 +362,28 @@ final class ActivityTracker: ObservableObject {
             }
         } catch { fail(error) }
     }
+    // Recognize backspace and forward-delete keys without saving other key identities.
     private func isDelete(_ event: NSEvent) -> Bool { event.keyCode == 51 || event.keyCode == 117 }
+    // Add one activity event with its elapsed time and work/check-in/break-return phase.
     private func record(type: String, at time: Double, repeated: Bool? = nil, hold: Double? = nil) throws {
         try writer?.event(time: time, type: type, repeated: repeated, hold: hold,
             activityPhase: activityPhase,
             secondsSinceLastBreak: breakPolicy.phase == .work ? breakPolicy.sinceLastBreak(at: time) : nil)
         eventsRecorded += 1
     }
+    // Pass completed mouse summaries to the file writer and update the test counter.
     private func append(_ rows: [MouseSummary]) {
         writer?.append(rows)
         rowsRecorded += rows.count
     }
+    // Show a recording error and stop safely instead of pretending data is still being saved.
     private func fail(_ error: Error) {
         stop(reason: "recording_error")
         writer = nil
         hasError = true
         message = "Recording stopped: \(error.localizedDescription). Existing files have been kept."
     }
+    // Remove input observers and timers, and release the app's recording activity assertion.
     private func removeMonitors() {
         if let backgroundActivity { ProcessInfo.processInfo.endActivity(backgroundActivity) }
         backgroundActivity = nil
@@ -371,6 +397,7 @@ final class ActivityTracker: ObservableObject {
         workspaceObservers.removeAll()
     }
 
+    // Copy the current break state and times into values the screen can display.
     private func updateBreakUI(at time: Double) {
         breakPhase = breakPolicy.phase
         breakPromptPending = isRecording && breakPolicy.promptID != nil
@@ -378,6 +405,7 @@ final class ActivityTracker: ObservableObject {
         latestBreak = breakPolicy.lastBreak
         secondsSinceBreak = breakPolicy.sinceLastBreak(at: time)
     }
+    // Start a fresh mouse summary when the activity phase changes so phases are not mixed.
     private func resetMouse(at time: Double, phase: String) {
         let point = CGEvent(source: nil)?.location ?? .zero
         mouse = MouseAccumulator(initialPosition: point, start: time, activityPhase: phase,
@@ -387,6 +415,7 @@ final class ActivityTracker: ObservableObject {
         returnWindowStart = time
         keys = KeyTiming() // Never match a key press across a paused interval.
     }
+    // Advance the break rules, record transitions and send a reminder when needed.
     private func advanceBreakClock(at time: Double, samplingStart: Double? = nil) throws {
         guard let entry = breakPolicy.tick(at: time) else { return }
         try writer?.logBreak(entry)
@@ -400,6 +429,7 @@ final class ActivityTracker: ObservableObject {
         }
         updateBreakUI(at: time)
     }
+    // Open the pre-break ratings and setup; opening this sheet is not yet taking a break.
     func chooseBreak() {
         guard isRecording, breakPolicy.phase == .work, !checkInOpen else { return }
         let time = now
@@ -413,11 +443,13 @@ final class ActivityTracker: ObservableObject {
             breakSetupPresented = true
         } catch { fail(error) }
     }
+    // Record that the break setup was cancelled and return to normal tracking.
     func cancelBreakCheckIn() {
         guard isRecording else { breakCheckIn = nil; return }
         do { try finishBreakCheckIn(status: .cancelled, at: now) }
         catch { fail(error) }
     }
+    // Save or skip the pre-break ratings and end the check-in activity phase.
     private func finishBreakCheckIn(status: CheckInStatus, at time: Double,
                                     breakID: String = "", fatigue: Int? = nil, productivity: Int? = nil) throws {
         guard let prompt = breakCheckIn else { return }
@@ -433,6 +465,7 @@ final class ActivityTracker: ObservableObject {
             breakPolicy.input(at: time)
         }
     }
+    // Validate the chosen duration/activity, save ratings and pause detailed tracking for the break.
     func beginBreak(minutes: Double, activity: String, fatigue: Int?, productivity: Int?) {
         guard isRecording, breakCheckIn != nil,
               (fatigue == nil && productivity == nil) ||
@@ -456,6 +489,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: time)
         } catch { fail(error) }
     }
+    // Delay the next reminder by 10 or 25 minutes without changing the last actual break time.
     func deferBreak(snooze: Bool) {
         guard isRecording, let entry = breakPolicy.deferPrompt(at: now, snooze: snooze) else { return }
         do {
@@ -466,6 +500,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: now)
         } catch { fail(error) }
     }
+    // End the break immediately when the user presses I'm back.
     func returnFromBreak() {
         guard isRecording, breakPolicy.activeBreak != nil else { return }
         do {
@@ -473,6 +508,7 @@ final class ActivityTracker: ObservableObject {
             try finishBreak(at: now, reason: "explicit_return")
         } catch { fail(error) }
     }
+    // Save the actual break end, resume work and schedule the next during-work check-in.
     private func finishBreak(at time: Double, reason: String) throws {
         if breakPolicy.phase == .awaitingReturn && suspendedBy.isEmpty { append(mouse.stop(at: time)) }
         guard let entry = breakPolicy.finish(at: time, reason: reason) else { return }
@@ -483,6 +519,7 @@ final class ActivityTracker: ObservableObject {
         elapsed = time
         updateBreakUI(at: time)
     }
+    // Handle sleep or an inactive login without inventing activity during the missing time.
     private func suspendForBreak(_ reason: String) {
         guard isRecording else { return }
         guard breakPolicy.phase != .work else {
@@ -496,6 +533,7 @@ final class ActivityTracker: ObservableObject {
             try writer?.logBreak(breakPolicy.entry(at: time, action: "suspended_\(reason)", record: breakPolicy.activeBreak))
         } catch { fail(error) }
     }
+    // Resume the break clock and sampling after wake/login, without assuming the user has returned to work.
     private func resumeAfterSuspension(_ reason: String) {
         guard isRecording, suspendedBy.remove(reason) != nil else { return }
         let time = now
@@ -510,6 +548,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: time)
         } catch { fail(error) }
     }
+    // Save a correction to what the user actually did during their most recent break.
     func confirmBreakActivity(_ activity: String) {
         guard isRecording else { return }
         let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
@@ -517,6 +556,7 @@ final class ActivityTracker: ObservableObject {
         do { try writer?.logBreak(entry); updateBreakUI(at: now) }
         catch { fail(error) }
     }
+    // Require meaningful input to end a break automatically; ignore tiny drift and key repeats.
     private func isReturnInput(_ event: NSEvent, at time: Double) -> Bool {
         switch event.type {
         case .keyDown: return !event.isARepeat
@@ -532,6 +572,7 @@ final class ActivityTracker: ObservableObject {
         default: return false
         }
     }
+    // Route a notification button to its action only if its session and prompt are still current.
     private func notificationAction(session: String, token: String, action: String) {
         guard isRecording, sessionFolder?.lastPathComponent == session else { return }
         if timedCheckInPolicy.hasPending, token == timedCheckInPolicy.current?.id {
@@ -551,10 +592,12 @@ final class ActivityTracker: ObservableObject {
             else if action == UNNotificationDefaultActionIdentifier { openMainWindow?() }
         }
     }
+    // Schedule one ratings opportunity 10 minutes after session start or an actual break return.
     private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
         let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak)
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "scheduled", time: time))
     }
+    // Open the requested survey and mark its interaction time separately from work.
     func openTimedCheckIn() {
         guard isRecording, breakPolicy.phase == .work, !checkInOpen,
               let token = timedCheckInPolicy.current?.id,
@@ -571,22 +614,26 @@ final class ActivityTracker: ObservableObject {
             openMainWindow?()
         } catch { fail(error) }
     }
+    // Validate both selected ratings and save the during-work answer.
     func completeTimedCheckIn(fatigue: Int, productivity: Int) {
         guard isRecording, timedCheckInSheet != nil,
               (0...10).contains(fatigue), (0...10).contains(productivity) else { return }
         do { try finishTimedCheckIn(action: "answered", at: now, fatigue: fatigue, productivity: productivity) }
         catch { fail(error) }
     }
+    // Record a deliberate skip without inventing fatigue or productivity scores.
     func skipTimedCheckIn() {
         guard isRecording, timedCheckInPolicy.hasPending else { return }
         do { try finishTimedCheckIn(action: "skipped", at: now) }
         catch { fail(error) }
     }
+    // Record dismissal of an open survey without counting it as an answer.
     func cancelTimedCheckIn() {
         guard isRecording, timedCheckInSheet != nil else { return }
         do { try finishTimedCheckIn(action: "cancelled", at: now) }
         catch { fail(error) }
     }
+    // Close the opportunity, log its outcome and restore the work activity phase.
     private func finishTimedCheckIn(action: String, at time: Double, fatigue: Int? = nil, productivity: Int? = nil) throws {
         guard let item = timedCheckInPolicy.finish() else { return }
         let sheet = timedCheckInSheet
@@ -609,15 +656,18 @@ final class ActivityTracker: ObservableObject {
         }
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: action, time: time))
     }
+    // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
         do {
             sessions = try SessionFiles.list(in: SessionFiles.root())
             libraryError = nil
         } catch { libraryError = error.localizedDescription }
     }
+    // Check whether a library entry is the session currently being recorded.
     func isActive(_ session: SavedSession) -> Bool {
         isRecording && session.folder == sessionFolder
     }
+    // Move an inactive local session to Trash and cancel any pending upload for it.
     func deleteSession(_ session: SavedSession) throws {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
@@ -626,6 +676,7 @@ final class ActivityTracker: ObservableObject {
         if sessionFolder == session.folder { sessionFolder = nil }
         refreshSessions()
     }
+    // Ask for an export destination and copy an inactive session without moving its originals.
     func exportSavedSession(_ session: SavedSession) throws -> URL? {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
