@@ -1,11 +1,15 @@
+// FF: UPLOADS — the private bucket's gatekeeper, deployed as a Cloudflare Worker.
+// No CSV data or participant credentials should be printed to logs here.
 import { uuid, hashPattern, sha256, metadata, dayFor, retryAfter,
   reserveSQL, reservationBindings, attemptsSQL, readBounded } from "./policy.mjs";
 
+// Return a small JSON reply that browsers/proxies must not cache.
 function reply(status, value, headers = {}) {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store", ...headers } });
 }
 
 export default {
+  // Handle one upload: authorize, reserve quota, verify bytes, store once and confirm.
   async fetch(request, env) {
     // A deployed service remains closed until explicitly enabled by the researcher.
     if (env.UPLOADS_ENABLED !== "true") return reply(503, { error: "Uploads are not enabled." });
@@ -14,6 +18,7 @@ export default {
     if (request.method !== "PUT" || !match || url.search) return reply(404, { error: "Not found." });
     if (url.protocol !== "https:") return reply(400, { error: "HTTPS required." });
 
+    // FF: ENROLLMENT — an ID alone is not enough; require its private credential.
     const participant = request.headers.get("X-Participant-ID") ?? "";
     const authorization = request.headers.get("Authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
@@ -27,6 +32,7 @@ export default {
         .bind(participant, digest).first();
       if (!enrolled) return reply(403, { error: "Enrollment invalid or revoked." });
 
+      // FF: QUOTAS — use the server's UTC day, not a date supplied by the Mac.
       const now = new Date();
       const day = dayFor(now);
       const attempt = await env.DB.prepare(attemptsSQL).bind(participant, day).first();
@@ -35,9 +41,12 @@ export default {
       const meta = metadata(request, match[1].toLowerCase());
       if (!meta) return reply(413, { error: "Invalid metadata or session exceeds limits." });
 
+      // Look up the reservation/receipt for this exact participant and session.
       const receiptQuery = () => env.DB.prepare("SELECT * FROM uploads WHERE participant_id = ? AND session_id = ?")
         .bind(participant, meta.sessionID).first();
+      // A retry must describe the same bytes and duration, not replace existing data.
       const receiptMatches = (receipt) => receipt.sha256 === meta.hash && receipt.bytes === meta.bytes && receipt.seconds === meta.seconds;
+      // Confirm the exact session/checksum the app is waiting for.
       const confirmed = () => reply(200, { stored: true, session_id: meta.sessionID, sha256: meta.hash });
       let receipt = await receiptQuery();
       if (receipt && !receiptMatches(receipt)) return reply(409, { error: "Session ID already reserved for different content." });
@@ -54,6 +63,7 @@ export default {
       if (!receiptMatches(receipt)) return reply(409, { error: "Session ID collision." });
       if (receipt.completed) return confirmed();
 
+      // FF: STORAGE — one private object per session, grouped by participant ID.
       const key = `${participant}/${meta.sessionID}.zip`;
       // Recover a successful R2 write if the previous Worker stopped before D1 confirmation.
       const existing = await env.RECORDINGS.head(key);
@@ -62,6 +72,7 @@ export default {
           return reply(409, { error: "Stored object doesn't match this session." });
         }
       } else {
+        // Bound memory use and reject truncated, non-ZIP or changed content.
         let body;
         try { body = await readBounded(request.body, meta.bytes); }
         catch { return reply(400, { error: "Incomplete or oversized upload." }); }
@@ -74,6 +85,7 @@ export default {
         const active = await env.DB.prepare("SELECT id FROM participants WHERE id = ? AND revoked = 0")
           .bind(participant).first();
         if (!active) return reply(403, { error: "Enrollment revoked." });
+        // Conditional creation prevents simultaneous retries from replacing a ZIP.
         const stored = await env.RECORDINGS.put(key, body, {
           onlyIf: new Headers({ "If-None-Match": "*" }),
           sha256: meta.hash,
@@ -88,6 +100,7 @@ export default {
           }
         }
       }
+      // Keep this receipt even after a researcher downloads/deletes the R2 object.
       await env.DB.prepare("UPDATE uploads SET completed = 1 WHERE participant_id = ? AND session_id = ? AND sha256 = ?")
         .bind(participant, meta.sessionID, meta.hash).run();
       return confirmed();
