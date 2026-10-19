@@ -51,13 +51,22 @@ struct ContentView: View {
 
             if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
 
+            if tracker.timedCheckInPending && !onBreak {
+                HStack {
+                    Text("Check-in available").font(.callout)
+                    Spacer()
+                    Button("Answer") { tracker.openTimedCheckIn() }
+                    Button("Skip") { tracker.skipTimedCheckIn() }
+                }
+            }
+
             if tracker.notificationPermission.needsAttention && !onBreak {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Turn on break notifications", systemImage: "bell.badge")
+                    Label("Turn on notifications", systemImage: "bell.badge")
                         .font(.callout.weight(.medium))
                     Text(tracker.notificationPermission.opensSettings
                          ? "In System Settings → Notifications → FocusFix, allow notifications and choose Banners or Alerts."
-                         : "Get a gentle reminder when it's time for a break and when your break timer ends. You can still use FocusFix without notifications.")
+                         : "Get reminders for breaks and check-ins. You can still use FocusFix without notifications.")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(tracker.notificationPermission.opensSettings ? "Open notification settings" : "Enable notifications") {
@@ -115,6 +124,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $tracker.sessionCheckInPresented, onDismiss: { tracker.cancelSessionCheckIn() }) {
             SessionCheckInView(tracker: tracker).tint(teal)
+        }
+        .sheet(isPresented: $tracker.timedCheckInPresented, onDismiss: { tracker.cancelTimedCheckIn() }) {
+            WorkCheckInView(tracker: tracker).tint(teal)
         }
         .onAppear {
             tracker.refreshNotificationPermission()
