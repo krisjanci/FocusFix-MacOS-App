@@ -12,6 +12,12 @@ The reminder rule is a prototype to evaluate, not evidence that fatigue is reduc
 
 ### Run it
 
+On launch, a short logo animation goes from a muted play symbol to the full-color
+pause logo with a press, bounce and clockwise quarter-turn of the ring. It only
+plays once per app launch. Click to skip; Reduce Motion skips it automatically.
+Reopening the main window doesn't replay it. This is visual only, not a loading
+operation, and it doesn't start recording or change any session timers.
+
 1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac and Run.
 2. Press **Start session**. If prompted in the app, choose **Allow Accessibility
    Access** and enable FocusFix in System Settings → Privacy & Security → Accessibility.
