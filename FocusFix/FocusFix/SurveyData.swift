@@ -1,7 +1,9 @@
 import Foundation
 
 // These are custom self-report items, not a NASA-TLX score or an ML prediction.
-enum CheckInContext: String { case sessionStart = "session_start", beforeBreak = "before_break" }
+enum CheckInContext: String {
+    case sessionStart = "session_start", beforeBreak = "before_break", duringWork = "during_work"
+}
 enum CheckInStatus: String { case answered, skipped, cancelled }
 
 struct CheckInPrompt {
