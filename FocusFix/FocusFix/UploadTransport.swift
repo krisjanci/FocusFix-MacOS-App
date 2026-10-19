@@ -1,6 +1,10 @@
+// MARK: - FF: UPLOADS
+// Packages approved session files and sends them to the receiver. No Cloudflare administrator credentials belong in the app.
+
 import Foundation
 import CryptoKit
 
+// MARK: - FF: UPLOAD_CONFIG
 enum UploadConfiguration {
     // After deploying upload-service, paste its HTTPS origin here. Not a bucket URL.
     // This is public configuration, never an R2 key or participant credential.
@@ -14,6 +18,7 @@ nonisolated struct PreparedUpload: Sendable {
 }
 
 nonisolated enum UploadArchive {
+    // Build or reuse a bounded ZIP containing only the allowed files, then calculate its SHA-256 fingerprint.
     static func prepare(sessionFolder: URL, destination: URL) throws -> PreparedUpload {
         let manager = FileManager.default
         if !manager.fileExists(atPath: destination.path) {
@@ -67,6 +72,7 @@ nonisolated enum UploadArchive {
 
 // Never forward research recordings or authorization to a redirect destination.
 final class NoUploadRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    // Refuse redirects so the participant credential and recording cannot be forwarded to a different host.
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
@@ -76,6 +82,7 @@ final class NoUploadRedirects: NSObject, URLSessionTaskDelegate, @unchecked Send
 }
 
 enum UploadTransport {
+    // Send one ZIP with its credential, timing and checksum, then return the server's reply.
     static func send(_ archive: PreparedUpload, item: UploadItem, endpoint: URL,
                      token: String) async throws -> (Data, HTTPURLResponse) {
         let config = URLSessionConfiguration.ephemeral
