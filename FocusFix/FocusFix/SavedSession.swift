@@ -1,3 +1,6 @@
+// MARK: - FF: STORAGE
+// Reads saved sessions and safely copies them for export. Local originals stay in Application Support.
+
 import Foundation
 
 // Read existing sessions without changing their CSVs or requiring a migration.
@@ -7,8 +10,10 @@ struct SavedSession: Identifiable, Hashable {
     let endedAt: Date?
     let duration: Double?
     let status: String
+    // Use the unique session folder name as the library row's identity.
     var id: String { folder.lastPathComponent }
 
+    // Read one session's metadata, including compatibility with older or unfinished recordings.
     init(folder: URL) throws {
         self.folder = folder
         let values = try folder.resourceValues(forKeys: [.creationDateKey])
@@ -26,6 +31,7 @@ struct SavedSession: Identifiable, Hashable {
         status = metadata["status"] as? String ?? "metadata_unavailable"
     }
 
+    // Build the readable FocusFix Session name from local start and end dates.
     func exportName(timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -39,12 +45,14 @@ struct SavedSession: Identifiable, Hashable {
 }
 
 enum SessionFiles {
+    // Locate the app's local Sessions directory in Application Support.
     static func root() throws -> URL {
         try FileManager.default.url(for: .applicationSupportDirectory,
             in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("FocusFix/Sessions", isDirectory: true)
     }
 
+    // Read valid session folders and sort them newest first, without following symlinks.
     static func list(in root: URL) throws -> [SavedSession] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: root,
@@ -58,6 +66,7 @@ enum SessionFiles {
     }
 
     // Only operate on a direct session directory, never the storage root or a symlink.
+    // Reject active sessions, symlinks and folders outside the expected session directory.
     static func validate(_ folder: URL, in root: URL, active: URL?) throws {
         let source = folder.standardizedFileURL
         let values = try source.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
@@ -69,6 +78,7 @@ enum SessionFiles {
         }
     }
 
+    // Copy a session to a new export folder, adding a suffix instead of overwriting an existing export.
     static func export(_ session: SavedSession, to destination: URL, root: URL, active: URL?) throws -> URL {
         try validate(session.folder, in: root, active: active)
         let target = destination.resolvingSymlinksInPath().standardizedFileURL
