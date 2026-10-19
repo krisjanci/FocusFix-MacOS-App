@@ -1,5 +1,9 @@
+// MARK: - FF: BREAKS
+// Displays break choices, duration presets, optional activity correction and current reminder controls.
+
 import SwiftUI
 
+// Turn elapsed seconds into a readable hours:minutes:seconds label.
 func durationText(_ seconds: Double) -> String {
     let value = Int(max(0, seconds).rounded(.up))
     return String(format: "%02d:%02d:%02d", value / 3600, value / 60 % 60, value % 60)
@@ -9,6 +13,7 @@ struct BreakActivityPicker: View {
     static let options = ["Stretch", "Walk", "Water / snack", "Rest my eyes", "Breathing", "Other"]
     @Binding var selection: String
     @Binding var custom: String
+    // Show common break activities and a short custom option.
     var body: some View {
         Picker("Activity", selection: $selection) {
             ForEach(Self.options, id: \.self) { Text($0).tag($0) }
@@ -30,10 +35,14 @@ struct BreakSetupView: View {
     @State private var customActivity = ""
     @State private var fatigue: Int?
     @State private var productivity: Int?
+    // Read either a preset duration or the typed custom minutes.
     private var minutes: Double? { preset == 0 ? Double(customMinutes.replacingOccurrences(of: ",", with: ".")) : Double(preset) }
+    // Use the chosen activity, or trimmed custom text for Other.
     private var label: String { (activity == "Other" ? customActivity : activity).trimmingCharacters(in: .whitespacesAndNewlines) }
+    // Require a finite 1–120 minute duration and a nonempty activity before starting.
     private var valid: Bool { minutes.map { $0.isFinite && (1...120).contains($0) } == true && !label.isEmpty }
 
+    // Show pre-break ratings, duration presets/custom minutes and the Start break controls.
     var body: some View {
         ScrollView {
         VStack(alignment: .leading, spacing: 22) {
@@ -82,7 +91,9 @@ struct BreakReviewView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var activity = "Stretch"
     @State private var custom = ""
+    // Use the chosen activity, or trimmed custom text for Other.
     private var label: String { (activity == "Other" ? custom : activity).trimmingCharacters(in: .whitespacesAndNewlines) }
+    // Let the user correct what they actually did during their most recent break.
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("What did you do?").font(.title2.weight(.semibold))
@@ -109,6 +120,7 @@ struct BreakReviewView: View {
 struct BreakControls: View {
     @ObservedObject var tracker: ActivityTracker
     @State private var reviewing = false
+    // Show Take a break, Skip and Snooze, plus the most recent break's activity review.
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if tracker.breakPromptPending {
