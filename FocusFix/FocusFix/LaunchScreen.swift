@@ -1,3 +1,6 @@
+// MARK: - FF: STARTUP
+// Animates the logo into the main screen. This is visual only, not a loading task or recording timer.
+
 import SwiftUI
 
 // A short introduction, not a loading task. It never starts or pauses recording.
@@ -11,6 +14,7 @@ struct LaunchScreen: View {
     @State private var spread = 0.0
     @State private var finished = false
 
+    // Overlay the animated logo and support click-to-skip and Reduce Motion.
     var body: some View {
         ZStack {
             // The real app is already underneath. Reveal it as the ring opens out.
@@ -31,6 +35,7 @@ struct LaunchScreen: View {
         }
     }
 
+    // Play the hold, press, turn and opening sequence, with cancellation and Reduce Motion support.
     @MainActor private func animate() async {
         // Don't make people who prefer reduced motion sit through a fake load.
         guard !reduceMotion else { finish(); return }
@@ -63,6 +68,7 @@ struct LaunchScreen: View {
         }
     }
 
+    // Finish the launch screen once, whether the animation completes or the user skips it.
     private func finish() {
         guard !finished else { return }
         finished = true
@@ -78,6 +84,7 @@ struct FocusFixLaunchLogo: View {
     var symbolScale = 1.0
     var symbolOpacity = 1.0
 
+    // Draw the ring pieces and center symbol separately so they can animate independently.
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
@@ -135,6 +142,7 @@ struct FocusFixLaunchLogo: View {
 private struct LaunchRingSegment: Shape {
     let quarter: Int
 
+    // Draw one separated quarter of the logo's ring.
     func path(in rect: CGRect) -> Path {
         let radius = min(rect.width, rect.height) * 0.32
         let center = CGPoint(x: rect.midX, y: rect.midY)
@@ -149,6 +157,7 @@ private struct LaunchRingSegment: Shape {
 }
 
 private struct LaunchPlaySymbol: Shape {
+    // Draw the play triangle used before the logo changes to pause.
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
