@@ -1,3 +1,6 @@
+// MARK: - FF: SURVEYS
+// Displays simple ratings. A slider's initial middle position is not an answer until the user chooses it.
+
 import SwiftUI
 
 struct RatingSlider: View {
@@ -6,6 +9,7 @@ struct RatingSlider: View {
     let high: String
     @Binding var rating: Int?
 
+    // Render a 0–10 slider with explicit selection and readable endpoint buttons.
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -31,6 +35,7 @@ struct RatingSlider: View {
 
 struct FatigueSlider: View {
     @Binding var rating: Int?
+    // Reuse the standard slider with the mental-fatigue question and anchors.
     var body: some View {
         RatingSlider(title: SurveyEntry.fatigueQuestion,
             low: "Not tired", high: "Extremely tired", rating: $rating)
@@ -42,6 +47,7 @@ struct SessionCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var fatigue: Int?
 
+    // Ask for fatigue before a session, with skip and cancel choices.
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Before you start").font(.title2.weight(.semibold))
@@ -62,6 +68,7 @@ struct WorkCheckInView: View {
     @State private var fatigue: Int?
     @State private var productivity: Int?
 
+    // Ask for fatigue and self-reported productivity during work without guessing unanswered values.
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Check-in").font(.title2.weight(.semibold))
