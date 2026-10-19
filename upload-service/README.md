@@ -18,46 +18,113 @@ The app still works locally without it. Creating the bucket doesn't deploy this 
 
 ## Connect Cloudflare
 
-Use a recent Node.js LTS (22.13+ for the local tests) and run these commands from
-this `upload-service` folder. `npx wrangler@4` downloads Cloudflare's deployment CLI;
-log in yourself in the browser, don't paste your Cloudflare password or API token into chat.
+Think of the setup as three things:
 
-1. Keep the R2 bucket private. Don't enable an `r2.dev` public URL or attach a public domain.
-   Use Standard storage, not Infrequent Access. Enable MFA on my Cloudflare account.
+- **R2 bucket = cupboard.** It holds the session ZIPs.
+- **Worker = person at the door.** It checks who is allowed to send a ZIP.
+- **D1 = notebook.** It remembers enrollment, daily limits and what already arrived.
 
-2. Sign in and create the small upload-control database:
+The bucket is already named in the code, but creating it alone doesn't connect the app.
+Read the billing section below first: this setup does **not** guarantee a $0 bill.
+These steps deploy a real service; I haven't run them against my account yet.
 
-   ```sh
-   npx wrangler@4 login
-   npx wrangler@4 d1 create focusfix-upload-control
-   ```
+### 1. Check my account and bucket
 
-   Copy the returned `database_id` into `wrangler.jsonc`. The ID isn't a secret.
-   Review the requested permissions and the account selected by Wrangler.
+Open Cloudflare and find R2 → `focusfix-mldata`. Keep it **private**, with public
+`r2.dev` access disabled and no public custom domain. Use **Standard** storage.
+Check the Workers plan is Free if that is the plan I intend to use, and enable account MFA.
+Do not upgrade a plan just to follow this guide. Workers Free does not remove R2 overage charges.
 
-3. Create the database tables:
+### 2. Open the right terminal folder
 
-   ```sh
-   npx wrangler@4 d1 execute focusfix-upload-control --remote --file=schema.sql
-   ```
+In VS Code, choose **Terminal → New Terminal**. Paste this command and press Return:
 
-4. Deploy with the service still disabled:
+```sh
+cd "/Users/krisjanci/Desktop/CS 600/FocusFix-MacOS-App/upload-service"
+```
 
-   ```sh
-   npx wrangler@4 deploy
-   ```
+`cd` means change folder. The quotes keep the space in `CS 600` from confusing the terminal.
+Run each following command separately and wait for it to finish. Stop if one reports an error.
 
-   Cloudflare prints a URL like `https://focusfix-uploads.MY-SUBDOMAIN.workers.dev`.
-   I don't need to buy a domain. This isn't the R2 S3 endpoint or a public bucket URL.
+### 3. Check Node is installed
 
-5. In `FocusFix/FocusFix/UploadTransport.swift`, set `UploadConfiguration.serviceURL`
-   to that exact HTTPS origin (no `/v1/...` suffix), then rebuild the app.
-   Changing the origin in a later build turns sharing off and requires fresh opt-in.
+```sh
+node --version
+```
 
-6. For my dummy-data test, set `UPLOADS_ENABLED` to `"true"` in `wrangler.jsonc`
-   and deploy again. That doesn't make the bucket public; credentials are still required.
-   Keep real participants out until my consent and institutional approvals are ready.
-   Setting it back to `"false"` and redeploying is the server-wide kill switch.
+If it says command not found, install the current LTS macOS installer from
+[the official Node.js download page](https://nodejs.org/en/download), then reopen
+the terminal and repeat step 2. Node runs the small setup scripts; it isn't added to the Mac app.
+The local service tests need Node 22.13 or newer.
+
+### 4. Let the deployment tool sign in
+
+```sh
+npx wrangler@4 login
+```
+
+`npx` downloads/runs Wrangler, Cloudflare's deployment tool. If it asks to install Wrangler,
+confirm. A browser opens: sign into my own account and review/approve its access request.
+Wait for the terminal to confirm login. Never paste a Cloudflare password or admin token into chat or Swift code.
+
+### 5. Create the notebook (D1 database)
+
+```sh
+npx wrangler@4 d1 create focusfix-upload-control
+```
+
+The output includes a `database_id`. Copy that value. Open `upload-service/wrangler.jsonc`
+in VS Code and replace **only** `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the copied ID.
+Keep its quotation marks and save. Leave the `RECORDINGS` and `DB` binding names unchanged;
+the receiver uses those exact names. If the database already exists, use its existing ID
+from the Cloudflare D1 dashboard instead of creating another database.
+
+### 6. Give the notebook its tables
+
+```sh
+npx wrangler@4 d1 execute focusfix-upload-control --remote --file=schema.sql
+```
+
+Confirm the remote execution if asked. This creates enrollment, upload and attempt tables
+in the cloud, not just on my laptop. The supplied schema uses `IF NOT EXISTS`; it doesn't
+erase existing rows. Successful output should report that the SQL ran without an error.
+These database setup steps follow [Cloudflare's D1 guide](https://developers.cloudflare.com/d1/get-started/).
+
+### 7. Put the receiver online, still closed to uploads
+
+Leave `"UPLOADS_ENABLED": "false"` in `wrangler.jsonc` and run:
+
+```sh
+npx wrangler@4 deploy
+```
+
+If Cloudflare asks me to choose a workers.dev subdomain, choose an available one.
+Copy the actual HTTPS address printed after a successful deployment. It looks like
+`https://focusfix-uploads.MY-SUBDOMAIN.workers.dev`; the example is not my real address.
+No domain purchase is needed. This address belongs to the Worker, not the R2 bucket.
+Opening it in a browser is not an upload test: there is no website at that address.
+
+### 8. Tell the Mac app where the receiver lives
+
+In Xcode or VS Code, search the project for `FF: UPLOAD_CONFIG`.
+Open `UploadTransport.swift` and find:
+
+```swift
+static let serviceURL = ""
+```
+
+Put the copied Worker address between the quotes. Use the origin only: no `/v1/sessions`
+suffix, no bucket name, no password. Save. Open `FocusFix/FocusFix.xcodeproj` in Xcode,
+select **FocusFix → My Mac**, and press **Command-R** to build/run this new version.
+Old app builds don't acquire this address automatically. Changing the address in a
+later build turns sharing off and requires a fresh opt-in.
+
+### 9. Open the receiver for a controlled test
+
+Only when ready to send deliberately created test data, change `UPLOADS_ENABLED` to
+`"true"` in `wrangler.jsonc`, save, and run `npx wrangler@4 deploy` again from this folder.
+This doesn't make the bucket public. Enrollment and opt-in are still required.
+For real participants, first finish the approved study consent and storage plan.
 
 ## Enroll a participant
 
@@ -78,6 +145,37 @@ log in yourself in the browser, don't paste your Cloudflare password or API toke
 6. Only new sessions started under that opt-in are eligible. Old sessions and sessions
    recorded before enrollment don't get uploaded later. Opt-out invalidates pending
    eligibility; turning sharing back on doesn't restart old uploads.
+
+For my first test, I'm the participant: copy the ID from my own app, replace the
+placeholder in the command with that ID, then use the printed SQL in D1's Console.
+Click Run in that console. The other printed value, shaped like `ID.secret`, goes
+into the app's secure **Enrollment credential** box, not the SQL console.
+
+### 10. Check one short test session arrives
+
+With sharing on, start a **new** session. Use only deliberate test activity; the app
+records activity outside its own window too. Stop after about a minute and leave the app
+open with internet access. Open Sessions and check the upload status.
+
+In Cloudflare, open R2 → `focusfix-mldata` and refresh the object list. Look inside
+my participant-ID prefix for a session ZIP. Download and unzip it. There should be
+five CSVs plus `session.json`, with matching session/participant IDs in the metadata.
+Compare these with the local originals before calling the connection tested.
+
+If something doesn't arrive:
+
+- Sharing toggle unavailable: check the app's service URL, saved enrollment and Keychain notice.
+- Enrollment rejected: confirm I ran the generated SQL in the same D1 database used by this Worker.
+- Service unavailable: check `UPLOADS_ENABLED` is true **and redeployed**.
+- Waiting: keep the app open; retries are delayed. The account panel also has Check pending uploads.
+- Quota reached: wait until the next UTC day. Don't reset identity to bypass it.
+- Old session stays local: expected. Opt-in only applies to sessions started afterwards.
+
+### 11. Close the receiver when finished testing
+
+Set `UPLOADS_ENABLED` back to `"false"`, save and deploy again. Turn off sharing in
+the test app too. This stops new app uploads; it doesn't delete files already stored,
+remove accrued usage, or guarantee billing stops. Downloads/retention are still my responsibility.
 
 The app stores its ID and credential in macOS Keychain, never in the session ZIP.
 Its random ID is also in new `session.json` files, so I can group all five CSVs by session
@@ -148,6 +246,41 @@ R2 `PutObject` uses Class A. `HeadObject` (existence/recovery checks) and `GetOb
 retries can add checks/writes. Dashboard listing uses Class A; deletion is free.
 Workers and D1 are separate services, so R2's free allowance isn't a spending cap
 for the entire system. Set usage alerts and review costs/retention before launch.
+
+## Operations and avoiding surprise bills
+
+I am keeping one ZIP per session for now. With 100 participants doing three sessions
+each day for 30 days, that is 9,000 new session uploads. The current normal path makes
+one R2 PUT (Class A) and one HEAD (Class B) per new session. Downloads, listings and
+some retries add operations. The current Standard allowance is 1 million Class A,
+10 million Class B and 10 GB-month of storage per month.
+[Check current R2 pricing](https://developers.cloudflare.com/r2/pricing/).
+
+Combining three sessions into one daily ZIP could reduce upload operations, but just
+waiting until evening to send three separate ZIPs would not. Batching doesn't remove
+the recorded bytes. It also delays delivery and needs new packaging/retry logic.
+The app still uploads per session; this guide has not changed that behavior.
+
+**I cannot promise never to be charged on pay-as-you-go R2.** The 180-minute limit
+is per participant, not a global storage limit or spending ceiling. Worker and D1
+usage also need review. I shouldn't enable real uploads if an absolute $0 guarantee
+is a requirement; I need an institution-funded service or an enforced free-only cap instead.
+
+My precautions before a pilot:
+
+1. Confirm Standard storage and my intended Workers/D1 plans in my account. Avoid
+   enabling unrelated paid features. Review usage across the account, not just this project.
+2. Use a small enrolled group first and measure actual ZIP sizes. Don't guess storage
+   needs from session length alone. There is no global automatic storage cutoff in this code.
+3. In Cloudflare's account billing area, open **Billable Usage → Create budget alert**
+   if available, choose a low threshold and an email I check. Alerts only warn: they
+   **do not stop usage**, and spending can already have happened when one arrives.
+   [Cloudflare budget-alert instructions and limitation](https://developers.cloudflare.com/billing/manage/budget-alerts/).
+4. Review R2 storage/operations plus Worker/D1 usage regularly. Keep a comfortable
+   margin below allowances. Follow the approved retention plan: download, verify,
+   make a second encrypted backup, then delete cloud copies when appropriate.
+5. If I need to stop receiving data, use the disabled-and-redeploy step above. Already
+   stored data can still accrue storage usage. Disabling uploads is not a billing switch.
 
 ## Tests
 
