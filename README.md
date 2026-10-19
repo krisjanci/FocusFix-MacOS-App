@@ -37,7 +37,7 @@ The reminder rule is a prototype to evaluate, not evidence that fatigue is reduc
 
 Sessions are automatically saved under
 `~/Library/Application Support/FocusFix/Sessions/<session-id>/`.
-Each new session has four CSVs and `session.json`. A new session never replaces an old
+Each new session has five CSVs and `session.json`. A new session never replaces an old
 one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
@@ -176,7 +176,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. Break boundaries can also create partial intervals. Position and key
 hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. New sessions use **schema version 5**; older files are left
+or a very long key hold. New sessions use **schema version 6**; older files are left
 unchanged and remain available in the library.
 
 **breaks.csv — append-only decisions and break lifecycle**
@@ -210,6 +210,21 @@ doesn't establish that the user saw or deliberately ignored it.
   0 (Not productive) to 10 (Extremely productive). The extra explanations and slider
   instructions are removed. There is no explicit recall period in these short labels.
   Productivity is the person's own rating, not an objective measure of output or workload.
+- Both ratings are also requested once **10 minutes after starting a session** and
+  once **10 minutes after each actual return from a break**. It doesn't repeat every
+  ten minutes or wait for inactivity/predicted fatigue. An early or late return shifts
+  the next check-in accordingly; break timer expiry alone doesn't start the wait.
+- A quiet notification offers **Answer** and **Skip**. Clicking Answer or the banner
+  opens the two sliders in a small in-app sheet, not inside the system notification.
+  This build doesn't add a custom notification-content extension. **Check-in available**
+  in the main window and **Answer check-in** in the menu bar work if banners are hidden.
+- I don't send these during breaks. If another check-in is open at the due time, I
+  wait until it closes. Opening break setup dismisses a pending work check-in rather
+  than stacking surveys. Starting a break cancels the old work-period schedule.
+  Skip/Snooze of a break reminder does not reset or remove the work check-in.
+- Answering, skipping or closing the sheet uses that period's one opportunity.
+  Dismissing a banner alone leaves it available in the app without repeated notifications.
+  Stop/Quit cancels it. Nothing is carried into another session or work period.
 - Move a slider, tap an endpoint, or press **Select 5 / 10** to deliberately select
   the midpoint. The initial thumb position is not an answer. Every check-in starts fresh.
 - Skip saves blank ratings with `status=skipped`, not zero. Cancelling break setup
@@ -217,24 +232,42 @@ doesn't establish that the user saw or deliberately ignored it.
   the initial check-in doesn't create a session or recording.
 - Rows contain `session_id`, `check_in_id`, `question_version`, `context`, `status`,
   `break_id`, UTC shown/answered times, session-relative shown/answered seconds,
-  `fatigue_0_10` and `productivity_0_10`. `context` is `session_start` or `before_break`.
-  The break ID joins to `breaks.csv`; it is blank for cancelled setup or session start.
+  `fatigue_0_10` and `productivity_0_10`. `context` is `session_start`, `before_break`
+  or `during_work`. The break ID joins to `breaks.csv` for pre-break responses; it is
+  blank for cancelled setup, session start and during-work responses.
   For skipped/cancelled rows, the answered time is the decision time, not a rating.
 - The initial check-in happens before recording, so its shown elapsed time is negative
-  and its completion is zero. Break setup stays in total session time, but not break
-  duration. Its activity is marked `check_in` with `check_in_start`/`check_in_end` events.
+  and its completion is zero. Break setup and opened work check-ins stay in total
+  session time, not break duration. Their activity is marked `check_in` with
+  `check_in_start`/`check_in_end` events. Waiting to answer a banner is still work.
   Exclude that interval from work predictors, even if someone uses another app while
   the sheet is open. Use behavior before the check-in, not clicks made answering it.
 - Responses are saved immediately and export with the session. Nothing is uploaded.
   Old recordings without this file still work. An interrupted session may have an
   unmatched `check_in_start`; don't invent an answer or a completion time for it.
 - These are custom ratings, not a validated NASA-TLX score, diagnosis or objective
-  productivity measurement. This version asks at session start and breaks only—not
-  every 30 minutes or after breaks. Break-triggered answers alone aren't a balanced
-  sample of all work states. I still need to finalize the research protocol/IRB plan.
+  productivity measurement. Timed check-ins add observations outside break-taking,
+  but don't guarantee low fatigue or an unbiased sample. A late answer isn't a rating
+  from exactly minute 10. I still need to finalize the research protocol/IRB plan and
+  use consistent assessment schedules across study conditions.
 - New check-ins use `focusfix_check_in_v2`. Older v1 sessions keep their original
   `workload_0_10` column and wording. I shouldn't rename or combine those scores with
   productivity ratings; they measure different things.
+
+**survey_prompts.csv — timed check-in history**
+
+- Records `scheduled`, `requested`, `opened`, `answered`, `skipped`, `cancelled`,
+  `break_setup`, `break_started` and `session_stopped` actions.
+- Each row has session/check-in IDs, action time, due time, notification-request time
+  and sheet-opening time (blank until known), in session-relative seconds.
+  `reference_break_id` identifies the preceding break, not a new break.
+- Join responses by `check_in_id`. This is append-only history, not a separate survey
+  per row. An unopened check-in has no response in surveys.csv; a skip from a banner
+  is recorded here without inventing a time when the slider sheet was shown.
+- `requested` isn't proof macOS delivered the banner or the person read it. Focus and
+  notification settings may hide or delay it. `opened` records opening the slider sheet.
+- Saved immediately and included in exports. Old sessions are unchanged. A crash can
+  leave an unfinished item; missing answers are never zero ratings.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason. It contains no participant identity or
@@ -249,9 +282,9 @@ survey scores. If needed, keep a consented participant-to-session mapping separa
 - Standard macOS Secure Input can suppress keyboard events. Absence of events is
   not proof of inactivity. Mouse events may be coalesced by macOS: this is not a
   hardware-level trace. Accessibility permission alone does not guarantee completeness.
-- Break notifications have no sound and don't force the app to the foreground.
-  Permission/setup/export dialogs and check-ins follow explicit actions; there are
-  no extra scheduled survey notifications.
+- Break and check-in notifications have no sound and don't force the app to the
+  foreground. The timed banner is automatic; slider sheets and permission/setup/export
+  dialogs follow explicit actions.
   Errors appear in the window; a recording error stops
   collection rather than silently continuing. The menu-bar indicator returns to idle.
 - Files are buffered and flushed approximately every second (earlier for a large
@@ -278,7 +311,7 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs four small Swift test programs. A failed assertion
+The script compiles and runs five small Swift test programs. A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
@@ -286,6 +319,8 @@ its own files, and never reads participant sessions or changes system permission
 - `BreakPolicyTests`: separate idle gaps, Skip/Snooze, early/late return and break records.
 - `SurveyDataTests`: rating validation, skipped/cancelled answers, timestamps,
   immediate saving, question metadata and the check-in activity phase.
+- `TimedCheckInTests`: ten-minute boundaries, one opportunity per work period,
+  deferral, stale/duplicate actions, early/late return, cancellation and linked CSVs.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
 
@@ -301,6 +336,12 @@ closed. Take two manual breaks and check that both ratings start unselected each
 Try cancelling setup, skipping ratings, and exporting the session to inspect surveys.csv.
 Check that answered break rows join to the correct break ID and setup activity is
 marked `check_in`. These UI checks aren't covered by the synthetic test programs.
+
+For the timed check-in, leave a session running for ten minutes with the main window
+closed. Check Answer/Skip in the notification, the menu-bar fallback, and that answering
+doesn't end the session. Try a manual break before minute ten (old reminder cancelled),
+then return and wait ten more minutes. Verify actual banner delivery, Focus/notifications
+off, stale banners after Stop, and the request/open/answer times in the exported files.
 
 For activity tracking, type five keys
 and Delete in another app, click and scroll, switch apps, move the pointer out and
