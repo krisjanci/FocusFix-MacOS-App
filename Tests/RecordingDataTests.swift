@@ -67,7 +67,7 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 5)
+        precondition(info["schema_version"] as? Int == 6)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
@@ -94,6 +94,8 @@ struct RecordingDataTests {
         let surveys = try String(contentsOf: copy.appendingPathComponent("surveys.csv"), encoding: .utf8)
         let expectedSurveys = SurveyEntry.header + (try initialRating.csv(sessionID: "synthetic-session"))
         precondition(surveys == expectedSurveys)
+        let prompts = try String(contentsOf: copy.appendingPathComponent("survey_prompts.csv"), encoding: .utf8)
+        precondition(prompts == SurveyPromptEntry.header)
         do {
             try SessionFiles.validate(saved.folder, in: root, active: saved.folder)
             preconditionFailure("Active sessions must be protected")
