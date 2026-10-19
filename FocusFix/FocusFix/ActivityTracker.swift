@@ -139,7 +139,7 @@ final class ActivityTracker: ObservableObject {
             try newWriter.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
                 status: fatigue == nil ? .skipped : .answered, breakID: "", shownAt: prompt.shownAt,
                 answeredAt: startedAt, shownElapsed: -checkInDuration, answeredElapsed: 0,
-                fatigue: fatigue, workload: nil))
+                fatigue: fatigue, productivity: nil))
             suspendedBy = []
             elapsed = 0
             eventsRecorded = 0
@@ -395,31 +395,31 @@ final class ActivityTracker: ObservableObject {
         catch { fail(error) }
     }
     private func finishBreakCheckIn(status: CheckInStatus, at time: Double,
-                                    breakID: String = "", fatigue: Int? = nil, workload: Int? = nil) throws {
+                                    breakID: String = "", fatigue: Int? = nil, productivity: Int? = nil) throws {
         guard let prompt = breakCheckIn else { return }
         append(mouse.stop(at: time))
         // Clear before writing so an I/O failure cannot recursively try the same check-in.
         breakCheckIn = nil
         try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .beforeBreak, status: status,
             breakID: breakID, shownAt: prompt.shownAt, answeredAt: Date(),
-            shownElapsed: prompt.elapsed, answeredElapsed: time, fatigue: fatigue, workload: workload))
+            shownElapsed: prompt.elapsed, answeredElapsed: time, fatigue: fatigue, productivity: productivity))
         try record(type: "check_in_end", at: time)
         if breakPolicy.phase == .work {
             resetMouse(at: time, phase: "work")
             breakPolicy.input(at: time)
         }
     }
-    func beginBreak(minutes: Double, activity: String, fatigue: Int?, workload: Int?) {
+    func beginBreak(minutes: Double, activity: String, fatigue: Int?, productivity: Int?) {
         guard isRecording, breakCheckIn != nil,
-              (fatigue == nil && workload == nil) ||
-                (fatigue.map({ (0...10).contains($0) }) == true && workload.map({ (0...10).contains($0) }) == true)
+              (fatigue == nil && productivity == nil) ||
+                (fatigue.map({ (0...10).contains($0) }) == true && productivity.map({ (0...10).contains($0) }) == true)
         else { return }
         let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let time = now
         guard let entry = breakPolicy.begin(at: time, seconds: minutes * 60, activity: label) else { return }
         do {
             try finishBreakCheckIn(status: fatigue == nil ? .skipped : .answered, at: time,
-                breakID: entry.record?.id ?? "", fatigue: fatigue, workload: workload)
+                breakID: entry.record?.id ?? "", fatigue: fatigue, productivity: productivity)
             try writer?.logBreak(entry)
             keys = KeyTiming()
             returnPoint = CGEvent(source: nil)?.location ?? .zero
