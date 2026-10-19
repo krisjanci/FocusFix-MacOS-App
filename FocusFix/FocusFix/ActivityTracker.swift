@@ -135,7 +135,10 @@ final class ActivityTracker: ObservableObject {
         do {
             let root = try SessionFiles.root()
             startedAt = Date()
-            let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt)
+            let sharing = SharingController.shared
+            let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
+                participantID: sharing.participantID.isEmpty ? nil : sharing.participantID,
+                sharingConsentID: sharing.consentID)
             writer = newWriter
             sessionFolder = newWriter.folder
             startInstant = clock.now
@@ -223,6 +226,7 @@ final class ActivityTracker: ObservableObject {
         updateBreakUI(at: end)
         suspendedBy = []
         refreshSessions()
+        SharingController.shared.retryPending()
     }
     private func tick() {
         guard isRecording else { return }
@@ -618,6 +622,7 @@ final class ActivityTracker: ObservableObject {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
         try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
+        SharingController.shared.cancelSession(session.id)
         if sessionFolder == session.folder { sessionFolder = nil }
         refreshSessions()
     }
