@@ -92,7 +92,11 @@ final class RecordingWriter {
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
-    init(root: URL, id: String, startedAt: Date) throws {
+    private let participantID: String?
+    private let sharingConsentID: String?
+    init(root: URL, id: String, startedAt: Date, participantID: String? = nil, sharingConsentID: String? = nil) throws {
+        self.participantID = participantID
+        self.sharingConsentID = sharingConsentID
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
             throw CocoaError(.fileWriteFileExists)
@@ -171,7 +175,7 @@ final class RecordingWriter {
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 6, "session_id": folder.lastPathComponent,
+            "schema_version": 7, "session_id": folder.lastPathComponent,
             "timed_check_in_policy": "One notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
             "survey_prompt_logging": "survey_prompts.csv records scheduled/requested/opened/answered/skipped/cancelled/break_setup/break_started/session_stopped. requested is not proof of banner delivery or viewing. Unopened check-ins have no surveys.csv response; join by check_in_id. reference_break_id identifies the preceding break, not a future break.",
             "check_in_version": SurveyEntry.version,
@@ -189,6 +193,9 @@ final class RecordingWriter {
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
         ]
+        if let participantID { fields["participant_id"] = participantID }
+        if let sharingConsentID { fields["sharing_consent_id"] = sharingConsentID }
+        fields["sharing_policy"] = "Optional research sharing. Eligibility captured at session start; opt-out cancels queued uploads. Participant ID identifies a Keychain installation, not a verified person. 180 elapsed minutes (including breaks) per UTC upload day; no truncation."
         if let duration {
             fields["duration_seconds"] = duration
             fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration))
