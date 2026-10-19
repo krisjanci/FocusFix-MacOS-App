@@ -11,6 +11,12 @@ ML. Optional research uploads are implemented but require enrollment and deploym
 of the included upload service. Sharing defaults to off; this build has no service URL yet.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
+For finding/editing a feature, I use [my code map](CODE_MAP.md). It lists the searchable
+`FF:` comments, which files do what, and Xcode/VS Code shortcuts. For connecting the
+bucket, use [the beginner upload setup guide](upload-service/README.md#connect-cloudflare).
+That guide also explains why per-session uploads are reasonable and why R2's free
+allowance and budget alerts are **not** a guaranteed spending cap.
+
 ### Run it
 
 On launch, the muted play logo holds for 0.9 seconds before a pronounced press,
