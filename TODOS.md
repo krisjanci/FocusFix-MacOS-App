@@ -32,7 +32,7 @@
 
 - using multiple devices intergration (ipad drawing while working)
 
-- adding white/brown etc. noise functional
+- adding white/brown etc. noise functional (automatic change to see which noise is best)
 
 
 Pre release todo (later stage)
