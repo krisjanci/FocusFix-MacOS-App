@@ -45,7 +45,8 @@ struct RecordingDataTests {
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("focusfix-tests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0))
+        let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0),
+            participantID: "synthetic-participant", sharingConsentID: "synthetic-consent")
         let initialRating = SurveyEntry(id: "synthetic-check-in", context: .sessionStart,
             status: .answered, breakID: "", shownAt: Date(timeIntervalSince1970: -2),
             answeredAt: Date(timeIntervalSince1970: 0), shownElapsed: -2, answeredElapsed: 0,
@@ -67,7 +68,10 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 6)
+        precondition(info["schema_version"] as? Int == 7)
+        precondition(info["participant_id"] as? String == "synthetic-participant")
+        precondition(info["sharing_consent_id"] as? String == "synthetic-consent")
+        precondition(info["token"] == nil && info["credential"] == nil)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
         do {
