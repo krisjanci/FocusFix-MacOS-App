@@ -25,6 +25,9 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
     var onStatus: ((String?) -> Void)?
     private let center = UNUserNotificationCenter.current()
     private var generation = 0
+    private var breakIDs: Set<String> = []
+    private var checkInID: String?
+    private var checkInGeneration = 0
 
     func configure() {
         center.delegate = self
@@ -32,15 +35,19 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         let skip = UNNotificationAction(identifier: "skip", title: "Skip", options: [])
         let snooze = UNNotificationAction(identifier: "snooze", title: "Snooze 10 min", options: [])
         let back = UNNotificationAction(identifier: "back", title: "I'm back", options: [.foreground])
+        let answer = UNNotificationAction(identifier: "answer_check_in", title: "Answer", options: [.foreground])
+        let skipCheckIn = UNNotificationAction(identifier: "skip_check_in", title: "Skip", options: [])
         center.setNotificationCategories([
             UNNotificationCategory(identifier: "break_prompt", actions: [take, skip, snooze], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "break_finished", actions: [back], intentIdentifiers: [])
+            UNNotificationCategory(identifier: "break_finished", actions: [back], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "work_check_in", actions: [answer, skipCheckIn], intentIdentifiers: [])
         ])
         clear()
     }
     func send(session: String, token: String, finished: Bool) {
         let version = generation
         let id = "focusfix-\(session)-\(token)-\(finished ? "end" : "prompt")"
+        breakIDs.insert(id)
         let content = UNMutableNotificationContent()
         content.title = finished ? "Your break timer has finished" : "A moment for a break?"
         content.body = finished ? "Return when you're ready. Extra time away is included in your break." : "Take a short break, skip, or snooze for 10 minutes."
@@ -58,9 +65,47 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         }
     }
     func clear() {
-        generation += 1
+        clearBreaks()
+        clearCheckIn()
+        // On launch/start/stop also remove leftovers from earlier app runs.
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
+    }
+    func clearBreaks() {
+        generation += 1
+        center.removePendingNotificationRequests(withIdentifiers: Array(breakIDs))
+        center.removeDeliveredNotifications(withIdentifiers: Array(breakIDs))
+        breakIDs.removeAll()
+    }
+    func sendCheckIn(session: String, token: String) {
+        clearCheckIn()
+        let version = checkInGeneration
+        let id = "focusfix-\(session)-\(token)-check-in"
+        checkInID = id
+        let content = UNMutableNotificationContent()
+        content.title = "Time for a check-in"
+        content.body = "Mental fatigue and productivity"
+        content.categoryIdentifier = "work_check_in"
+        content.userInfo = ["session": session, "token": token]
+        Task {
+            do {
+                try await center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+                if version != checkInGeneration {
+                    center.removePendingNotificationRequests(withIdentifiers: [id])
+                    center.removeDeliveredNotifications(withIdentifiers: [id])
+                }
+            } catch {
+                onStatus?("Couldn't deliver the check-in notification. You can answer it in FocusFix or the menu bar.")
+            }
+        }
+    }
+    func clearCheckIn() {
+        checkInGeneration += 1
+        if let checkInID {
+            center.removePendingNotificationRequests(withIdentifiers: [checkInID])
+            center.removeDeliveredNotifications(withIdentifiers: [checkInID])
+        }
+        checkInID = nil
     }
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
