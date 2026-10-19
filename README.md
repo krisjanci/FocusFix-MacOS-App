@@ -6,7 +6,7 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 ## Current app: activity collector and rule-based breaks
 
 This version collects local behavior data and recommends breaks using a timing/idle
-rule. It collects brief fatigue/workload check-ins. It does not predict fatigue with
+rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
 ML or upload data.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
@@ -66,7 +66,7 @@ but renamed data could still be staged accidentally.
    each within the last 60 seconds**. Only prompt while currently idle for at least
    5 seconds. A continuous 10-second pause counts once, not twice. Without a qualifying
    moment, keep waiting; 25 minutes is a minimum, not a guaranteed prompt time.
-2. **Take a break** opens a setup sheet with fatigue and workload sliders. Rate both,
+2. **Take a break** opens a setup sheet with fatigue and productivity sliders. Rate both,
    or choose **Skip ratings & start break**. Choose **5 minutes** (default), **10**, **15**,
    or a custom duration from **1–120 minutes**. Choose Stretch, Walk, Water / snack,
    Rest my eyes, Breathing or Other (custom text). **Start break** begins the timer.
@@ -176,7 +176,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. Break boundaries can also create partial intervals. Position and key
 hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. New sessions use **schema version 4**; older files are left
+or a very long key hold. New sessions use **schema version 5**; older files are left
 unchanged and remain available in the library.
 
 **breaks.csv — append-only decisions and break lifecycle**
@@ -204,11 +204,12 @@ doesn't establish that the user saw or deliberately ignored it.
 
 **surveys.csv — short check-ins**
 
-- Before a session I ask only **How mentally tired do you feel right now?**
+- Before a session I show only **Mental fatigue** above the slider.
   The scale is 0 (Not tired) to 10 (Extremely tired).
-- Before each break I ask that again, plus **How mentally demanding was your work
-  in the last 5 minutes?** The scale is 0 (Not demanding) to 10 (Extremely demanding).
-  Fatigue means a tired mind; workload means the thinking/focus/effort the task needed.
+- Before each break I show that again, plus **Productivity**. The scale is
+  0 (Not productive) to 10 (Extremely productive). The extra explanations and slider
+  instructions are removed. There is no explicit recall period in these short labels.
+  Productivity is the person's own rating, not an objective measure of output or workload.
 - Move a slider, tap an endpoint, or press **Select 5 / 10** to deliberately select
   the midpoint. The initial thumb position is not an answer. Every check-in starts fresh.
 - Skip saves blank ratings with `status=skipped`, not zero. Cancelling break setup
@@ -216,7 +217,7 @@ doesn't establish that the user saw or deliberately ignored it.
   the initial check-in doesn't create a session or recording.
 - Rows contain `session_id`, `check_in_id`, `question_version`, `context`, `status`,
   `break_id`, UTC shown/answered times, session-relative shown/answered seconds,
-  `fatigue_0_10` and `workload_0_10`. `context` is `session_start` or `before_break`.
+  `fatigue_0_10` and `productivity_0_10`. `context` is `session_start` or `before_break`.
   The break ID joins to `breaks.csv`; it is blank for cancelled setup or session start.
   For skipped/cancelled rows, the answered time is the decision time, not a rating.
 - The initial check-in happens before recording, so its shown elapsed time is negative
@@ -231,6 +232,9 @@ doesn't establish that the user saw or deliberately ignored it.
   productivity measurement. This version asks at session start and breaks only—not
   every 30 minutes or after breaks. Break-triggered answers alone aren't a balanced
   sample of all work states. I still need to finalize the research protocol/IRB plan.
+- New check-ins use `focusfix_check_in_v2`. Older v1 sessions keep their original
+  `workload_0_10` column and wording. I shouldn't rename or combine those scores with
+  productivity ratings; they measure different things.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason. It contains no participant identity or
