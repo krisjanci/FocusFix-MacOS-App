@@ -7,7 +7,8 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 
 This version collects local behavior data and recommends breaks using a timing/idle
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
-ML or upload data.
+ML. Optional research uploads are implemented but require enrollment and deployment
+of the included upload service. Sharing defaults to off; this build has no service URL yet.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
 ### Run it
@@ -50,6 +51,32 @@ one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
+
+### Optional research sharing
+
+- The account icon at the top left opens my research profile and sharing settings.
+  Sharing is off by default. Recording still works without joining the study.
+- FocusFix makes a random participant ID and keeps it in Keychain across relaunches
+  and ordinary updates. New session metadata includes the ID, so I can group sessions
+  without recording someone's name. A second Mac has a different ID; enrollment needs
+  to account for that. This is pseudonymous data, not automatically anonymous.
+- After study enrollment and explicit opt-in, new finished sessions are zipped and
+  queued automatically. Old sessions aren't backfilled. Turning sharing off cancels
+  pending work, and turning it back on only applies to subsequently started sessions.
+- The session library shows upload status. Queued work survives quit/relaunch, retries
+  with delays while the app is running, and keeps the original files locally.
+- Limits are enforced on the server: 180 elapsed minutes (including breaks), 50 MiB
+  of compressed data and 30 newly admitted sessions per participant per UTC day.
+  Each ZIP is limited to 25 MiB. Whole sessions that don't fit wait until the next day;
+  sessions longer than 180 minutes stay local. These limits don't stop local recording.
+- The app only packages the five CSVs and session metadata. Credentials aren't included.
+  The service checks authorization, size and checksum, and protects against duplicate
+  uploads. Opt-out can't recall a transfer already received. Deleting locally doesn't
+  delete cloud copies; cloud deletion requests go to the researcher using the ID.
+- The receiver's R2 binding is configured for **focusfix-mldata**, but it hasn't been
+  deployed or linked to this build yet. Follow [the setup guide](upload-service/README.md)
+  to create its D1 quota database, deploy the Worker, set the app's service URL and enroll
+  test IDs. No credentials should be pasted into chat or committed to GitHub.
 
 ### Session library and exports
 
@@ -250,7 +277,8 @@ doesn't establish that the user saw or deliberately ignored it.
   `check_in_start`/`check_in_end` events. Waiting to answer a banner is still work.
   Exclude that interval from work predictors, even if someone uses another app while
   the sheet is open. Use behavior before the check-in, not clicks made answering it.
-- Responses are saved immediately and export with the session. Nothing is uploaded.
+- Responses are saved immediately and export with the session. They are included in
+  optional research uploads only after enrollment and explicit opt-in.
   Old recordings without this file still work. An interrupted session may have an
   unmatched `check_in_start`; don't invent an answer or a completion time for it.
 - These are custom ratings, not a validated NASA-TLX score, diagnosis or objective
@@ -278,8 +306,11 @@ doesn't establish that the user saw or deliberately ignored it.
   leave an unfinished item; missing answers are never zero ratings.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
-definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason. It contains no participant identity or
-survey scores. If needed, keep a consented participant-to-session mapping separately.
+definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason.
+Schema 7 also includes a random Keychain-backed `participant_id` when available and
+`sharing_consent_id` only for sessions started while sharing is enabled. It contains
+no name, email, enrollment credential or survey scores. Keep any mapping from that
+pseudonymous ID to a real participant separately under the study's approved plan.
 
 ### Background behavior and limitations
 
@@ -301,7 +332,8 @@ survey scores. If needed, keep a consented participant-to-session mapping separa
 - The native app is configured without App Sandbox for global monitoring. Run only
   trusted builds; this is a local research prototype, not an App Store release.
 - Event timing is sensitive even without text. Obtain the required institutional
-  approval/consent before recording participants. Nothing is uploaded automatically.
+  approval/consent before recording participants. Sharing is off by default; once
+  enrolled and opted in, eligible new sessions upload automatically after Stop.
 
 ### Verification
 
@@ -319,7 +351,7 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs five small Swift test programs. A failed assertion
+The script compiles and runs seven small Swift test programs. A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
@@ -331,6 +363,19 @@ its own files, and never reads participant sessions or changes system permission
   deferral, stale/duplicate actions, early/late return, cancellation and linked CSVs.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
+- `UploadPolicyTests`: eligibility, whole-session limits, HTTPS configuration, ZIP
+  allowlisting, checksums and rejecting symlink inputs. Synthetic temporary files only.
+- `SharingQueueTests`: opt-in, no historical backfill, opt-out during preparation,
+  restart recovery, offline retries, quota delays and fail-closed settings. Fake
+  identity/networking; no real Keychain access or uploads.
+
+The upload service also has eight Node tests using in-memory SQLite and fake R2:
+
+```sh
+node --test upload-service/tests/*.test.mjs
+```
+
+Use Node 22.13+ for those tests. Both test commands run in GitHub Actions.
 
 The same command is configured in `.github/workflows/tests.yml` for pushes and pull
 requests using [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
