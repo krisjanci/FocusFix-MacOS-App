@@ -18,3 +18,8 @@ jobs:
           persist-credentials: false
       - name: Test recording, break timing and notification permissions
         run: bash scripts/test.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test upload authorization, quotas and receipts with synthetic data
+        run: node --test upload-service/tests/*.test.mjs
