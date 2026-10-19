@@ -1,3 +1,6 @@
+// MARK: - FF: SESSIONS
+// Shows the local session library and the separate Test tracking window.
+
 import SwiftUI
 import AppKit
 
@@ -9,9 +12,11 @@ struct SessionLibraryView: View {
     @State private var confirmDeletion = false
     @State private var notice: String?
 
+    // Find the saved session matching the current list selection.
     private var selected: SavedSession? { tracker.sessions.first { $0.id == selection } }
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
+    // List saved sessions with selection, export/delete controls and upload status.
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -87,11 +92,13 @@ struct SessionLibraryView: View {
             Button("OK") { notice = nil }
         } message: { Text(notice ?? "") }
     }
+    // Show live duration for the active session and saved duration for completed sessions.
     private func durationLabel(_ session: SavedSession) -> String {
         guard let seconds = tracker.isActive(session) ? tracker.elapsed : session.duration else { return "—" }
         let value = Int(seconds)
         return String(format: "%02d:%02d:%02d", value / 3600, value / 60 % 60, value % 60)
     }
+    // Translate a saved stop reason into a readable library label.
     private func statusLabel(_ session: SavedSession) -> String {
         if tracker.isActive(session) { return tracker.breakPhase == .work ? "Recording" : "On break" }
         if session.endedAt == nil { return "Incomplete" }
@@ -104,6 +111,7 @@ struct SessionLibraryView: View {
         default: return "Saved"
         }
     }
+    // Export the selected session through the tracker and report any error.
     private func exportSelected() {
         guard let selected else { return }
         do {
@@ -114,6 +122,7 @@ struct SessionLibraryView: View {
 
 struct TrackingTestView: View {
     @ObservedObject var tracker: ActivityTracker
+    // Show event and mouse counters in a separate diagnostic window.
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Label("Test tracking", systemImage: "waveform.path.ecg").font(.title2.weight(.semibold))
@@ -129,6 +138,7 @@ struct TrackingTestView: View {
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.padding(28).frame(width: 430)
     }
+    // Display one diagnostic count without putting it on the main recording screen.
     private func metric(_ name: String, _ value: Int) -> some View {
         VStack(spacing: 6) {
             Text(value, format: .number).font(.largeTitle).monospacedDigit()
