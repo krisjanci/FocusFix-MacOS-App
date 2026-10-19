@@ -36,6 +36,8 @@
 
 - an ai that you tell the task to to customise the settings
 
+    - research work may have long gaps 
+
 
 Pre release todo (later stage)
 
