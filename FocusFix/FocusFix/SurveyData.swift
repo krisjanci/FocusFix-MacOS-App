@@ -12,10 +12,11 @@ struct CheckInPrompt {
 }
 
 struct SurveyEntry {
-    static let version = "focusfix_check_in_v1"
-    static let fatigueQuestion = "How mentally tired do you feel right now?"
-    static let workloadQuestion = "How mentally demanding was your work in the last 5 minutes?"
-    static let header = "session_id,check_in_id,question_version,context,status,break_id,shown_at_utc,answered_at_utc,shown_elapsed_seconds,answered_elapsed_seconds,fatigue_0_10,workload_0_10\n"
+    static let version = "focusfix_check_in_v2"
+    // Store the labels actually shown, without implying an undisplayed time window.
+    static let fatigueQuestion = "Mental fatigue"
+    static let productivityQuestion = "Productivity"
+    static let header = "session_id,check_in_id,question_version,context,status,break_id,shown_at_utc,answered_at_utc,shown_elapsed_seconds,answered_elapsed_seconds,fatigue_0_10,productivity_0_10\n"
     let id: String
     let context: CheckInContext
     let status: CheckInStatus
@@ -25,14 +26,14 @@ struct SurveyEntry {
     let shownElapsed: Double
     let answeredElapsed: Double
     let fatigue: Int?
-    let workload: Int?
+    let productivity: Int?
 
     func csv(sessionID: String) throws -> String {
-        let values = [fatigue, workload].compactMap { $0 }
+        let values = [fatigue, productivity].compactMap { $0 }
         guard values.allSatisfy({ (0...10).contains($0) }),
               shownElapsed.isFinite, answeredElapsed.isFinite, shownElapsed <= answeredElapsed,
-              context != .sessionStart || workload == nil,
-              status != .answered || (fatigue != nil && (context == .sessionStart || workload != nil)),
+              context != .sessionStart || productivity == nil,
+              status != .answered || (fatigue != nil && (context == .sessionStart || productivity != nil)),
               status == .answered || values.isEmpty else {
             throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid check-in response."])
         }
@@ -41,6 +42,6 @@ struct SurveyEntry {
         return [BreakLogEntry.text(sessionID), BreakLogEntry.text(id), Self.version, context.rawValue,
                 status.rawValue, BreakLogEntry.text(breakID), formatter.string(from: shownAt),
                 formatter.string(from: answeredAt), csvNumber(shownElapsed), csvNumber(answeredElapsed),
-                fatigue.map(String.init) ?? "", workload.map(String.init) ?? ""].joined(separator: ",") + "\n"
+                fatigue.map(String.init) ?? "", productivity.map(String.init) ?? ""].joined(separator: ",") + "\n"
     }
 }
