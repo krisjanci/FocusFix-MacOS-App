@@ -1,3 +1,6 @@
+// MARK: - FF: QUOTAS
+// Client-side sharing eligibility and size limits. The server enforces its own limits; these are not an account-wide billing cap.
+
 import Foundation
 
 // Shared rules for the queue. The server independently enforces the same limits.
@@ -10,11 +13,13 @@ nonisolated enum UploadPolicy {
     static let files = ["events.csv", "mouse_movement.csv", "breaks.csv", "surveys.csv",
                         "survey_prompts.csv", "session.json"]
 
+    // Accept a finite session duration within the limit and round it up to whole seconds.
     static func seconds(_ duration: Double) -> Int? {
         guard duration.isFinite, duration > 0, duration <= Double(dailySeconds) else { return nil }
         return Int(ceil(duration))
     }
 
+    // Accept only a plain HTTPS service origin, not embedded credentials, query strings or an endpoint path.
     static func endpoint(_ value: String) -> URL? {
         guard let url = URL(string: value), url.scheme == "https", url.host != nil,
               url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
@@ -22,6 +27,7 @@ nonisolated enum UploadPolicy {
         return url
     }
 
+    // Allow only finished sessions belonging to this participant and the current sharing consent.
     static func eligible(metadata: [String: Any], participant: String, consent: String?) -> Bool {
         guard let consent, metadata["participant_id"] as? String == participant,
               metadata["sharing_consent_id"] as? String == consent,
@@ -63,6 +69,7 @@ nonisolated struct UploadReceipt: Decodable {
 
 nonisolated enum SharingError: LocalizedError {
     case message(String)
+    // Turn a sharing error into the plain message shown to the user.
     var errorDescription: String? {
         switch self { case .message(let text): return text }
     }
