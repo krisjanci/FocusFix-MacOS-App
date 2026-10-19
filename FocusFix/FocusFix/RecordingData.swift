@@ -88,6 +88,7 @@ final class RecordingWriter {
     private let mouse: FileHandle
     private let breaks: FileHandle
     private let surveys: FileHandle
+    private let surveyPrompts: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
@@ -102,18 +103,22 @@ final class RecordingWriter {
         let mouseURL = folder.appendingPathComponent("mouse_movement.csv")
         let breakURL = folder.appendingPathComponent("breaks.csv")
         let surveyURL = folder.appendingPathComponent("surveys.csv")
+        let promptURL = folder.appendingPathComponent("survey_prompts.csv")
         try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
         try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
         try Data(BreakLogEntry.header.utf8).write(to: breakURL)
         try Data(SurveyEntry.header.utf8).write(to: surveyURL)
+        try Data(SurveyPromptEntry.header.utf8).write(to: promptURL)
         events = try FileHandle(forWritingTo: eventURL)
         mouse = try FileHandle(forWritingTo: mouseURL)
         breaks = try FileHandle(forWritingTo: breakURL)
         surveys = try FileHandle(forWritingTo: surveyURL)
+        surveyPrompts = try FileHandle(forWritingTo: promptURL)
         try events.seekToEnd()
         try mouse.seekToEnd()
         try breaks.seekToEnd()
         try surveys.seekToEnd()
+        try surveyPrompts.seekToEnd()
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
     }
     func event(time: Double, type: String, repeated: Bool? = nil, hold: Double? = nil,
@@ -151,23 +156,30 @@ final class RecordingWriter {
         try surveys.write(contentsOf: Data(row.utf8))
         try surveys.synchronize()
     }
+    func logSurveyPrompt(_ entry: SurveyPromptEntry) throws {
+        try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
+        try surveyPrompts.synchronize()
+    }
     func finish(startedAt: Date, duration: Double, reason: String) throws {
         try flush()
         try events.synchronize()
         try mouse.synchronize()
         try breaks.synchronize()
         try surveys.synchronize()
+        try surveyPrompts.synchronize()
         try metadata(startedAt: startedAt, duration: duration, reason: reason)
     }
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 5, "session_id": folder.lastPathComponent,
+            "schema_version": 6, "session_id": folder.lastPathComponent,
+            "timed_check_in_policy": "One notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
+            "survey_prompt_logging": "survey_prompts.csv records scheduled/requested/opened/answered/skipped/cancelled/break_setup/break_started/session_stopped. requested is not proof of banner delivery or viewing. Unopened check-ins have no surveys.csv response; join by check_in_id. reference_break_id identifies the preceding break, not a future break.",
             "check_in_version": SurveyEntry.version,
             "fatigue_question": SurveyEntry.fatigueQuestion,
             "fatigue_scale": "0 = Not tired; 10 = Extremely tired",
             "productivity_question": SurveyEntry.productivityQuestion,
             "productivity_scale": "0 = Not productive; 10 = Extremely productive",
-            "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Break setup activity is marked check_in; exclude it from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores are a different measure and must not be relabelled as productivity.",
+            "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks and during_work timed check-ins. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Open check-in sheets and break setup are marked check_in; exclude them from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores must not be relabelled as productivity.",
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
             "timestamp_basis": "continuous monotonic callback receipt time including sleep, relative to session start",
             "mouse_interval_seconds": 1,
@@ -184,5 +196,5 @@ final class RecordingWriter {
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
-    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close() }
+    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close(); try? surveyPrompts.close() }
 }
