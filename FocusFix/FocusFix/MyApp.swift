@@ -1,10 +1,15 @@
+// MARK: - FF: UI
+// Registers app windows, menu-bar controls, appearance and the once-per-launch opening animation.
+
 import SwiftUI
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Register notification actions before the app finishes launching.
     func applicationWillFinishLaunching(_ notification: Notification) {
         ActivityTracker.shared.configureNotifications()
     }
+    // Keep FocusFix running in the menu bar after the last window closes.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
@@ -13,9 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @StateObject private var tracker = ActivityTracker.shared
     @State private var launchFinished = false
     @AppStorage("appearance") private var appearance = "system"
+    // Translate System/Light/Dark preferences into SwiftUI's appearance setting.
     private var colorScheme: ColorScheme? {
         appearance == "dark" ? .dark : appearance == "light" ? .light : nil
     }
+    // Create the main window, session/test windows and menu bar, applying the remembered appearance.
     var body: some Scene {
         Window("FocusFix", id: "collector") {
             ContentView(tracker: tracker)
@@ -55,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 private struct RecordingMenu: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.openWindow) private var openWindow
+    // Expose session, break and survey controls while the main window is closed.
     var body: some View {
         Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
         Button("Show FocusFix") {
