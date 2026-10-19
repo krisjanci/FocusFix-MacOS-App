@@ -1,3 +1,6 @@
+// MARK: - FF: SHARING
+// Supplies real identity, storage and networking services; tests replace these with safe fakes.
+
 import Foundation
 
 // Injectable boundaries let queue tests use temporary files and fake networking,
@@ -12,6 +15,7 @@ import Foundation
     var prepare: (URL, URL) async throws -> PreparedUpload
     var send: (PreparedUpload, UploadItem, URL, String) async throws -> (Data, HTTPURLResponse)
 
+    // Wire up Keychain, local folders, background ZIP preparation and the real HTTPS sender.
     static var live: SharingEnvironment {
         SharingEnvironment(serviceURL: UploadConfiguration.serviceURL,
             identity: { try SharingIdentity.participantID() },
