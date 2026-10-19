@@ -12,3 +12,11 @@ breaks.csv
 surveys.csv
 survey_prompts.csv
 session.json
+
+# Upload credentials, local Cloudflare state and research archives stay private.
+node_modules/
+.wrangler/
+.dev.vars*
+.env*
+*.zip
+enrollment*.sql
