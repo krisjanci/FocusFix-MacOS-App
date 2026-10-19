@@ -26,9 +26,14 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var notificationPermissionBusy = false
     @Published var breakSetupPresented = false
     @Published var sessionCheckInPresented = false
+    @Published var timedCheckInPresented = false
+    @Published private(set) var timedCheckInPending = false
     private var sessionCheckIn: CheckInPrompt?
     private var breakCheckIn: CheckInPrompt?
-    private var activityPhase: String { breakCheckIn == nil ? breakPolicy.activityPhase : "check_in" }
+    private var timedCheckInSheet: CheckInPrompt?
+    private var timedCheckInPolicy = TimedCheckInPolicy()
+    private var checkInOpen: Bool { breakCheckIn != nil || timedCheckInSheet != nil }
+    private var activityPhase: String { checkInOpen ? "check_in" : breakPolicy.activityPhase }
     var openMainWindow: (() -> Void)?
     private var breakPolicy = BreakPolicy()
     private let breakNotifications = BreakNotifications()
@@ -148,6 +153,10 @@ final class ActivityTracker: ObservableObject {
             movementRows = 0
             keys = KeyTiming()
             breakPolicy = BreakPolicy()
+            timedCheckInPolicy = TimedCheckInPolicy()
+            timedCheckInSheet = nil
+            timedCheckInPending = false
+            timedCheckInPresented = false
             breakSetupPresented = false
             breakNotifications.clear()
             updateBreakUI(at: 0)
@@ -159,6 +168,7 @@ final class ActivityTracker: ObservableObject {
             backgroundActivity = ProcessInfo.processInfo.beginActivity(
                 options: .userInitiatedAllowingIdleSystemSleep, reason: "Recording a FocusFix session")
             try record(type: "session_start", at: 0)
+            try scheduleTimedCheckIn(at: 0)
             installMonitors()
             guard globalMonitor != nil, localMonitor != nil else {
                 stop(reason: "monitor_unavailable")
@@ -181,6 +191,8 @@ final class ActivityTracker: ObservableObject {
         // Close an abandoned break setup before finishing the recording.
         var checkInSaveError: Error?
         do { try finishBreakCheckIn(status: .cancelled, at: end) }
+        catch { checkInSaveError = error }
+        do { try finishTimedCheckIn(action: "session_stopped", at: end) }
         catch { checkInSaveError = error }
         isRecording = false
         removeMonitors()
@@ -222,7 +234,13 @@ final class ActivityTracker: ObservableObject {
         do {
             elapsed = now
             if suspendedBy.isEmpty {
-                if breakCheckIn == nil { try advanceBreakClock(at: elapsed) }
+                if !checkInOpen { try advanceBreakClock(at: elapsed) }
+                if let item = timedCheckInPolicy.tick(at: elapsed,
+                    canPrompt: breakPolicy.phase == .work && !checkInOpen) {
+                    try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "requested", time: elapsed))
+                    timedCheckInPending = true
+                    breakNotifications.sendCheckIn(session: sessionFolder?.lastPathComponent ?? "", token: item.id)
+                }
                 if breakPolicy.phase != .resting { append(mouse.advance(to: elapsed)) }
             }
             try writer?.flush()
@@ -379,9 +397,11 @@ final class ActivityTracker: ObservableObject {
         updateBreakUI(at: time)
     }
     func chooseBreak() {
-        guard isRecording, breakPolicy.phase == .work, breakCheckIn == nil else { return }
+        guard isRecording, breakPolicy.phase == .work, !checkInOpen else { return }
         let time = now
         do {
+            // Don't stack a due work check-in on top of the pre-break ratings.
+            if timedCheckInPolicy.hasPending { try finishTimedCheckIn(action: "break_setup", at: time) }
             append(mouse.stop(at: time))
             breakCheckIn = CheckInPrompt(elapsed: time)
             resetMouse(at: time, phase: "check_in")
@@ -421,6 +441,7 @@ final class ActivityTracker: ObservableObject {
             try finishBreakCheckIn(status: fatigue == nil ? .skipped : .answered, at: time,
                 breakID: entry.record?.id ?? "", fatigue: fatigue, productivity: productivity)
             try writer?.logBreak(entry)
+            try finishTimedCheckIn(action: "break_started", at: time)
             keys = KeyTiming()
             returnPoint = CGEvent(source: nil)?.location ?? .zero
             returnWindowStart = time
@@ -436,7 +457,7 @@ final class ActivityTracker: ObservableObject {
         do {
             try finishBreakCheckIn(status: .cancelled, at: now)
             try writer?.logBreak(entry)
-            breakNotifications.clear()
+            breakNotifications.clearBreaks()
             breakSetupPresented = false
             updateBreakUI(at: now)
         } catch { fail(error) }
@@ -454,6 +475,7 @@ final class ActivityTracker: ObservableObject {
         try writer?.logBreak(entry)
         resetMouse(at: time, phase: "work")
         breakNotifications.clear()
+        try scheduleTimedCheckIn(at: time, afterBreak: entry.record?.id ?? "")
         elapsed = time
         updateBreakUI(at: time)
     }
@@ -508,7 +530,11 @@ final class ActivityTracker: ObservableObject {
     }
     private func notificationAction(session: String, token: String, action: String) {
         guard isRecording, sessionFolder?.lastPathComponent == session else { return }
-        if token == breakPolicy.promptID {
+        if timedCheckInPolicy.hasPending, token == timedCheckInPolicy.current?.id {
+            if action == "answer_check_in" || action == UNNotificationDefaultActionIdentifier {
+                openTimedCheckIn()
+            } else if action == "skip_check_in" { skipTimedCheckIn() }
+        } else if token == breakPolicy.promptID {
             switch action {
             case "take": chooseBreak(); openMainWindow?()
             case "skip": deferBreak(snooze: false)
@@ -520,6 +546,64 @@ final class ActivityTracker: ObservableObject {
             if action == "back" { returnFromBreak(); openMainWindow?() }
             else if action == UNNotificationDefaultActionIdentifier { openMainWindow?() }
         }
+    }
+    private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
+        let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak)
+        try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "scheduled", time: time))
+    }
+    func openTimedCheckIn() {
+        guard isRecording, breakPolicy.phase == .work, !checkInOpen,
+              let token = timedCheckInPolicy.current?.id,
+              let item = timedCheckInPolicy.open(token: token, at: now) else { return }
+        let time = item.openedAt!
+        do {
+            append(mouse.stop(at: time))
+            timedCheckInSheet = CheckInPrompt(elapsed: time)
+            resetMouse(at: time, phase: "check_in")
+            try record(type: "check_in_start", at: time)
+            try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "opened", time: time))
+            breakNotifications.clearCheckIn()
+            timedCheckInPresented = true
+            openMainWindow?()
+        } catch { fail(error) }
+    }
+    func completeTimedCheckIn(fatigue: Int, productivity: Int) {
+        guard isRecording, timedCheckInSheet != nil,
+              (0...10).contains(fatigue), (0...10).contains(productivity) else { return }
+        do { try finishTimedCheckIn(action: "answered", at: now, fatigue: fatigue, productivity: productivity) }
+        catch { fail(error) }
+    }
+    func skipTimedCheckIn() {
+        guard isRecording, timedCheckInPolicy.hasPending else { return }
+        do { try finishTimedCheckIn(action: "skipped", at: now) }
+        catch { fail(error) }
+    }
+    func cancelTimedCheckIn() {
+        guard isRecording, timedCheckInSheet != nil else { return }
+        do { try finishTimedCheckIn(action: "cancelled", at: now) }
+        catch { fail(error) }
+    }
+    private func finishTimedCheckIn(action: String, at time: Double, fatigue: Int? = nil, productivity: Int? = nil) throws {
+        guard let item = timedCheckInPolicy.finish() else { return }
+        let sheet = timedCheckInSheet
+        // Clear the state first so I/O errors and late notification clicks cannot resubmit it.
+        timedCheckInSheet = nil
+        timedCheckInPending = false
+        timedCheckInPresented = false
+        breakNotifications.clearCheckIn()
+        if let sheet {
+            append(mouse.stop(at: time))
+            let status: CheckInStatus = action == "answered" ? .answered : action == "skipped" ? .skipped : .cancelled
+            try writer?.logSurvey(SurveyEntry(id: item.id, context: .duringWork, status: status,
+                breakID: "", shownAt: sheet.shownAt, answeredAt: Date(), shownElapsed: sheet.elapsed,
+                answeredElapsed: time, fatigue: fatigue, productivity: productivity))
+            try record(type: "check_in_end", at: time)
+            if breakPolicy.phase == .work {
+                resetMouse(at: time, phase: "work")
+                breakPolicy.input(at: time)
+            }
+        }
+        try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: action, time: time))
     }
     func refreshSessions() {
         do {
