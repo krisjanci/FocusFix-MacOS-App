@@ -34,6 +34,8 @@
 
 - adding white/brown etc. noise functional (automatic change to see which noise is best)
 
+- an ai that you tell the task to to customise the settings
+
 
 Pre release todo (later stage)
 
