@@ -1,3 +1,6 @@
+// MARK: - FF: SHARING
+// Shows the participant ID, enrollment and explicit sharing choice, with limits and opt-out caveats.
+
 import SwiftUI
 import AppKit
 
@@ -7,6 +10,7 @@ struct SharingView: View {
     @State private var credential = ""
     @State private var confirmSharing = false
 
+    // Show enrollment, consent controls and queue status; require confirmation before sharing starts.
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
