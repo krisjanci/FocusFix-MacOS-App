@@ -55,6 +55,15 @@ private struct RecordingMenu: View {
         }
         if tracker.isRecording {
             Divider()
+            if tracker.timedCheckInPending {
+                Button("Answer check-in") {
+                    openWindow(id: "collector")
+                    NSApp.activate(ignoringOtherApps: true)
+                    tracker.openTimedCheckIn()
+                }
+                Button("Skip check-in") { tracker.skipTimedCheckIn() }
+                Divider()
+            }
             if tracker.breakPhase != .work {
                 Button("I'm back") { tracker.returnFromBreak() }
             } else {
@@ -62,7 +71,7 @@ private struct RecordingMenu: View {
                     tracker.chooseBreak()
                     openWindow(id: "collector")
                     NSApp.activate(ignoringOtherApps: true)
-                }
+                }.disabled(tracker.timedCheckInPresented)
                 if tracker.breakPromptPending {
                     Button("Skip — wait 25 min") { tracker.deferBreak(snooze: false) }
                     Button("Snooze 10 min") { tracker.deferBreak(snooze: true) }
