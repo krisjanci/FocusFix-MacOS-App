@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main struct MyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var tracker = ActivityTracker.shared
+    @State private var launchFinished = false
     @AppStorage("appearance") private var appearance = "system"
     private var colorScheme: ColorScheme? {
         appearance == "dark" ? .dark : appearance == "light" ? .light : nil
@@ -18,7 +19,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var body: some Scene {
         Window("FocusFix", id: "collector") {
             ContentView(tracker: tracker)
+                .opacity(launchFinished ? 1 : 0)
+                .allowsHitTesting(launchFinished)
+                .accessibilityHidden(!launchFinished)
+                .overlay {
+                    if !launchFinished {
+                        LaunchScreen { launchFinished = true }.transition(.opacity)
+                    }
+                }
                 .preferredColorScheme(colorScheme)
+                .onDisappear { launchFinished = true }
+                // An explicit menu-bar action takes priority over the introduction.
+                .onChange(of: tracker.sessionCheckInPresented) { _, shown in
+                    if shown { launchFinished = true }
+                }
+                .onChange(of: tracker.isRecording) { _, recording in
+                    if recording { launchFinished = true }
+                }
         }.windowResizability(.contentSize)
         Window("Sessions — FocusFix", id: "sessions") {
             SessionLibraryView(tracker: tracker).preferredColorScheme(colorScheme)
