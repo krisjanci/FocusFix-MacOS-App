@@ -1,3 +1,6 @@
+// MARK: - FF: IDENTITY
+// Stores a random installation ID and enrollment credential in macOS Keychain, never in Git or exported CSV contents.
+
 import Foundation
 import Security
 
@@ -5,6 +8,7 @@ import Security
 enum SharingIdentity {
     private static let service = "org.focusfix.research-sharing"
 
+    // Read one Keychain value; a missing entry is different from a Keychain access error.
     static func read(_ account: String) throws -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: account,
@@ -19,6 +23,7 @@ enum SharingIdentity {
         return value
     }
 
+    // Update an existing Keychain entry or create it with this-device-only accessibility.
     static func save(_ value: String, account: String) throws {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: account]
@@ -36,6 +41,7 @@ enum SharingIdentity {
         }
     }
 
+    // Reuse the saved random participant ID, or create it once for this installation.
     static func participantID() throws -> String {
         if let value = try read("participant-id") {
             guard UUID(uuidString: value) != nil else {
