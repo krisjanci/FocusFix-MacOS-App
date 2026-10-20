@@ -21,15 +21,18 @@ final class SharingController: ObservableObject {
 
     // Whether a sharing opt-in is saved.
     var enabled: Bool { settings.consentID != nil }
+    // Release builds cannot opt in, read enrollment secrets or resume a development upload queue.
+    var researchAvailable: Bool { environment.researchUploadsAllowed }
     // Expose the consent marker only while all upload prerequisites are available.
     var consentID: String? { canEnable ? settings.consentID : nil }
     // Whether this build contains a valid HTTPS receiver origin.
     var configured: Bool { UploadPolicy.endpoint(environment.serviceURL) != nil }
     // Require working storage, enrollment, identity and configuration before allowing sharing.
-    var canEnable: Bool { storageReady && configured && hasCredential && !participantID.isEmpty }
+    var canEnable: Bool { researchAvailable && storageReady && configured && hasCredential && !participantID.isEmpty }
 
     // Explain a disabled switch without treating local setup as proof the server is ready.
     var setupBlocker: String? {
+        if !researchAvailable { return "This build is local-only. Research uploads and enrollment are unavailable." }
         if !configured { return "This app build is not connected to the upload service. Add the Worker address and rebuild the app." }
         if participantID.isEmpty { return "The participant ID could not be read from Keychain. Allow FocusFix access, then quit and reopen the app." }
         if !storageReady { return "Sharing preferences are unavailable. Resolve the error shown below, then quit and reopen the app. Local recording still works." }
@@ -40,6 +43,11 @@ final class SharingController: ObservableObject {
     // Load identity and queue state; fail closed on invalid state or a changed service URL.
     init(environment: SharingEnvironment) {
         self.environment = environment
+        // Leave the test installation's Keychain and queue untouched when running a local-only build.
+        guard researchAvailable else {
+            notice = "Local-only build. No research data is uploaded."
+            return
+        }
         do {
             participantID = try environment.identity()
             hasCredential = try environment.readCredential() != nil
@@ -74,6 +82,7 @@ final class SharingController: ObservableObject {
 
     // Start the retry timer and resume eligible pending uploads while the app is running.
     func resume() {
+        guard researchAvailable else { return }
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { _ = self?.retryPending() }
@@ -83,6 +92,10 @@ final class SharingController: ObservableObject {
 
     // Validate and store the enrollment credential in Keychain, resetting sharing before replacing it.
     func saveCredential(_ input: String) {
+        guard researchAvailable else {
+            notice = setupBlocker ?? "Research sharing is unavailable."
+            return
+        }
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         // The researcher issues ID.secret. This catches a token for the wrong Mac
         // before sharing is enabled; the server still verifies the secret itself.
