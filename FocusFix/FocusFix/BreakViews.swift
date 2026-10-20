@@ -47,11 +47,13 @@ struct BreakSetupView: View {
         ScrollView {
         VStack(alignment: .leading, spacing: 22) {
             Label("Make time for a break", systemImage: "leaf").font(.title2.weight(.semibold))
-            Text("Before you step away, a quick check-in.").foregroundStyle(.secondary)
-            FatigueSlider(rating: $fatigue)
-            RatingSlider(title: SurveyEntry.productivityQuestion,
-                low: "Not productive", high: "Extremely productive", rating: $productivity)
-            Divider()
+            if tracker.sessionSurveyOptions.beforeBreak {
+                Text("Before you step away, a quick check-in.").foregroundStyle(.secondary)
+                FatigueSlider(rating: $fatigue)
+                RatingSlider(title: SurveyEntry.productivityQuestion,
+                    low: "Not productive", high: "Extremely productive", rating: $productivity)
+                Divider()
+            }
             Text("Choose a duration and what you feel like doing.").foregroundStyle(.secondary)
             Picker("Duration", selection: $preset) {
                 Text("5 min").tag(5)
@@ -74,12 +76,15 @@ struct BreakSetupView: View {
                 Button("Start break") {
                     guard let minutes, valid else { return }
                     tracker.beginBreak(minutes: minutes, activity: label, fatigue: fatigue, productivity: productivity)
-                }.buttonStyle(.borderedProminent).disabled(!valid || fatigue == nil || productivity == nil)
+                }.buttonStyle(.borderedProminent)
+                    .disabled(!valid || (tracker.sessionSurveyOptions.beforeBreak && (fatigue == nil || productivity == nil)))
             }
-            Button("Skip ratings & start break") {
-                guard let minutes, valid else { return }
-                tracker.beginBreak(minutes: minutes, activity: label, fatigue: nil, productivity: nil)
-            }.disabled(!valid).font(.callout)
+            if tracker.sessionSurveyOptions.beforeBreak {
+                Button("Skip ratings & start break") {
+                    guard let minutes, valid else { return }
+                    tracker.beginBreak(minutes: minutes, activity: label, fatigue: nil, productivity: nil)
+                }.disabled(!valid).font(.callout)
+            }
         }.padding(28)
         }.frame(width: 480, height: 520)
     }
