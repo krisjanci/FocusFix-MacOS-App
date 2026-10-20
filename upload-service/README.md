@@ -6,11 +6,13 @@ The app still works locally without it. Creating the bucket doesn't deploy this 
 
 ## What is ready
 
-- The code and local tests are here. Nothing has been deployed to my Cloudflare account yet.
-- The bucket binding already says `focusfix-mldata`. The D1 database ID and the app's
-  Worker URL still need to be filled in.
-- Uploads default to disabled on the server and off in the app. I need to finish the
-  study consent/storage plan before enrolling participants. I can use dummy data to test.
+- As of October 19, 2026, the Worker is deployed and enabled for my controlled test.
+  The D1 tables exist, and the app's Worker URL and database ID are configured.
+- One test installation is enrolled. An empty authentication probe confirmed its
+  credential was accepted, then intentionally stopped before any R2 write. A complete
+  app-session upload/download test is still needed; no recording was sent by that probe.
+- Sharing still defaults to off in the app. I must save the registered credential
+  and explicitly turn it on. I need the study consent/storage plan before real participants.
 - This is a research pilot, not an anonymous public upload endpoint. No public signup.
   I issue one credential per enrolled participant ID and can revoke it.
 - R2 holds ZIP files. D1 holds credential hashes, quota reservations and upload receipts,
@@ -26,7 +28,8 @@ Think of the setup as three things:
 
 The bucket is already named in the code, but creating it alone doesn't connect the app.
 Read the billing section below first: this setup does **not** guarantee a $0 bill.
-These steps deploy a real service; I haven't run them against my account yet.
+These are the setup steps for a fresh deployment. My test deployment is already online;
+I don't need to create a second database or regenerate a working enrollment code.
 
 ### 1. Check my account and bucket
 
@@ -92,7 +95,7 @@ These database setup steps follow [Cloudflare's D1 guide](https://developers.clo
 
 ### 7. Put the receiver online, still closed to uploads
 
-Leave `"UPLOADS_ENABLED": "false"` in `wrangler.jsonc` and run:
+For a fresh deployment, first set `"UPLOADS_ENABLED": "false"` in `wrangler.jsonc`, save and run:
 
 ```sh
 npx wrangler@4 deploy
@@ -164,7 +167,11 @@ Compare these with the local originals before calling the connection tested.
 
 If something doesn't arrive:
 
-- Sharing toggle unavailable: check the app's service URL, saved enrollment and Keychain notice.
+- Sharing toggle unavailable: read the setup explanation under the switch. Missing
+  enrollment opens Research enrollment automatically. Save the registered credential;
+  a Mac password or participant ID alone isn't the credential. Recording a new session
+  does not unlock the switch. If the ID/preferences are unavailable, resolve the
+  displayed Keychain/storage error and quit/reopen the app.
 - Enrollment rejected: confirm I ran the generated SQL in the same D1 database used by this Worker.
 - Service unavailable: check `UPLOADS_ENABLED` is true **and redeployed**.
 - Waiting: keep the app open; retries are delayed. The account panel also has Check pending uploads.
