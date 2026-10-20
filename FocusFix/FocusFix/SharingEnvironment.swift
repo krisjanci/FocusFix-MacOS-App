@@ -6,6 +6,7 @@ import Foundation
 // Injectable boundaries let queue tests use temporary files and fake networking,
 // without reading a real Keychain identity or participant recordings.
 @MainActor struct SharingEnvironment {
+    var researchUploadsAllowed = true
     var serviceURL: String
     var identity: () throws -> String
     var readCredential: () throws -> String?
@@ -17,7 +18,8 @@ import Foundation
 
     // Wire up Keychain, local folders, background ZIP preparation and the real HTTPS sender.
     static var live: SharingEnvironment {
-        SharingEnvironment(serviceURL: UploadConfiguration.serviceURL,
+        SharingEnvironment(researchUploadsAllowed: UploadConfiguration.researchUploadsAllowed,
+            serviceURL: UploadConfiguration.serviceURL,
             identity: { try SharingIdentity.participantID() },
             readCredential: { try SharingIdentity.read("upload-credential") },
             saveCredential: { try SharingIdentity.save($0, account: "upload-credential") },
