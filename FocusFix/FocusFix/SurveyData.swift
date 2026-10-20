@@ -9,6 +9,27 @@ enum CheckInContext: String {
 }
 enum CheckInStatus: String { case answered, skipped, cancelled }
 
+// Copy these choices at session start so a session keeps one clear survey protocol.
+struct SurveyOptions: Equatable {
+    var beforeSession = true
+    var beforeBreak = true
+    var duringWork = true
+
+    func isEnabled(for context: CheckInContext) -> Bool {
+        switch context {
+        case .sessionStart: return beforeSession
+        case .beforeBreak: return beforeBreak
+        case .duringWork: return duringWork
+        }
+    }
+
+    // Disabled is different from a skipped question; save the choices alongside the CSVs.
+    var metadata: [String: Bool] {
+        ["before_session": beforeSession, "before_break": beforeBreak,
+         "during_work_10_minutes": duringWork]
+    }
+}
+
 struct CheckInPrompt {
     let id = UUID().uuidString
     let shownAt = Date()
