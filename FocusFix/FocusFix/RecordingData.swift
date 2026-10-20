@@ -106,10 +106,13 @@ final class RecordingWriter {
     private var breakBuffer = ""
     private let participantID: String?
     private let sharingConsentID: String?
+    private let surveyOptions: SurveyOptions
     // Create a new session folder and CSV files, then write the initial session metadata.
-    init(root: URL, id: String, startedAt: Date, participantID: String? = nil, sharingConsentID: String? = nil) throws {
+    init(root: URL, id: String, startedAt: Date, participantID: String? = nil, sharingConsentID: String? = nil,
+         surveyOptions: SurveyOptions = SurveyOptions()) throws {
         self.participantID = participantID
         self.sharingConsentID = sharingConsentID
+        self.surveyOptions = surveyOptions
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
             throw CocoaError(.fileWriteFileExists)
@@ -174,12 +177,14 @@ final class RecordingWriter {
     }
     // Validate and save a check-in response immediately rather than waiting for the activity buffer.
     func logSurvey(_ entry: SurveyEntry) throws {
+        guard surveyOptions.isEnabled(for: entry.context) else { return }
         let row = try entry.csv(sessionID: folder.lastPathComponent)
         try surveys.write(contentsOf: Data(row.utf8))
         try surveys.synchronize()
     }
     // Save a survey opportunity's scheduling/delivery/action history separately from its answers.
     func logSurveyPrompt(_ entry: SurveyPromptEntry) throws {
+        guard surveyOptions.duringWork else { return }
         try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
         try surveyPrompts.synchronize()
     }
@@ -196,8 +201,10 @@ final class RecordingWriter {
     // Write session timing, schema, participant identity and consent information into session.json.
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 7, "session_id": folder.lastPathComponent,
-            "timed_check_in_policy": "One notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
+            "schema_version": 8, "session_id": folder.lastPathComponent,
+            "survey_options": surveyOptions.metadata,
+            "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
+            "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
             "survey_prompt_logging": "survey_prompts.csv records scheduled/requested/opened/answered/skipped/cancelled/break_setup/break_started/session_stopped. requested is not proof of banner delivery or viewing. Unopened check-ins have no surveys.csv response; join by check_in_id. reference_break_id identifies the preceding break, not a future break.",
             "check_in_version": SurveyEntry.version,
             "fatigue_question": SurveyEntry.fatigueQuestion,
