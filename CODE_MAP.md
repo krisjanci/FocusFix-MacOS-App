@@ -36,6 +36,8 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: UPLOAD_CONFIG` | `UploadTransport.swift`, `upload-service/wrangler.jsonc` | Worker URL, bucket/database bindings and server upload switch |
 | `FF: QUOTAS` | `UploadPolicy.swift`, `upload-service/src/policy.mjs`, `upload-service/schema.sql` | Size/time/request limits and server counters |
 | `FF: ENROLLMENT` | `upload-service/enroll.mjs`, `upload-service/src/worker.mjs`, `upload-service/schema.sql` | Creating credentials, checking access and storing credential hashes |
+| `FF: PRIVACY` | `RecordingNotice.swift`, `RecordingNoticeView.swift` | First-use recording notice, remembered acknowledgement and profile privacy details |
+| `FF: RELEASE` | `UploadTransport.swift`, `scripts/verify-release.sh` | Local-only Release configuration and checks on an exported signed/notarized app |
 
 ## Some useful exact searches
 
