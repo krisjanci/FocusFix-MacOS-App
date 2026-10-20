@@ -17,6 +17,12 @@ struct TimedCheckInPolicy {
     // Whether the current opportunity has been requested and is waiting for an action.
     var hasPending: Bool { current?.requestedAt != nil }
 
+    // An opted-out session gets no opportunity, notification or artificial skipped answer.
+    mutating func scheduleIfEnabled(from time: Double, afterBreak: String = "", options: SurveyOptions) -> TimedCheckIn? {
+        guard options.duringWork else { current = nil; return nil }
+        return schedule(from: time, afterBreak: afterBreak)
+    }
+
     // Replace the previous opportunity with one due 10 minutes from this start or break return.
     mutating func schedule(from time: Double, afterBreak: String = "") -> TimedCheckIn {
         let item = TimedCheckIn(id: UUID().uuidString, due: time + 600, referenceBreakID: afterBreak)
