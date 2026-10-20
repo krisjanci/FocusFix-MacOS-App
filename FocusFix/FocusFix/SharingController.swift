@@ -28,6 +28,15 @@ final class SharingController: ObservableObject {
     // Require working storage, enrollment, identity and configuration before allowing sharing.
     var canEnable: Bool { storageReady && configured && hasCredential && !participantID.isEmpty }
 
+    // Explain a disabled switch without treating local setup as proof the server is ready.
+    var setupBlocker: String? {
+        if !configured { return "This app build is not connected to the upload service. Add the Worker address and rebuild the app." }
+        if participantID.isEmpty { return "The participant ID could not be read from Keychain. Allow FocusFix access, then quit and reopen the app." }
+        if !storageReady { return "Sharing preferences are unavailable. Resolve the error shown below, then quit and reopen the app. Local recording still works." }
+        if !hasCredential { return "Save an enrollment credential before turning on sharing. Open Research enrollment below. You don't need to record a session first." }
+        return nil
+    }
+
     // Load identity and queue state; fail closed on invalid state or a changed service URL.
     init(environment: SharingEnvironment) {
         self.environment = environment
@@ -94,7 +103,7 @@ final class SharingController: ObservableObject {
     // Create a fresh consent marker on opt-in, or cancel pending work and discard its cached ZIPs on opt-out.
     func setEnabled(_ value: Bool) {
         if value {
-            guard canEnable else { notice = "The upload service and enrollment must be configured first."; return }
+            guard canEnable else { notice = setupBlocker ?? "Sharing setup is incomplete."; return }
             guard !enabled else { return }
             settings.consentID = UUID().uuidString
             settings.consentedAt = Date()
