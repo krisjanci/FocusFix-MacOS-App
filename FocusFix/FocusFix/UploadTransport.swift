@@ -6,9 +6,15 @@ import CryptoKit
 
 // MARK: - FF: UPLOAD_CONFIG
 enum UploadConfiguration {
-    // After deploying upload-service, paste its HTTPS origin here. Not a bucket URL.
-    // This is public configuration, never an R2 key or participant credential.
-        static let serviceURL = "https://focusfix-uploads.focusfix-research.workers.dev"
+    // FF: RELEASE — public Release builds stay local-only until the study release is reviewed.
+    // Debug keeps the explicitly enrolled development test. Never ship a Debug app as a release.
+    #if DEBUG
+    static let researchUploadsAllowed = true
+    static let serviceURL = "https://focusfix-uploads.focusfix-research.workers.dev"
+    #else
+    static let researchUploadsAllowed = false
+    static let serviceURL = ""
+    #endif
 }
 
 nonisolated struct PreparedUpload: Sendable {
