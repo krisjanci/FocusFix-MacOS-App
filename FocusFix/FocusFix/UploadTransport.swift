@@ -8,7 +8,7 @@ import CryptoKit
 enum UploadConfiguration {
     // After deploying upload-service, paste its HTTPS origin here. Not a bucket URL.
     // This is public configuration, never an R2 key or participant credential.
-    static let serviceURL = ""
+        static let serviceURL = "https://focusfix-uploads.focusfix-research.workers.dev"
 }
 
 nonisolated struct PreparedUpload: Sendable {
