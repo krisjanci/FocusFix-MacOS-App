@@ -68,7 +68,7 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 7)
+        precondition(info["schema_version"] as? Int == 8)
         precondition(info["participant_id"] as? String == "synthetic-participant")
         precondition(info["sharing_consent_id"] as? String == "synthetic-consent")
         precondition(info["token"] == nil && info["credential"] == nil)
