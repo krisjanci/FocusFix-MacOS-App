@@ -29,6 +29,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var notificationPermissionBusy = false
     @Published var breakSetupPresented = false
     @Published var sessionCheckInPresented = false
+    @Published var recordingNoticePresented = false
     @Published private(set) var sessionSurveyOptions = SurveyOptions()
     @Published var timedCheckInPresented = false
     @Published private(set) var timedCheckInPending = false
@@ -114,6 +115,10 @@ final class ActivityTracker: ObservableObject {
     }
     // Ask for Accessibility access, which is needed to observe activity outside FocusFix.
     func requestPermission() {
+        guard !RecordingNotice().needsAcknowledgement else {
+            recordingNoticePresented = true
+            return
+        }
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
         needsPermission = !AXIsProcessTrusted()
@@ -121,7 +126,11 @@ final class ActivityTracker: ObservableObject {
     }
     // Check permission and open the fatigue check-in before starting a new session.
     func requestStart() {
-        guard !isRecording, !sessionCheckInPresented else { return }
+        guard !isRecording, !sessionCheckInPresented, !recordingNoticePresented else { return }
+        guard !RecordingNotice().needsAcknowledgement else {
+            recordingNoticePresented = true
+            return
+        }
         guard AXIsProcessTrusted() else {
             needsPermission = true
             message = "Keyboard recording needs Accessibility access. Allow access, then start again."
@@ -139,6 +148,12 @@ final class ActivityTracker: ObservableObject {
     }
     // Close the starting check-in without recording a session or an answer.
     func cancelSessionCheckIn() { sessionCheckIn = nil }
+    // Acknowledge local collection, then let the user press Start again after the notice closes.
+    // Avoid stacking two SwiftUI sheets during the same dismissal animation.
+    func acceptRecordingNotice() {
+        RecordingNotice().acknowledge()
+        recordingNoticePresented = false
+    }
     // Accept a selected fatigue score, or an explicit skip, then start the session.
     func completeSessionCheckIn(fatigue: Int?) {
         guard let prompt = sessionCheckIn, fatigue.map({ (0...10).contains($0) }) ?? true else { return }
@@ -148,7 +163,7 @@ final class ActivityTracker: ObservableObject {
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
     private func start(fatigue: Int?, prompt: CheckInPrompt?) {
-        guard !isRecording else { return }
+        guard !isRecording, !RecordingNotice().needsAcknowledgement else { return }
         guard AXIsProcessTrusted() else {
             needsPermission = true
             message = "Keyboard recording needs Accessibility access. Allow access, then start again."
