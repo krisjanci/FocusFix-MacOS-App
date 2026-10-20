@@ -8,9 +8,14 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 This version collects local behavior data and recommends breaks using a timing/idle
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
 ML. Optional research uploads require enrollment and explicit opt-in. The included
-upload service is deployed and enabled for a controlled test, and its URL is configured.
-Sharing still defaults to off in the app. A full app-session upload test is still needed.
+upload service is deployed and enabled for a controlled development test. Debug builds
+contain its URL and sharing defaults to off. **Release builds are local-only**: research
+uploads and enrollment are disabled, even if a development build previously had sharing on.
+A full app-session upload test is still needed before any research release.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
+
+**Not ready for a public app download yet.** See [my release checklist](RELEASE.md)
+for signing, notarization, clean-Mac testing and the separate study approval steps.
 
 For finding/editing a feature, I use [my code map](CODE_MAP.md). It lists the searchable
 `FF:` comments, which files do what, and Xcode/VS Code shortcuts. For connecting the
@@ -29,7 +34,9 @@ Reopening the main window doesn't replay it. This is visual only, not a loading
 operation, and it doesn't start recording or change any session timers.
 
 1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac and Run.
-2. Press **Start session**. If prompted in the app, choose **Allow Accessibility
+2. Press **Start session**. On first use, review the recording/privacy notice and
+   choose **I understand**, then press Start again. **Not now** records nothing.
+   The notice is also available in the profile. If prompted, choose **Allow Accessibility
    Access** and enable FocusFix in System Settings → Privacy & Security → Accessibility.
    Then press Start again. If macOS does not recognize a rebuilt app, quit and relaunch it.
 3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
@@ -79,6 +86,10 @@ The CSV files are still included, even if they only contain headers. I need to a
 for these choices when comparing sessions; opting out can change which labels I receive.
 
 ### Optional research sharing
+
+This section applies to **Debug development builds**, not the local-only Release build.
+Release neither reads enrollment secrets nor touches the saved development upload queue.
+Changing Release into a research build needs the separate review described in RELEASE.md.
 
 - The account icon at the top left opens my research profile and sharing settings.
   Sharing is off by default. Recording still works without joining the study.
@@ -377,7 +388,8 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs eight small Swift test programs. A failed assertion
+The script compiles and runs ten small Swift test programs (the release-configuration
+test runs twice, once with Debug enabled and once without it). A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
@@ -389,13 +401,17 @@ its own files, and never reads participant sessions or changes system permission
   deferral, stale/duplicate actions, early/late return, cancellation and linked CSVs.
 - `SurveyPreferencesTests`: all eight switch combinations, persistence, per-session
   snapshots, enabled/disabled scheduling and matching metadata/CSV output.
+- `RecordingNoticeTests`: first-use acknowledgement, cancellation/no automatic acceptance
+  and asking again when the notice version changes.
+- `ReleaseConfigurationTests`: Debug retains the test URL; Release has no upload URL.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
 - `UploadPolicyTests`: eligibility, whole-session limits, HTTPS configuration, ZIP
   allowlisting, checksums and rejecting symlink inputs. Synthetic temporary files only.
 - `SharingQueueTests`: opt-in, no historical backfill, opt-out during preparation,
   restart recovery, offline retries, quota delays and fail-closed settings. Fake
-  identity/networking; no real Keychain access or uploads.
+  identity/networking; no real Keychain access or uploads. Also checks that local-only
+  builds don't read credentials, alter an existing queue or upload despite a saved opt-in.
 
 The upload service also has eight Node tests using in-memory SQLite and fake R2:
 
@@ -459,6 +475,14 @@ notifications and banners, and return to FocusFix: the card should disappear.
 Disable banners again and return: it should reappear. Finally test actual break
 banners with Focus mode off. An automated permission test cannot prove macOS will
 display a banner. Do not reset permissions or delete real sessions just to test this.
+
+## License
+
+Copyright (c) 2026 Kristian Janci. All rights reserved.
+This is a public repository, but it isn't open-source licensed.
+Permissions and restrictions are in [LICENSE](LICENSE). GitHub's own
+viewing and forking rights still apply, and third-party components keep
+their own licenses.
 
 ## Future ML workflow (not implemented in this collector)
 
