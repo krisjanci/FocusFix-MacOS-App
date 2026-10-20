@@ -7,8 +7,9 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 
 This version collects local behavior data and recommends breaks using a timing/idle
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
-ML. Optional research uploads are implemented but require enrollment and deployment
-of the included upload service. Sharing defaults to off; this build has no service URL yet.
+ML. Optional research uploads require enrollment and explicit opt-in. The included
+upload service is deployed and enabled for a controlled test, and its URL is configured.
+Sharing still defaults to off in the app. A full app-session upload test is still needed.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
 For finding/editing a feature, I use [my code map](CODE_MAP.md). It lists the searchable
@@ -79,10 +80,10 @@ but renamed data could still be staged accidentally.
   The service checks authorization, size and checksum, and protects against duplicate
   uploads. Opt-out can't recall a transfer already received. Deleting locally doesn't
   delete cloud copies; cloud deletion requests go to the researcher using the ID.
-- The receiver's R2 binding is configured for **focusfix-mldata**, but it hasn't been
-  deployed or linked to this build yet. Follow [the setup guide](upload-service/README.md)
-  to create its D1 quota database, deploy the Worker, set the app's service URL and enroll
-  test IDs. No credentials should be pasted into chat or committed to GitHub.
+- The receiver is deployed with the **focusfix-mldata** binding and a D1 quota database.
+  The configured URL takes effect after rebuilding the app. Follow
+  [the setup guide](upload-service/README.md) for enrollment and testing. Never paste
+  credentials into chat or commit them to GitHub. Server enablement isn't app consent.
 
 ### Session library and exports
 
