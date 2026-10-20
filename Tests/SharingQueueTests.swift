@@ -6,14 +6,19 @@ import Foundation
     var uploads: [String] = []
     var responseCode = 200
     var offline = false
+    var credentialAvailable = true
+    var credentialSaves = 0
     var onPrepare: (() -> Void)?
     var onSend: (() -> Void)?
     var sessions: URL { root.appendingPathComponent("Sessions") }
     var sharing: URL { root.appendingPathComponent("Sharing") }
     var environment: SharingEnvironment {
         SharingEnvironment(serviceURL: "https://synthetic.example",
-            identity: { self.participant }, readCredential: { "\(self.participant).\(String(repeating: "a", count: 64))" },
-            saveCredential: { _ in }, sharingRoot: { self.sharing }, sessionRoot: { self.sessions },
+            identity: { self.participant }, readCredential: {
+                self.credentialAvailable ? "\(self.participant).\(String(repeating: "a", count: 64))" : nil
+            },
+            saveCredential: { _ in self.credentialSaves += 1; self.credentialAvailable = true },
+            sharingRoot: { self.sharing }, sessionRoot: { self.sessions },
             prepare: { _, destination in
                 self.onPrepare?()
                 return PreparedUpload(file: destination, sha256: String(repeating: "a", count: 64), bytes: 7)
@@ -44,6 +49,32 @@ import Foundation
 
 @main struct SharingQueueTests {
     @MainActor static func main() async throws {
+        // Missing enrollment explains the disabled toggle and never silently opts in.
+        let enrollment = QueueFixture()
+        defer { enrollment.cleanup() }
+        enrollment.credentialAvailable = false
+        let onboarding = SharingController(environment: enrollment.environment)
+        precondition(!onboarding.canEnable && !onboarding.enabled)
+        precondition(onboarding.setupBlocker?.contains("Save an enrollment credential") == true)
+        onboarding.setEnabled(true)
+        precondition(!onboarding.enabled && onboarding.notice == onboarding.setupBlocker)
+        onboarding.saveCredential("not-an-enrollment-code")
+        precondition(!onboarding.canEnable && enrollment.credentialSaves == 0)
+        onboarding.saveCredential("\(UUID().uuidString.lowercased()).\(String(repeating: "a", count: 64))")
+        precondition(!onboarding.canEnable && enrollment.credentialSaves == 0)
+        onboarding.saveCredential("\(enrollment.participant).\(String(repeating: "a", count: 64))")
+        precondition(onboarding.canEnable && onboarding.setupBlocker == nil)
+        precondition(!onboarding.enabled && enrollment.credentialSaves == 1 && enrollment.uploads.isEmpty)
+
+        var missingURL = enrollment.environment
+        missingURL.serviceURL = ""
+        let unconfigured = SharingController(environment: missingURL)
+        precondition(!unconfigured.canEnable && unconfigured.setupBlocker?.contains("Worker address") == true)
+        var failedIdentity = enrollment.environment
+        failedIdentity.identity = { throw SharingError.message("Synthetic Keychain failure") }
+        let locked = SharingController(environment: failedIdentity)
+        precondition(!locked.canEnable && locked.setupBlocker?.contains("Keychain") == true)
+
         let f = QueueFixture()
         defer { f.cleanup() }
         let c = SharingController(environment: f.environment)
@@ -119,6 +150,7 @@ import Foundation
         try Data("corrupt".utf8).write(to: f.sharing.appendingPathComponent("state.json"))
         let corrupt = SharingController(environment: f.environment)
         precondition(!corrupt.enabled && !corrupt.canEnable)
-        print("Sharing queue tests passed: opt-in, no backfill, cancellation, restart, offline retry, quota delay and fail-closed settings")
+        precondition(corrupt.setupBlocker?.contains("Sharing preferences") == true)
+        print("Sharing queue tests passed: enrollment guidance, opt-in, no backfill, cancellation, restart, offline retry, quota delay and fail-closed settings")
     }
 }
