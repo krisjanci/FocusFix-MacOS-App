@@ -29,6 +29,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var notificationPermissionBusy = false
     @Published var breakSetupPresented = false
     @Published var sessionCheckInPresented = false
+    @Published private(set) var sessionSurveyOptions = SurveyOptions()
     @Published var timedCheckInPresented = false
     @Published private(set) var timedCheckInPending = false
     private var sessionCheckIn: CheckInPrompt?
@@ -127,6 +128,12 @@ final class ActivityTracker: ObservableObject {
             return
         }
         needsPermission = false
+        // Freeze the choices before any survey opens; changes during a session wait until the next one.
+        sessionSurveyOptions = SurveyPreferences.shared.snapshot
+        guard sessionSurveyOptions.beforeSession else {
+            start(fatigue: nil, prompt: nil)
+            return
+        }
         sessionCheckIn = CheckInPrompt(elapsed: 0)
         sessionCheckInPresented = true
     }
@@ -140,7 +147,7 @@ final class ActivityTracker: ObservableObject {
         start(fatigue: fatigue, prompt: prompt)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?) {
         guard !isRecording else { return }
         guard AXIsProcessTrusted() else {
             needsPermission = true
@@ -155,16 +162,18 @@ final class ActivityTracker: ObservableObject {
             let sharing = SharingController.shared
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
                 participantID: sharing.participantID.isEmpty ? nil : sharing.participantID,
-                sharingConsentID: sharing.consentID)
+                sharingConsentID: sharing.consentID, surveyOptions: sessionSurveyOptions)
             writer = newWriter
             sessionFolder = newWriter.folder
             startInstant = clock.now
-            let beforeStart = prompt.instant.duration(to: startInstant).components
-            let checkInDuration = Double(beforeStart.seconds) + Double(beforeStart.attoseconds) / 1e18
-            try newWriter.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
-                status: fatigue == nil ? .skipped : .answered, breakID: "", shownAt: prompt.shownAt,
-                answeredAt: startedAt, shownElapsed: -checkInDuration, answeredElapsed: 0,
-                fatigue: fatigue, productivity: nil))
+            if let prompt, sessionSurveyOptions.beforeSession {
+                let beforeStart = prompt.instant.duration(to: startInstant).components
+                let checkInDuration = Double(beforeStart.seconds) + Double(beforeStart.attoseconds) / 1e18
+                try newWriter.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
+                    status: fatigue == nil ? .skipped : .answered, breakID: "", shownAt: prompt.shownAt,
+                    answeredAt: startedAt, shownElapsed: -checkInDuration, answeredElapsed: 0,
+                    fatigue: fatigue, productivity: nil))
+            }
             suspendedBy = []
             elapsed = 0
             eventsRecorded = 0
@@ -456,9 +465,11 @@ final class ActivityTracker: ObservableObject {
         append(mouse.stop(at: time))
         // Clear before writing so an I/O failure cannot recursively try the same check-in.
         breakCheckIn = nil
-        try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .beforeBreak, status: status,
-            breakID: breakID, shownAt: prompt.shownAt, answeredAt: Date(),
-            shownElapsed: prompt.elapsed, answeredElapsed: time, fatigue: fatigue, productivity: productivity))
+        if sessionSurveyOptions.beforeBreak {
+            try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .beforeBreak, status: status,
+                breakID: breakID, shownAt: prompt.shownAt, answeredAt: Date(),
+                shownElapsed: prompt.elapsed, answeredElapsed: time, fatigue: fatigue, productivity: productivity))
+        }
         try record(type: "check_in_end", at: time)
         if breakPolicy.phase == .work {
             resetMouse(at: time, phase: "work")
@@ -467,6 +478,9 @@ final class ActivityTracker: ObservableObject {
     }
     // Validate the chosen duration/activity, save ratings and pause detailed tracking for the break.
     func beginBreak(minutes: Double, activity: String, fatigue: Int?, productivity: Int?) {
+        // Break duration/activity still work when the pre-break survey is disabled.
+        let fatigue = sessionSurveyOptions.beforeBreak ? fatigue : nil
+        let productivity = sessionSurveyOptions.beforeBreak ? productivity : nil
         guard isRecording, breakCheckIn != nil,
               (fatigue == nil && productivity == nil) ||
                 (fatigue.map({ (0...10).contains($0) }) == true && productivity.map({ (0...10).contains($0) }) == true)
@@ -594,7 +608,8 @@ final class ActivityTracker: ObservableObject {
     }
     // Schedule one ratings opportunity 10 minutes after session start or an actual break return.
     private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
-        let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak)
+        guard let item = timedCheckInPolicy.scheduleIfEnabled(from: time, afterBreak: afterBreak,
+            options: sessionSurveyOptions) else { return }
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "scheduled", time: time))
     }
     // Open the requested survey and mark its interaction time separately from work.
