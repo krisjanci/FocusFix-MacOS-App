@@ -478,11 +478,18 @@ display a banner. Do not reset permissions or delete real sessions just to test 
 
 ## License
 
-Copyright (c) 2026 Kristian Janci. All rights reserved.
-This is a public repository, but it isn't open-source licensed.
-Permissions and restrictions are in [LICENSE](LICENSE). GitHub's own
-viewing and forking rights still apply, and third-party components keep
-their own licenses.
+Copyright (c) 2026 Kristian Janci.
+
+FocusFix's original software and project material in this repository are
+licensed under the GNU General Public License, version 3 only
+(`GPL-3.0-only`). You may redistribute and modify this material under those
+terms. The complete license is in [LICENSE](LICENSE).
+
+This material is distributed without any warranty, including the implied
+warranties of merchantability or fitness for a particular purpose. See the
+license for details. Third-party components retain their own licenses and
+notices; this grant applies only to material whose rights are held by
+Kristian Janci.
 
 ## Future ML workflow (not implemented in this collector)
 
