@@ -9,9 +9,12 @@ struct SharingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var credential = ""
     @State private var confirmSharing = false
+    @State private var enrollmentExpanded = false
 
     // Show enrollment, consent controls and queue status; require confirmation before sharing starts.
     var body: some View {
+        // Keep enrollment controls reachable even when setup help needs extra space.
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Label("Your research profile", systemImage: "person.crop.circle").font(.title2.weight(.semibold))
@@ -33,18 +36,25 @@ struct SharingView: View {
             Toggle("Share new sessions for research", isOn: Binding(get: { sharing.enabled }, set: { value in
                 if value { confirmSharing = true } else { sharing.setEnabled(false) }
             })).disabled(!sharing.enabled && !sharing.canEnable)
+            if let blocker = sharing.setupBlocker {
+                Label(blocker, systemImage: "info.circle")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text("Shares activity events, mouse summaries, breaks, fatigue/productivity ratings and session timing with the FocusFix researcher. No typed text or cursor paths. Uploads go to private Cloudflare storage.")
                 .font(.callout).fixedSize(horizontal: false, vertical: true)
             Text("Up to 180 minutes, 50 MiB and 30 sessions per UTC day. Sessions over 180 minutes or 25 MiB compressed stay local. Recording itself has no daily limit.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text("Turning sharing off cancels pending uploads. A transfer already received may remain on the server. To request deletion of uploaded data, contact the researcher with your participant ID. Deleting a session here only removes the local copy.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            DisclosureGroup("Research enrollment") {
+            DisclosureGroup("Research enrollment", isExpanded: $enrollmentExpanded) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(sharing.configured ? "Service: \(UploadConfiguration.serviceURL)" : "The upload service hasn't been connected to this build yet.")
                         .font(.caption).textSelection(.enabled)
                     Text("Give your ID to the researcher, then paste the enrollment credential they provide. Only enroll after reviewing the study information and consent process.")
                         .font(.caption).fixedSize(horizontal: false, vertical: true)
+                    Text("This is a separate enrollment code, not your Mac or Cloudflare password. The researcher must register it with the upload service first.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     SecureField("Enrollment credential", text: $credential)
                     Button("Save enrollment") { sharing.saveCredential(credential); credential = "" }
                         .disabled(credential.isEmpty)
@@ -60,7 +70,13 @@ struct SharingView: View {
                 Button("Check pending uploads") { sharing.retryPending() }
                     .disabled(!sharing.enabled || sharing.uploading)
             }
-        }.padding(26).frame(width: 510)
+        }.padding(26)
+        }.frame(width: 510, height: 650)
+            // Make the missing step visible instead of hiding it behind a closed section.
+            .onAppear { enrollmentExpanded = !sharing.hasCredential }
+            .onChange(of: sharing.hasCredential) { _, saved in
+                if !saved { enrollmentExpanded = true }
+            }
             .tint(Color(red: 0.02, green: 0.60, blue: 0.54))
             .confirmationDialog("Share new sessions with the FocusFix researcher?", isPresented: $confirmSharing,
                                 titleVisibility: .visible) {
