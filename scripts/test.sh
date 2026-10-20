@@ -21,6 +21,8 @@ run_test BreakPolicyTests "$source_dir/RecordingData.swift" "$source_dir/BreakPo
 run_test SurveyDataTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test TimedCheckInTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test NotificationAccessTests "$source_dir/NotificationAccess.swift"
+run_test SurveyPreferencesTests "$source_dir/SurveyPreferences.swift" "$source_dir/SurveyData.swift" \
+    "$source_dir/TimedCheckIn.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift"
 run_test UploadPolicyTests "$source_dir/UploadPolicy.swift" "$source_dir/UploadTransport.swift"
 run_test SharingQueueTests "$source_dir/UploadPolicy.swift" "$source_dir/UploadTransport.swift" \
     "$source_dir/SharingController.swift" "$source_dir/SharingEnvironment.swift" \
