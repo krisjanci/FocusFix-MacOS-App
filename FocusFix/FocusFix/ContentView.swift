@@ -20,7 +20,7 @@ struct ContentView: View {
                 Button { sharingPresented = true } label: {
                     Image(systemName: "person.crop.circle").font(.title2)
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .help("Research profile and data sharing").accessibilityLabel("Research profile and data sharing")
+                    .help("Profile, surveys and privacy").accessibilityLabel("Profile, surveys and privacy")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable().scaledToFit().frame(width: 54, height: 54)
                     .accessibilityHidden(true)
@@ -130,6 +130,7 @@ struct ContentView: View {
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $sharingPresented) { SharingView() }
+        .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal) }
         .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
             BreakSetupView(tracker: tracker).tint(teal)
         }
