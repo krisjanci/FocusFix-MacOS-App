@@ -18,10 +18,11 @@ struct SharingView: View {
         ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Label("Your research profile", systemImage: "person.crop.circle").font(.title2.weight(.semibold))
+                Label("Your profile", systemImage: "person.crop.circle").font(.title2.weight(.semibold))
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
+            if sharing.researchAvailable {
             Text("Participant ID").font(.headline)
             HStack {
                 Text(sharing.participantID.isEmpty ? "Unavailable" : sharing.participantID)
@@ -33,6 +34,7 @@ struct SharingView: View {
             }
             Text("This random ID links your sessions on this Mac. It isn't your name or a login.")
                 .font(.caption).foregroundStyle(.secondary)
+            }
             Divider()
             Text("Surveys").font(.headline)
             Toggle("Before a session · mental fatigue", isOn: $surveys.beforeSession)
@@ -41,6 +43,10 @@ struct SharingView: View {
             Text("The 10-minute check-in happens after starting or returning from a break. Changes apply to your next session. Saved answers are kept.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Divider()
+            DisclosureGroup("Recording & privacy") {
+                PrivacyNoticeDetails().padding(.top, 8)
+            }
+            if sharing.researchAvailable {
             Toggle("Share new sessions for research", isOn: Binding(get: { sharing.enabled }, set: { value in
                 if value { confirmSharing = true } else { sharing.setEnabled(false) }
             })).disabled(!sharing.enabled && !sharing.canEnable)
@@ -77,6 +83,10 @@ struct SharingView: View {
                 Spacer()
                 Button("Check pending uploads") { sharing.retryPending() }
                     .disabled(!sharing.enabled || sharing.uploading)
+            }
+            } else {
+                Label("Local-only build · research uploads unavailable", systemImage: "internaldrive")
+                    .font(.callout).foregroundStyle(.secondary)
             }
         }.padding(26)
         }.frame(width: 510, height: 650)
