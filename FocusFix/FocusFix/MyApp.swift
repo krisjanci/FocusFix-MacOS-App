@@ -40,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .onChange(of: tracker.sessionCheckInPresented) { _, shown in
                     if shown { launchFinished = true }
                 }
+                .onChange(of: tracker.recordingNoticePresented) { _, shown in
+                    if shown { launchFinished = true }
+                }
                 .onChange(of: tracker.isRecording) { _, recording in
                     if recording { launchFinished = true }
                 }
