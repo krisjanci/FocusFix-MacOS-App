@@ -6,6 +6,7 @@ import AppKit
 
 struct SharingView: View {
     @ObservedObject var sharing = SharingController.shared
+    @ObservedObject var surveys = SurveyPreferences.shared
     @Environment(\.dismiss) private var dismiss
     @State private var credential = ""
     @State private var confirmSharing = false
@@ -32,6 +33,13 @@ struct SharingView: View {
             }
             Text("This random ID links your sessions on this Mac. It isn't your name or a login.")
                 .font(.caption).foregroundStyle(.secondary)
+            Divider()
+            Text("Surveys").font(.headline)
+            Toggle("Before a session · mental fatigue", isOn: $surveys.beforeSession)
+            Toggle("Before a break · fatigue & productivity", isOn: $surveys.beforeBreak)
+            Toggle("10-minute check-in · fatigue & productivity", isOn: $surveys.duringWork)
+            Text("The 10-minute check-in happens after starting or returning from a break. Changes apply to your next session. Saved answers are kept.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Divider()
             Toggle("Share new sessions for research", isOn: Binding(get: { sharing.enabled }, set: { value in
                 if value { confirmSharing = true } else { sharing.setEnabled(false) }
