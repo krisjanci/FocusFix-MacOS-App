@@ -49,6 +49,28 @@ import Foundation
 
 @main struct SharingQueueTests {
     @MainActor static func main() async throws {
+        // Local-only builds must not read Keychain, reopen an opted-in queue or modify its saved state.
+        let release = QueueFixture()
+        defer { release.cleanup() }
+        let development = SharingController(environment: release.environment)
+        development.setEnabled(true)
+        let stateFile = release.sharing.appendingPathComponent("state.json")
+        let previousState = try Data(contentsOf: stateFile)
+        var localEnvironment = release.environment
+        localEnvironment.researchUploadsAllowed = false
+        localEnvironment.identity = { preconditionFailure("Local-only must not read identity") }
+        localEnvironment.readCredential = { preconditionFailure("Local-only must not read credentials") }
+        localEnvironment.sharingRoot = { preconditionFailure("Local-only must not open the queue") }
+        let local = SharingController(environment: localEnvironment)
+        precondition(!local.researchAvailable && !local.canEnable && !local.enabled && local.consentID == nil)
+        local.resume()
+        local.setEnabled(true)
+        local.saveCredential("ignored")
+        await local.retryPending()?.value
+        precondition(!local.enabled && release.uploads.isEmpty && release.credentialSaves == 0)
+        let unchangedState = try Data(contentsOf: stateFile)
+        precondition(previousState == unchangedState)
+
         // Missing enrollment explains the disabled toggle and never silently opts in.
         let enrollment = QueueFixture()
         defer { enrollment.cleanup() }
