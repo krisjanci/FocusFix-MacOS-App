@@ -25,7 +25,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: TRACKING` | `ActivityTracker.swift` | Start/stop, input events, session clock and coordination with breaks/surveys |
 | `FF: STORAGE` | `RecordingData.swift`, `SavedSession.swift` | CSV writing, one-second mouse summaries, key hold timing, saved sessions and exports |
 | `FF: BREAKS` | `BreakPolicy.swift`, `BreakViews.swift` | 25-minute/idle reminder rules, snooze, actual break duration and break controls |
-| `FF: SURVEYS` | `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | 10-minute opportunities, rating validation, CSV answers and sliders |
+| `FF: SURVEYS` | `SurveyPreferences.swift`, `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | Saved survey switches, session snapshots, 10-minute opportunities, rating validation, CSV answers and sliders |
 | `FF: NOTIFICATIONS` | `NotificationAccess.swift`, `BreakNotifications.swift` | Asking for permission, banners and notification buttons |
 | `FF: SESSIONS` | `SessionViews.swift` | Session library and Test tracking window |
 | `FF: UI` | `MyApp.swift`, `ContentView.swift` | App windows, main screen, menu bar and appearance |
