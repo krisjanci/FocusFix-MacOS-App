@@ -32,7 +32,7 @@ operation, and it doesn't start recording or change any session timers.
 2. Press **Start session**. If prompted in the app, choose **Allow Accessibility
    Access** and enable FocusFix in System Settings → Privacy & Security → Accessibility.
    Then press Start again. If macOS does not recognize a rebuilt app, quit and relaunch it.
-3. Rate how mentally tired you feel before starting, or choose **Skip & start**.
+3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
    Then work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
 4. Choose **Stop & save**. Sessions are saved automatically; you don't need to export
@@ -58,6 +58,25 @@ one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
+
+### Survey choices
+
+The account icon opens **Surveys**, with separate switches for:
+
+- Before a session: mental fatigue.
+- Before a break: mental fatigue and self-reported productivity.
+- The 10-minute check-in: both ratings after starting or actually returning from a break.
+
+All three start on. The choices are remembered locally and apply to the **next session**,
+even if I change them while recording. They don't require enrollment or sharing.
+Turning off pre-break ratings keeps the duration/activity picker and break timer.
+Turning off the 10-minute check-in removes that survey's schedule and notification,
+not the normal break reminders. Saved answers aren't deleted.
+
+Each new session records its choices under `survey_options` in `session.json`.
+Disabled surveys produce no answer/prompt rows, rather than fake skipped responses.
+The CSV files are still included, even if they only contain headers. I need to account
+for these choices when comparing sessions; opting out can change which labels I receive.
 
 ### Optional research sharing
 
@@ -218,7 +237,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. Break boundaries can also create partial intervals. Position and key
 hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. New sessions use **schema version 6**; older files are left
+or a very long key hold. New sessions use **schema version 8**; older files are left
 unchanged and remain available in the library.
 
 **breaks.csv — append-only decisions and break lifecycle**
@@ -358,7 +377,7 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs seven small Swift test programs. A failed assertion
+The script compiles and runs eight small Swift test programs. A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
@@ -368,6 +387,8 @@ its own files, and never reads participant sessions or changes system permission
   immediate saving, question metadata and the check-in activity phase.
 - `TimedCheckInTests`: ten-minute boundaries, one opportunity per work period,
   deferral, stale/duplicate actions, early/late return, cancellation and linked CSVs.
+- `SurveyPreferencesTests`: all eight switch combinations, persistence, per-session
+  snapshots, enabled/disabled scheduling and matching metadata/CSV output.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
 - `UploadPolicyTests`: eligibility, whole-session limits, HTTPS configuration, ZIP
@@ -396,6 +417,11 @@ closed. Take two manual breaks and check that both ratings start unselected each
 Try cancelling setup, skipping ratings, and exporting the session to inspect surveys.csv.
 Check that answered break rows join to the correct break ID and setup activity is
 marked `check_in`. These UI checks aren't covered by the synthetic test programs.
+
+In the profile, turn all three surveys off, stop any current session and start a new
+one. It should start directly, allow breaks without ratings and have no timed survey.
+Change a switch during recording: it should only affect the next session. Relaunch
+to check the choices persist, then turn surveys back on and check the original flow.
 
 For the timed check-in, leave a session running for ten minutes with the main window
 closed. Check Answer/Skip in the notification, the menu-bar fallback, and that answering
