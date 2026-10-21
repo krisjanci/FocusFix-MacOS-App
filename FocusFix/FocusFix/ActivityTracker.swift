@@ -2,7 +2,7 @@
 // Coordinates recording, breaks, check-ins and the session library. Nothing starts recording until the user chooses Start.
 
 import AppKit
-import ApplicationServices
+import CoreGraphics
 import Combine
 import UserNotifications
 
@@ -58,8 +58,7 @@ final class ActivityTracker: ObservableObject {
     private var eventsRecorded = 0
     private var rowsRecorded = 0
     private var lastApplication: pid_t?
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    private let inputMonitor = InputMonitor()
     private var timer: Timer?
     private var backgroundActivity: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
@@ -113,16 +112,30 @@ final class ActivityTracker: ObservableObject {
             notificationNotice = "Open System Settings → Notifications → FocusFix and turn on Allow Notifications and Banners."
         }
     }
-    // Ask for Accessibility access, which is needed to observe activity outside FocusFix.
+    // Ask for Input Monitoring only after the user acknowledges local recording.
     func requestPermission() {
         guard !RecordingNotice().needsAcknowledgement else {
             recordingNoticePresented = true
             return
         }
-        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
-        needsPermission = !AXIsProcessTrusted()
-        message = "Enable FocusFix in System Settings → Privacy & Security → Accessibility, then press Start."
+        needsPermission = !InputMonitor.requestPermission()
+        message = needsPermission
+            ? "Enable this copy of FocusFix in System Settings → Privacy & Security → Input Monitoring. If it is missing, use + to add the app shown by Show this app in Finder. Then quit and reopen it."
+            : "Input Monitoring is enabled. Press Start when you are ready."
+    }
+    func openInputSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return }
+        if !NSWorkspace.shared.open(url) {
+            message = "Open System Settings → Privacy & Security → Input Monitoring, then use + to add this copy of FocusFix."
+        }
+    }
+    func revealRunningApp() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+    }
+    func refreshInputPermission() {
+        guard needsPermission, InputMonitor.hasPermission else { return }
+        needsPermission = false
+        message = "Input Monitoring is enabled. Press Start when you are ready."
     }
     // Check permission and open the fatigue check-in before starting a new session.
     func requestStart() {
@@ -131,9 +144,8 @@ final class ActivityTracker: ObservableObject {
             recordingNoticePresented = true
             return
         }
-        guard AXIsProcessTrusted() else {
-            needsPermission = true
-            message = "Keyboard recording needs Accessibility access. Allow access, then start again."
+        guard InputMonitor.hasPermission else {
+            requestPermission()
             return
         }
         needsPermission = false
@@ -164,9 +176,9 @@ final class ActivityTracker: ObservableObject {
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
     private func start(fatigue: Int?, prompt: CheckInPrompt?) {
         guard !isRecording, !RecordingNotice().needsAcknowledgement else { return }
-        guard AXIsProcessTrusted() else {
+        guard InputMonitor.hasPermission else {
             needsPermission = true
-            message = "Keyboard recording needs Accessibility access. Allow access, then start again."
+            message = "Activity recording needs Input Monitoring access. Allow access, then start again."
             return
         }
         needsPermission = false
@@ -214,10 +226,10 @@ final class ActivityTracker: ObservableObject {
             try record(type: "session_start", at: 0)
             try scheduleTimedCheckIn(at: 0)
             installMonitors()
-            guard globalMonitor != nil, localMonitor != nil else {
+            guard inputMonitor.isEnabled else {
                 stop(reason: "monitor_unavailable")
                 hasError = true
-                message = "Could not attach input monitors. Check Accessibility access and relaunch FocusFix."
+                message = "Could not attach input monitors. Check Input Monitoring access and relaunch FocusFix."
                 return
             }
             let clock = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -273,9 +285,13 @@ final class ActivityTracker: ObservableObject {
     // Update the clock, mouse summaries and reminder rules once per timer tick.
     private func tick() {
         guard isRecording else { return }
-        guard AXIsProcessTrusted() else {
+        guard InputMonitor.hasPermission else {
             stop(reason: "permission_lost")
             needsPermission = true
+            return
+        }
+        guard inputMonitor.isEnabled else {
+            inputInterrupted()
             return
         }
         do {
@@ -298,18 +314,9 @@ final class ActivityTracker: ObservableObject {
     }
     // Listen for local/global input, app switches and sleep/login changes while recording.
     private func installMonitors() {
-        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp, .flagsChanged,
-            .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
-            .otherMouseDown, .otherMouseUp, .scrollWheel, .mouseMoved,
-            .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
-        // Global sees other apps; local sees FocusFix. Return input unchanged.
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated { self?.receive(event, outsideApp: true) }
-        }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated { self?.receive(event, outsideApp: false) }
-            return event
-        }
+        _ = inputMonitor.start(onInput: { [weak self] event in
+            self?.receive(event, outsideApp: event.isOutsideApp(processID: ProcessInfo.processInfo.processIdentifier))
+        }, onInterruption: { [weak self] in self?.inputInterrupted() })
         let center = NSWorkspace.shared.notificationCenter
         workspaceObservers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main) { [weak self] notification in
@@ -344,7 +351,7 @@ final class ActivityTracker: ObservableObject {
         }
     }
     // Turn an input event into a generic activity record; never store typed text or a cursor path.
-    private func receive(_ event: NSEvent, outsideApp: Bool) {
+    private func receive(_ event: ActivityInput, outsideApp: Bool) {
         guard isRecording, suspendedBy.isEmpty else { return }
         let time = now
         do {
@@ -362,7 +369,7 @@ final class ActivityTracker: ObservableObject {
             }
             switch event.type {
             case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-                if let point = event.cgEvent?.location { append(mouse.move(to: point, at: time)) }
+                append(mouse.move(to: event.location, at: time))
             case .keyDown:
                 keys.down(code: event.keyCode, at: time, repeated: event.isARepeat)
                 try record(type: isDelete(event) ? "delete_down" : "key_down", at: time, repeated: event.isARepeat)
@@ -387,7 +394,7 @@ final class ActivityTracker: ObservableObject {
         } catch { fail(error) }
     }
     // Recognize backspace and forward-delete keys without saving other key identities.
-    private func isDelete(_ event: NSEvent) -> Bool { event.keyCode == 51 || event.keyCode == 117 }
+    private func isDelete(_ event: ActivityInput) -> Bool { event.keyCode == 51 || event.keyCode == 117 }
     // Add one activity event with its elapsed time and work/check-in/break-return phase.
     private func record(type: String, at time: Double, repeated: Bool? = nil, hold: Double? = nil) throws {
         try writer?.event(time: time, type: type, repeated: repeated, hold: hold,
@@ -407,16 +414,19 @@ final class ActivityTracker: ObservableObject {
         hasError = true
         message = "Recording stopped: \(error.localizedDescription). Existing files have been kept."
     }
+    private func inputInterrupted() {
+        stop(reason: "input_monitor_interrupted")
+        hasError = true
+        needsPermission = !InputMonitor.hasPermission
+        message = "Recording stopped because input monitoring was interrupted. The session was saved. Check Input Monitoring access, then start a new session."
+    }
     // Remove input observers and timers, and release the app's recording activity assertion.
     private func removeMonitors() {
         if let backgroundActivity { ProcessInfo.processInfo.endActivity(backgroundActivity) }
         backgroundActivity = nil
         timer?.invalidate()
         timer = nil
-        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
-        if let localMonitor { NSEvent.removeMonitor(localMonitor) }
-        globalMonitor = nil
-        localMonitor = nil
+        inputMonitor.stop()
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         workspaceObservers.removeAll()
     }
@@ -586,14 +596,14 @@ final class ActivityTracker: ObservableObject {
         catch { fail(error) }
     }
     // Require meaningful input to end a break automatically; ignore tiny drift and key repeats.
-    private func isReturnInput(_ event: NSEvent, at time: Double) -> Bool {
+    private func isReturnInput(_ event: ActivityInput, at time: Double) -> Bool {
         switch event.type {
         case .keyDown: return !event.isARepeat
         case .leftMouseDown, .rightMouseDown, .otherMouseDown: return true
         case .scrollWheel:
-            return event.momentumPhase.isEmpty && (event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0)
+            return !event.isMomentum && (event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0)
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-            guard let point = event.cgEvent?.location else { return false }
+            let point = event.location
             if time - returnWindowStart > 1 { returnDistance = 0; returnWindowStart = time }
             returnDistance += hypot(point.x - returnPoint.x, point.y - returnPoint.y)
             returnPoint = point
@@ -718,6 +728,8 @@ final class ActivityTracker: ObservableObject {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let destination = panel.url else { return nil }
+        let scopedAccess = destination.startAccessingSecurityScopedResource()
+        defer { if scopedAccess { destination.stopAccessingSecurityScopedResource() } }
         return try SessionFiles.export(session, to: destination, root: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
     }
