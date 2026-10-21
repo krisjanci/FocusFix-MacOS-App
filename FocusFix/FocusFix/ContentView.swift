@@ -91,22 +91,22 @@ struct ContentView: View {
             }
 
             // Only actionable problems belong on the main recording screen.
-            if tracker.hasError || tracker.needsPermission {
+            if tracker.hasError {
                 Text(tracker.message).font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                    .foregroundStyle(tracker.hasError ? Color.red : Color.secondary)
+                    .foregroundStyle(Color.red)
             }
             if tracker.needsPermission {
                 VStack(alignment: .leading, spacing: 8) {
-                    Button("Allow Input Monitoring") { tracker.requestPermission() }.buttonStyle(.bordered)
-                    HStack {
-                        Button("Open Settings") { tracker.openInputSettings() }
-                        Button("Show this app in Finder") { tracker.revealRunningApp() }
-                    }
-                    Text("Add this exact copy with the + button if it is missing. Older versions may use Accessibility instead. Reopen this copy after changing permission.")
+                    Label("Input Monitoring", systemImage: "keyboard")
+                        .font(.callout.weight(.medium))
+                    Text(tracker.message)
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
+                    Button("Enable Input Monitoring") { tracker.requestPermission() }
+                        .buttonStyle(.borderedProminent).tint(teal)
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
             HStack(spacing: 12) {
                 if onBreak {
