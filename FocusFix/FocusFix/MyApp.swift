@@ -47,6 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if recording { launchFinished = true }
                 }
         }.windowResizability(.contentSize)
+        .commands { FocusFixCommands() }
+        Window("About, privacy & support — FocusFix", id: "about") {
+            AboutView().preferredColorScheme(colorScheme)
+        }.defaultSize(width: 560, height: 650)
         Window("Sessions — FocusFix", id: "sessions") {
             SessionLibraryView(tracker: tracker).preferredColorScheme(colorScheme)
         }.defaultSize(width: 760, height: 520)
@@ -111,9 +115,26 @@ private struct RecordingMenu: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         Divider()
+        Button("About, privacy & support") {
+            openWindow(id: "about")
+            NSApp.activate(ignoringOtherApps: true)
+        }
         Button("Quit FocusFix") {
             tracker.stop(reason: "app_quit")
             NSApp.terminate(nil)
         }.keyboardShortcut("q")
+    }
+}
+
+private struct FocusFixCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+    var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About FocusFix") { openWindow(id: "about") }
+        }
+        CommandGroup(replacing: .help) {
+            Button("Privacy & support") { openWindow(id: "about") }
+            Link("FocusFix support", destination: AppLinks.support)
+        }
     }
 }
