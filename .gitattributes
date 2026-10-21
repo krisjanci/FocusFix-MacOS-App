@@ -1,0 +1,3 @@
+# Source packages must not contain personal Xcode UI state.
+**/xcuserdata export-ignore
+*.xcuserstate export-ignore
