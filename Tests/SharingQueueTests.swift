@@ -8,14 +8,17 @@ import Foundation
     var offline = false
     var credentialAvailable = true
     var credentialSaves = 0
+    var identityReads = 0
+    var credentialReads = 0
     var onPrepare: (() -> Void)?
     var onSend: (() -> Void)?
     var sessions: URL { root.appendingPathComponent("Sessions") }
     var sharing: URL { root.appendingPathComponent("Sharing") }
     var environment: SharingEnvironment {
         SharingEnvironment(serviceURL: "https://synthetic.example",
-            identity: { self.participant }, readCredential: {
-                self.credentialAvailable ? "\(self.participant).\(String(repeating: "a", count: 64))" : nil
+            identity: { self.identityReads += 1; return self.participant }, readCredential: {
+                self.credentialReads += 1
+                return self.credentialAvailable ? "\(self.participant).\(String(repeating: "a", count: 64))" : nil
             },
             saveCredential: { _ in self.credentialSaves += 1; self.credentialAvailable = true },
             sharingRoot: { self.sharing }, sessionRoot: { self.sessions },
@@ -49,10 +52,37 @@ import Foundation
 
 @main struct SharingQueueTests {
     @MainActor static func main() async throws {
+        // Launch, profile display and retries do not touch Keychain or an existing opted-in queue.
+        let startup = QueueFixture()
+        defer { startup.cleanup() }
+        let previousLaunch = SharingController(environment: startup.environment)
+        previousLaunch.loadResearchAccess()
+        previousLaunch.setEnabled(true)
+        await previousLaunch.retryPending()?.value
+        let pendingID = try startup.session(consent: previousLaunch.consentID)
+        let savedState = try Data(contentsOf: startup.sharing.appendingPathComponent("state.json"))
+        startup.identityReads = 0
+        startup.credentialReads = 0
+        let freshLaunch = SharingController(environment: startup.environment)
+        freshLaunch.resume()
+        await freshLaunch.retryPending()?.value
+        freshLaunch.setEnabled(true)
+        freshLaunch.saveCredential("ignored while locked")
+        precondition(!freshLaunch.researchAccessLoaded && freshLaunch.consentID == nil)
+        precondition(startup.identityReads == 0 && startup.credentialReads == 0 && startup.uploads.isEmpty)
+        let stillSaved = try Data(contentsOf: startup.sharing.appendingPathComponent("state.json"))
+        precondition(stillSaved == savedState)
+        freshLaunch.loadResearchAccess()
+        freshLaunch.loadResearchAccess() // Repeated clicks do not read the same secrets again.
+        precondition(startup.identityReads == 1 && startup.credentialReads == 1 && freshLaunch.enabled)
+        await freshLaunch.retryPending()?.value
+        precondition(startup.uploads == [pendingID] && startup.credentialReads == 1)
+
         // Local-only builds must not read Keychain, reopen an opted-in queue or modify its saved state.
         let release = QueueFixture()
         defer { release.cleanup() }
         let development = SharingController(environment: release.environment)
+        development.loadResearchAccess()
         development.setEnabled(true)
         let stateFile = release.sharing.appendingPathComponent("state.json")
         let previousState = try Data(contentsOf: stateFile)
@@ -62,6 +92,7 @@ import Foundation
         localEnvironment.readCredential = { preconditionFailure("Local-only must not read credentials") }
         localEnvironment.sharingRoot = { preconditionFailure("Local-only must not open the queue") }
         let local = SharingController(environment: localEnvironment)
+        local.loadResearchAccess()
         precondition(!local.researchAvailable && !local.canEnable && !local.enabled && local.consentID == nil)
         local.resume()
         local.setEnabled(true)
@@ -76,6 +107,7 @@ import Foundation
         defer { enrollment.cleanup() }
         enrollment.credentialAvailable = false
         let onboarding = SharingController(environment: enrollment.environment)
+        onboarding.loadResearchAccess()
         precondition(!onboarding.canEnable && !onboarding.enabled)
         precondition(onboarding.setupBlocker?.contains("Save an enrollment credential") == true)
         onboarding.setEnabled(true)
@@ -91,15 +123,18 @@ import Foundation
         var missingURL = enrollment.environment
         missingURL.serviceURL = ""
         let unconfigured = SharingController(environment: missingURL)
+        unconfigured.loadResearchAccess()
         precondition(!unconfigured.canEnable && unconfigured.setupBlocker?.contains("Worker address") == true)
         var failedIdentity = enrollment.environment
         failedIdentity.identity = { throw SharingError.message("Synthetic Keychain failure") }
         let locked = SharingController(environment: failedIdentity)
+        locked.loadResearchAccess()
         precondition(!locked.canEnable && locked.setupBlocker?.contains("Keychain") == true)
 
         let f = QueueFixture()
         defer { f.cleanup() }
         let c = SharingController(environment: f.environment)
+        c.loadResearchAccess()
         precondition(!c.enabled && c.canEnable)
         let old = try f.session(consent: nil)
         await c.retryPending()?.value
@@ -111,6 +146,7 @@ import Foundation
         await c.retryPending()?.value
         precondition(f.uploads == [first] && c.status(for: first) == "Uploaded")
         let restored = SharingController(environment: f.environment)
+        restored.loadResearchAccess()
         precondition(restored.participantID == c.participantID && restored.enabled)
         await restored.retryPending()?.value
         precondition(f.uploads == [first]) // Local receipt survives restart.
@@ -143,6 +179,7 @@ import Foundation
         precondition(waiting.state == "waiting" && waiting.retryAfter > Date())
         f.offline = false
         let offlineRestart = SharingController(environment: f.environment)
+        offlineRestart.loadResearchAccess()
         precondition(offlineRestart.settings.items.first { $0.id == pending }!.state == "waiting")
         // Advance the persisted retry clock in this temporary test directory only.
         var state = offlineRestart.settings
@@ -150,6 +187,7 @@ import Foundation
         state.items[index].retryAfter = .distantPast
         try JSONEncoder().encode(state).write(to: f.sharing.appendingPathComponent("state.json"))
         let reconnect = SharingController(environment: f.environment)
+        reconnect.loadResearchAccess()
         await reconnect.retryPending()?.value
         precondition(f.uploads == [first, pending] && reconnect.status(for: pending) == "Uploaded")
 
@@ -168,11 +206,13 @@ import Foundation
         var changedEnvironment = f.environment
         changedEnvironment.serviceURL = "https://different.example"
         let changed = SharingController(environment: changedEnvironment)
+        changed.loadResearchAccess()
         precondition(!changed.enabled)
         try Data("corrupt".utf8).write(to: f.sharing.appendingPathComponent("state.json"))
         let corrupt = SharingController(environment: f.environment)
+        corrupt.loadResearchAccess()
         precondition(!corrupt.enabled && !corrupt.canEnable)
-        precondition(corrupt.setupBlocker?.contains("Sharing preferences") == true)
+        precondition(corrupt.setupBlocker?.contains("Research setup is locked") == true)
         print("Sharing queue tests passed: enrollment guidance, opt-in, no backfill, cancellation, restart, offline retry, quota delay and fail-closed settings")
     }
 }
