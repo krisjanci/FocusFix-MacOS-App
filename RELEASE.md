@@ -1,6 +1,6 @@
 # Preparing FocusFix for distribution
 
-Updated October 20, 2026 with Codex assistance. This is release preparation,
+Updated October 21, 2026. This is release preparation,
 **not an approved or published app**. No Apple developer signing identity is
 configured on this Mac. Do not commit, push or publish without explicit authorization.
 
@@ -103,8 +103,9 @@ plus Intel and Apple Silicon before claiming support for both.
 - Debug launch must not show Keychain prompts or resume research uploads. Explicit
   research unlock may prompt, preserves saved consent, and must read credentials only
   once per launch. Test denied Keychain access without losing local recording.
-- Notice cancel/accept; Input Monitoring deny/allow, missing-list-entry + manual add
-  using Show this app in Finder, requested quit/reopen, permission
+- Notice cancel/accept; the single Enable Input Monitoring button registers the app
+  and opens Settings without granting access. Test denied/already-granted access,
+  returning from Settings, requested quit/reopen, permission
   revocation while recording, stop/restart and duplicate Start clicks.
 - In another app and FocusFix: key down/up, delete/forward-delete, hold/repeat,
   modifiers, buttons, wheel/trackpad, drag/movement and app switches. Check no duplicate
