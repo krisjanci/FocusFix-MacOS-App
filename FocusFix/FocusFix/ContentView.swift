@@ -97,7 +97,16 @@ struct ContentView: View {
                     .foregroundStyle(tracker.hasError ? Color.red : Color.secondary)
             }
             if tracker.needsPermission {
-                Button("Allow Accessibility Access") { tracker.requestPermission() }.buttonStyle(.bordered)
+                VStack(alignment: .leading, spacing: 8) {
+                    Button("Allow Input Monitoring") { tracker.requestPermission() }.buttonStyle(.bordered)
+                    HStack {
+                        Button("Open Settings") { tracker.openInputSettings() }
+                        Button("Show this app in Finder") { tracker.revealRunningApp() }
+                    }
+                    Text("Add this exact copy with the + button if it is missing. Older versions may use Accessibility instead. Reopen this copy after changing permission.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             HStack(spacing: 12) {
                 if onBreak {
@@ -151,6 +160,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             tracker.refreshNotificationPermission()
+            tracker.refreshInputPermission()
         }
     }
 }
