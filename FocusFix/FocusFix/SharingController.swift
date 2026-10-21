@@ -15,7 +15,8 @@ final class SharingController: ObservableObject {
     private var root: URL?
     private var task: Task<Void, Never>?
     private var timer: Timer?
-    private var storageReady = false
+    @Published private(set) var researchAccessLoaded = false
+    private var cachedCredential: String?
     private var generation = UUID()
     private let environment: SharingEnvironment
 
@@ -28,19 +29,19 @@ final class SharingController: ObservableObject {
     // Whether this build contains a valid HTTPS receiver origin.
     var configured: Bool { UploadPolicy.endpoint(environment.serviceURL) != nil }
     // Require working storage, enrollment, identity and configuration before allowing sharing.
-    var canEnable: Bool { researchAvailable && storageReady && configured && hasCredential && !participantID.isEmpty }
+    var canEnable: Bool { researchAvailable && researchAccessLoaded && configured && hasCredential && !participantID.isEmpty }
 
     // Explain a disabled switch without treating local setup as proof the server is ready.
     var setupBlocker: String? {
         if !researchAvailable { return "This build is local-only. Research uploads and enrollment are unavailable." }
         if !configured { return "This app build is not connected to the upload service. Add the Worker address and rebuild the app." }
-        if participantID.isEmpty { return "The participant ID could not be read from Keychain. Allow FocusFix access, then quit and reopen the app." }
-        if !storageReady { return "Sharing preferences are unavailable. Resolve the error shown below, then quit and reopen the app. Local recording still works." }
+        if !researchAccessLoaded { return "Research setup is locked. Choose Unlock research setup below if you want to use enrollment or sharing. Local recording does not need Keychain access." }
+        if participantID.isEmpty { return "The participant ID is unavailable. Local recording still works." }
         if !hasCredential { return "Save an enrollment credential before turning on sharing. Open Research enrollment below. You don't need to record a session first." }
         return nil
     }
 
-    // Load identity and queue state; fail closed on invalid state or a changed service URL.
+    // Launch never opens Keychain or resumes research uploads. Local recording works immediately.
     init(environment: SharingEnvironment) {
         self.environment = environment
         // Leave the test installation's Keychain and queue untouched when running a local-only build.
@@ -48,9 +49,16 @@ final class SharingController: ObservableObject {
             notice = "Local-only build. No research data is uploaded."
             return
         }
+        notice = "Research setup is locked for this launch. Local recording still works."
+    }
+
+    // Explicit profile action only. Preserve existing identity and consent; do not reenroll or opt in.
+    func loadResearchAccess() {
+        guard researchAvailable, !researchAccessLoaded else { return }
         do {
             participantID = try environment.identity()
-            hasCredential = try environment.readCredential() != nil
+            cachedCredential = try environment.readCredential()
+            hasCredential = cachedCredential != nil
             let directory = try environment.sharingRoot()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
@@ -71,10 +79,14 @@ final class SharingController: ObservableObject {
             for index in settings.items.indices where settings.items[index].state == "uploading" {
                 settings.items[index].state = "waiting"
             }
-            storageReady = true
-            _ = persist()
-            if enabled { notice = "Sharing is on for new sessions." }
+            researchAccessLoaded = true
+            guard persist() else { return }
+            notice = enabled ? "Sharing is on for new sessions." : "Sharing is off. Recordings stay on this Mac."
         } catch {
+            researchAccessLoaded = false
+            cachedCredential = nil
+            hasCredential = false
+            participantID = ""
             settings = SharingSettings()
             notice = error.localizedDescription
         }
@@ -82,7 +94,7 @@ final class SharingController: ObservableObject {
 
     // Start the retry timer and resume eligible pending uploads while the app is running.
     func resume() {
-        guard researchAvailable else { return }
+        guard researchAvailable, researchAccessLoaded else { return }
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { _ = self?.retryPending() }
@@ -92,7 +104,7 @@ final class SharingController: ObservableObject {
 
     // Validate and store the enrollment credential in Keychain, resetting sharing before replacing it.
     func saveCredential(_ input: String) {
-        guard researchAvailable else {
+        guard researchAvailable, researchAccessLoaded else {
             notice = setupBlocker ?? "Research sharing is unavailable."
             return
         }
@@ -108,6 +120,7 @@ final class SharingController: ObservableObject {
         setEnabled(false)
         do {
             try environment.saveCredential(value)
+            cachedCredential = value
             hasCredential = true
             notice = "Enrollment saved. Turn on sharing when you're ready."
         } catch { notice = error.localizedDescription }
@@ -142,7 +155,8 @@ final class SharingController: ObservableObject {
 
     // Return a session's sharing status for display in the session library.
     func status(for sessionID: String) -> String {
-        settings.items.first { $0.id == sessionID }?.message ?? "Local only"
+        if researchAvailable && !researchAccessLoaded { return "Research status locked" }
+        return settings.items.first { $0.id == sessionID }?.message ?? "Local only"
     }
 
     // Cancel pending sharing for a deleted local session without claiming cloud copies were deleted.
@@ -221,7 +235,7 @@ final class SharingController: ObservableObject {
                 let archive = try await environment.prepare(folder, destination)
                 try Task.checkCancellation()
                 guard currentGeneration == generation, enabled, item.consentID == consentID else { return }
-                guard let token = try environment.readCredential() else {
+                guard let token = cachedCredential else {
                     throw SharingError.message("Enrollment credential is missing.")
                 }
                 if let previous = item.sha256, previous != archive.sha256 {
@@ -282,14 +296,14 @@ final class SharingController: ObservableObject {
 
     // Save queue/settings atomically; stop sharing if this state cannot be safely saved.
     @discardableResult private func persist() -> Bool {
-        guard let root, storageReady else { return false }
+        guard let root, researchAccessLoaded else { return false }
         do {
             let destination = root.appendingPathComponent("state.json")
             try JSONEncoder().encode(settings).write(to: destination, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
             return true
         } catch {
-            storageReady = false
+            researchAccessLoaded = false
             settings.consentID = nil
             task?.cancel()
             notice = "Couldn't save sharing preferences. Uploads stopped; relaunch before trying again."
