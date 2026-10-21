@@ -23,6 +23,15 @@ struct SharingView: View {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
             if sharing.researchAvailable {
+            if !sharing.researchAccessLoaded {
+                Button("Unlock research setup") {
+                    sharing.loadResearchAccess()
+                    sharing.resume()
+                }
+                Text("Only needed for research enrollment and uploads. macOS may ask for Keychain access. This restores your saved sharing choice and resumes pending uploads if you had sharing on.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text("Participant ID").font(.headline)
             HStack {
                 Text(sharing.participantID.isEmpty ? "Unavailable" : sharing.participantID)
@@ -46,6 +55,9 @@ struct SharingView: View {
             DisclosureGroup("Recording & privacy") {
                 PrivacyNoticeDetails().padding(.top, 8)
             }
+            Link("Support on GitHub", destination: AppLinks.support)
+            Text("Support issues are public. Do not post recordings or personal information.")
+                .font(.caption).foregroundStyle(.secondary)
             if sharing.researchAvailable {
             Toggle("Share new sessions for research", isOn: Binding(get: { sharing.enabled }, set: { value in
                 if value { confirmSharing = true } else { sharing.setEnabled(false) }
@@ -71,7 +83,7 @@ struct SharingView: View {
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     SecureField("Enrollment credential", text: $credential)
                     Button("Save enrollment") { sharing.saveCredential(credential); credential = "" }
-                        .disabled(credential.isEmpty)
+                        .disabled(credential.isEmpty || !sharing.researchAccessLoaded)
                     if sharing.hasCredential { Label("Enrollment saved", systemImage: "key.fill").font(.caption) }
                 }.padding(.top, 8)
             }
