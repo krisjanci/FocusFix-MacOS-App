@@ -33,12 +33,18 @@ plays once per app launch. Click to skip; Reduce Motion skips it automatically.
 Reopening the main window doesn't replay it. This is visual only, not a loading
 operation, and it doesn't start recording or change any session timers.
 
-1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac and Run.
+1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac.
+   Debug supports enrolled research tests; do not distribute it. Research setup stays
+   locked at launch until explicitly unlocked in the profile.
+   Use Release for local-only checks. Both configurations target macOS 14 or later;
+   runtime compatibility still needs testing on each supported system.
 2. Press **Start session**. On first use, review the recording/privacy notice and
    choose **I understand**, then press Start again. **Not now** records nothing.
-   The notice is also available in the profile. If prompted, choose **Allow Accessibility
-   Access** and enable FocusFix in System Settings → Privacy & Security → Accessibility.
-   Then press Start again. If macOS does not recognize a rebuilt app, quit and relaunch it.
+   The notice is also available in the profile. Start requests **Input Monitoring** if needed.
+   Enable FocusFix in System Settings → Privacy & Security → Input Monitoring.
+   If it is missing, choose **Show this app in Finder**, then use **+** in Settings
+   to add that exact copy. Quit and reopen it, then press Start again. Debug, Release
+   and older copies can have different permission entries; older builds used Accessibility.
 3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
    Then work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
@@ -58,8 +64,12 @@ operation, and it doesn't start recording or change any session timers.
    in the app and menu bar. Focus / Do Not Disturb and
    macOS notification settings may hide or delay banners; the app doesn't override them.
 
-Sessions are automatically saved under
-`~/Library/Application Support/FocusFix/Sessions/<session-id>/`.
+Sessions are automatically saved inside the app sandbox, normally under
+`~/Library/Containers/io.github.krisjanci.FocusFix/Data/Library/Application Support/FocusFix/Sessions/<session-id>/`.
+Use **Sessions → Show in Finder** to locate the actual folder. Debug builds use
+`io.github.krisjanci.FocusFix.debug` and a separate container. Old unsandboxed
+recordings are not moved or deleted; export them from the old build before changing
+installations. No existing participant identity is automatically migrated.
 Each new session has five CSVs and `session.json`. A new session never replaces an old
 one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
@@ -92,8 +102,12 @@ Release neither reads enrollment secrets nor touches the saved development uploa
 Changing Release into a research build needs the separate review described in RELEASE.md.
 
 - The account icon at the top left opens my research profile and sharing settings.
-  Sharing is off by default. Recording still works without joining the study.
-- FocusFix makes a random participant ID and keeps it in Keychain across relaunches
+  Research setup stays locked on each launch; local recording does not access Keychain.
+  Choose **Unlock research setup** only when you need enrollment or uploads. This may
+  ask for Keychain access and restores the saved sharing choice. If sharing was on,
+  pending uploads resume. Unlocking does not opt in a previously opted-out installation.
+- When research setup is unlocked, FocusFix makes or reads a random participant ID
+  and keeps it in Keychain across relaunches
   and ordinary updates. New session metadata includes the ID, so I can group sessions
   without recording someone's name. A second Mac has a different ID; enrollment needs
   to account for that. This is pseudonymous data, not automatically anonymous.
@@ -101,7 +115,10 @@ Changing Release into a research build needs the separate review described in RE
   queued automatically. Old sessions aren't backfilled. Turning sharing off cancels
   pending work, and turning it back on only applies to subsequently started sessions.
 - The session library shows upload status. Queued work survives quit/relaunch, retries
-  with delays while the app is running, and keeps the original files locally.
+  with delays after research setup is unlocked, and keeps the original files locally.
+  The upload credential is read once per unlock and reused in memory for that launch;
+  background retries do not repeatedly open Keychain. Sessions started while locked
+  remain local and are not backfilled after unlocking.
 - Limits are enforced on the server: 180 elapsed minutes (including breaks), 50 MiB
   of compressed data and 30 newly admitted sessions per participant per UTC day.
   Each ZIP is limited to 25 MiB. Whole sessions that don't fit wait until the next day;
@@ -351,13 +368,15 @@ pseudonymous ID to a real participant separately under the study's approved plan
 
 ### Background behavior and limitations
 
-- Local and global monitors observe FocusFix and other apps without modifying input.
+- One passive Core Graphics event tap observes input across apps, including FocusFix,
+  using Input Monitoring permission. No input is modified, blocked or synthesized.
+  A disabled tap ends the session visibly; queued events from an old session are discarded.
 - App Nap is discouraged, but system sleep is allowed. Outside breaks, sleep/screen
   sleep and inactive login stop collection. During breaks, they suspend sampling
-  while keeping break timing. Lost Accessibility, Stop and Quit end the session.
+  while keeping break timing. Lost Input Monitoring permission, Stop and Quit end the session.
 - Standard macOS Secure Input can suppress keyboard events. Absence of events is
   not proof of inactivity. Mouse events may be coalesced by macOS: this is not a
-  hardware-level trace. Accessibility permission alone does not guarantee completeness.
+  hardware-level trace. Input Monitoring permission alone does not guarantee completeness.
 - Break and check-in notifications have no sound and don't force the app to the
   foreground. The timed banner is automatic; slider sheets and permission/setup/export
   dialogs follow explicit actions.
@@ -366,8 +385,10 @@ pseudonymous ID to a real participant separately under the study's approved plan
 - Files are buffered and flushed approximately every second (earlier for a large
   event buffer), and synchronized on Stop. A crash can lose buffered data; metadata
   left with `status: recording` should be treated as an unfinished session.
-- The native app is configured without App Sandbox for global monitoring. Run only
-  trusted builds; this is a local research prototype, not an App Store release.
+- Both production distribution paths use App Sandbox. The local-only Release build
+  grants user-selected read/write access for exports and has no network entitlement.
+  A compiled build is not proof of App Store approval or live input-monitoring coverage.
+  Fresh-Mac permission and feature checks remain required; see [RELEASE.md](RELEASE.md).
 - Event timing is sensitive even without text. Obtain the required institutional
   approval/consent before recording participants. Sharing is off by default; once
   enrolled and opted in, eligible new sessions upload automatically after Stop.
@@ -426,7 +447,7 @@ requests using [GitHub Actions](https://docs.github.com/en/actions/reference/wor
 Check the Actions tab for the remote result. This workflow tests logic and file
 handling, not the full Xcode app or UI. Build the app locally using the command above.
 
-Manual check after granting Accessibility: start a short session and complete the
+Manual check after granting Input Monitoring permission: start a short session and complete the
 fatigue check-in first. Also try Cancel (no session starts), Skip
 (blank score), selecting 0 and 10, and starting from the menu bar with the main window
 closed. Take two manual breaks and check that both ratings start unselected each time.
