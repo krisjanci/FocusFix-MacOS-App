@@ -42,9 +42,14 @@ operation, and it doesn't start recording or change any session timers.
    choose **I understand**, then press Start again. **Not now** records nothing.
    The notice is also available in the profile. Start requests **Input Monitoring** if needed.
    Enable FocusFix in System Settings → Privacy & Security → Input Monitoring.
-   If it is missing, choose **Show this app in Finder**, then use **+** in Settings
-   to add that exact copy. Quit and reopen it, then press Start again. Debug, Release
-   and older copies can have different permission entries; older builds used Accessibility.
+   **Enable Input Monitoring** is the single setup button: it requests the app entry
+   and opens the right Settings page. Turn on FocusFix there, then quit and reopen
+   it if macOS asks. FocusFix cannot grant itself permission. Debug, Release and older
+   copies can have different entries; older builds used Accessibility.
+
+   For a development build that still fails to appear, add the exact built app using
+   **+** in Input Monitoring settings. Repeated local builds are not a substitute
+   for testing a stable, developer-signed release.
 3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
    Then work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
