@@ -86,7 +86,10 @@ struct SessionLibraryView: View {
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: {
-            Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to Trash. Pending uploads will be cancelled, but already uploaded or exported copies stay unchanged. Contact the researcher to request deletion from cloud storage.")
+            Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to Trash. Exported copies and backups stay unchanged.")
+            if sharing.researchAvailable {
+                Text("Pending uploads will be cancelled, but already uploaded copies stay unchanged. Contact the researcher privately to request deletion from cloud storage.")
+            }
         }
         .alert("FocusFix", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
@@ -107,7 +110,7 @@ struct SessionLibraryView: View {
         case "app_quit": return "Saved on quit"
         case "sleep_or_inactive_session": return "Stopped on sleep / inactivity"
         case "permission_lost": return "Access interrupted"
-        case "recording_error", "monitor_unavailable": return "Check recording"
+        case "recording_error", "monitor_unavailable", "input_monitor_interrupted": return "Check recording"
         default: return "Saved"
         }
     }
