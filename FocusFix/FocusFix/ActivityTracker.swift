@@ -118,19 +118,18 @@ final class ActivityTracker: ObservableObject {
             recordingNoticePresented = true
             return
         }
+        hasError = false
         needsPermission = !InputMonitor.requestPermission()
         message = needsPermission
-            ? "Enable this copy of FocusFix in System Settings → Privacy & Security → Input Monitoring. If it is missing, use + to add the app shown by Show this app in Finder. Then quit and reopen it."
+            ? "Turn on FocusFix in Input Monitoring to record activity across apps. If macOS asks, quit and reopen FocusFix."
             : "Input Monitoring is enabled. Press Start when you are ready."
+        if needsPermission { openInputSettings() }
     }
-    func openInputSettings() {
+    private func openInputSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return }
         if !NSWorkspace.shared.open(url) {
-            message = "Open System Settings → Privacy & Security → Input Monitoring, then use + to add this copy of FocusFix."
+            message = "Open System Settings → Privacy & Security → Input Monitoring and turn on FocusFix."
         }
-    }
-    func revealRunningApp() {
-        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
     func refreshInputPermission() {
         guard needsPermission, InputMonitor.hasPermission else { return }
