@@ -94,8 +94,18 @@ then create an account profile. Existing local names/photos are NOT automaticall
 sent to the account service. Explicitly save a chosen name/avatar to sync it.
 Account profiles are private in stage 1. A signed-out local profile stays separate.
 Passwords are never persisted. Session tokens use a separate Keychain service.
-After relaunch, choose **Restore saved sign-in**; launching/recording alone never
-reads account Keychain entries or contacts the account service.
+The first launch offers Create account, Log in and Use as guest. Guest choice is
+remembered. Keep me signed in is selected by default; successful sign-in with that
+choice saves tokens in Keychain and authorizes automatic restoration after the intro
+on future launches. macOS can prompt for Keychain access. Without that choice, the
+new session stays in memory and is not automatically restored. Old installations
+without the new preference do not automatically read previously saved credentials.
+Continue with saved account remains an explicit option in the account form. Guest
+selection cancels pending authentication/restoration, ignores late results, and
+turns off automatic restoration without opening Keychain. A previous credential
+can remain in Keychain until an explicit sign-out/deletion; Guest does not reuse it.
+Newly confirmed accounts offer optional profile setup with a clickable avatar circle
+and Skip for now. The menu-bar Start action cannot bypass unresolved onboarding.
 
 ## 4. Per-session delivery and enrollment
 
