@@ -9,45 +9,55 @@ final class LaunchCoordinator: ObservableObject {
     static let shared = LaunchCoordinator(account: .shared)
     @Published private(set) var page: Page
     let account: AccountController
-    private let defaults: UserDefaults
+    let isPreview: Bool
+    private let defaults: UserDefaults?
     private static let guestKey = "focusfix.launch.guest"
     private var started = false
     private var restoreTask: Task<Void, Never>?
     private var observation: AnyCancellable?
     private var generation = UUID()
 
-    var canRecord: Bool { page == .app }
+    var canRecord: Bool { !isPreview && page == .app }
 
-    init(account: AccountController, defaults: UserDefaults = .standard) {
+    init(account: AccountController, defaults: UserDefaults? = .standard, isPreview: Bool = false) {
+        self.isPreview = isPreview
         self.account = account
         self.defaults = defaults
         // Rendering this state never accesses Keychain or the network.
-        page = defaults.bool(forKey: Self.guestKey) ? .app : .welcome
+        page = defaults?.bool(forKey: Self.guestKey) == true ? .app : .welcome
         observation = account.$session.sink { [weak self] session in
             guard let self else { return }
             if session != nil {
-                self.defaults.set(false, forKey: Self.guestKey)
+                self.defaults?.set(false, forKey: Self.guestKey)
                 if self.page != .app {
                     self.page = self.account.isNewAccount ? .profileSetup : .app
                 }
             } else if self.page == .app || self.page == .profileSetup {
                 // Explicit sign-out leaves a working guest app; it doesn't erase local data.
-                self.defaults.set(true, forKey: Self.guestKey)
+                self.defaults?.set(true, forKey: Self.guestKey)
                 self.page = .app
             }
         }
     }
 
+    // No API, real preferences, or credential provider exists in this isolated preview.
+    static func preview() -> LaunchCoordinator {
+        let account = AccountController(configuration: nil,
+            transport: { _ in throw AccountFailure(message: "Account preview is offline.") },
+            readCredential: { nil }, writeCredential: { _ in }, defaults: nil)
+        return LaunchCoordinator(account: account, defaults: nil, isPreview: true)
+    }
+
     // Start restoration only once and only after the existing intro finishes.
     func begin() {
-        guard !started else { return }
+        guard !isPreview, !started else { return }
         started = true
         guard account.session == nil else { page = .app; return }
         if account.remembersSignIn && account.configured { restore() }
     }
 
     func showAccount(create: Bool) {
-        guard account.configured else { return }
+        guard isPreview || account.configured else { return }
         page = create ? .createAccount : .login
     }
 
@@ -57,7 +67,7 @@ final class LaunchCoordinator: ObservableObject {
     }
 
     func restore() {
-        guard account.configured, !account.busy else { return }
+        guard !isPreview, account.configured, !account.busy else { return }
         generation = UUID()
         let token = generation
         page = .restoring
@@ -74,8 +84,8 @@ final class LaunchCoordinator: ObservableObject {
         generation = UUID()
         restoreTask?.cancel()
         restoreTask = nil
-        account.continueAsGuest()
-        defaults.set(true, forKey: Self.guestKey)
+        if !isPreview { account.continueAsGuest() }
+        defaults?.set(true, forKey: Self.guestKey)
         page = .app
     }
 
