@@ -154,15 +154,6 @@ struct ContentView: View {
         .sheet(isPresented: $tracker.timedCheckInPresented, onDismiss: { tracker.cancelTimedCheckIn() }) {
             WorkCheckInView(tracker: tracker).tint(teal)
         }
-        .onAppear {
-            SharingController.shared.resume()
-            tracker.refreshNotificationPermission()
-            NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true }
-            tracker.openMainWindow = {
-                openWindow(id: "collector")
-                NSApp.activate(ignoringOtherApps: true)
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             tracker.refreshNotificationPermission()
             tracker.refreshInputPermission()
