@@ -7,6 +7,7 @@ import AppKit
 struct SharingView: View {
     @ObservedObject var account = AccountController.shared
     @ObservedObject var sharing = SharingController.shared
+    @ObservedObject private var tracker = ActivityTracker.shared
     @ObservedObject var surveys = SurveyPreferences.shared
     @Environment(\.dismiss) private var dismiss
     @State private var credential = ""
@@ -60,6 +61,8 @@ struct SharingView: View {
             Toggle("10-minute check-in · fatigue & productivity", isOn: $surveys.duringWork)
             Text("The 10-minute check-in happens after starting or returning from a break. Changes apply to your next session. Saved answers are kept.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Divider()
+            AdvancedSettingsView(tracker: tracker)
             Divider()
             DisclosureGroup("Recording & privacy") {
                 PrivacyNoticeDetails().padding(.top, 8)
