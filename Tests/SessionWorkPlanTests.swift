@@ -3,26 +3,50 @@ import Foundation
 @main @MainActor
 struct SessionWorkPlanTests {
     static func main() {
-        let suite = "focusfix.test.plan.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let preferences = SessionWorkPlanPreferences(defaults: defaults)
-        precondition(!preferences.enabled && preferences.minutes == 60)
-        var disabled = preferences.snapshot
+        var draft = SessionStartDraft(asksForFatigue: false)
+        precondition(!draft.planning && draft.selection()?.plan.targetMinutes == nil)
+        var disabled = draft.selection()!.plan
         disabled.credit(3600)
         precondition(disabled.workSeconds == 0 && !disabled.isComplete)
-        preferences.enabled = true
-        var plan = preferences.snapshot
-        preferences.setMinutes(30)
-        precondition(plan.targetMinutes == 60 && preferences.snapshot.targetMinutes == 30)
-        precondition(!preferences.setMinutes(0) && !preferences.setMinutes(481))
-        precondition(preferences.setMinutes(1) && preferences.setMinutes(480))
-        precondition(SessionWorkPlanPreferences(defaults: defaults).minutes == 480)
-        precondition(SessionWorkPlanPreferences(defaults: defaults).enabled)
-        preferences.enabled = false
-        precondition(preferences.snapshot.targetMinutes == nil)
-        defaults.set(-12, forKey: "focusfix.plan.minutes")
-        precondition(SessionWorkPlanPreferences(defaults: defaults).minutes == 60)
+        draft.addPlan()
+        precondition(draft.targetMinutes == 60)
+        var plan = draft.selection()!.plan
+        precondition(plan.summary == "Planned session · 0 / 60 min")
+        draft.durationChoice = 30
+        precondition(plan.targetMinutes == 60 && draft.selection()?.plan.targetMinutes == 30)
+        draft.durationChoice = 0
+        for invalid in ["", "0", "481", "-1", "1.5", "abc"] {
+            draft.customMinutes = invalid
+            precondition(!draft.validPlan && draft.selection() == nil)
+            precondition(draft.selection(skippingFatigue: true) == nil)
+        }
+        for valid in ["1", "60", "480"] {
+            draft.customMinutes = valid
+            precondition(draft.validPlan && draft.selection()?.plan.targetMinutes == Int(valid))
+        }
+        draft.removePlan()
+        precondition(draft.selection()?.plan.targetMinutes == nil)
+        draft.addPlan()
+        precondition(draft.targetMinutes == 60)
+        // Dismissal destroys the window's draft; the next attempt starts untargeted.
+        draft = SessionStartDraft(asksForFatigue: false)
+        precondition(!draft.planning && draft.selection()?.plan.targetMinutes == nil)
+        // Survey-disabled starts never supply a survey answer, even if a stale value is set.
+        draft.fatigue = 8
+        precondition(draft.selection()?.fatigue == nil)
+        for asksForFatigue in [false, true] {
+            var attempt = SessionStartDraft(asksForFatigue: asksForFatigue)
+            attempt.addPlan()
+            if asksForFatigue { precondition(attempt.selection() == nil) }
+            let skipped = attempt.selection(skippingFatigue: true)!
+            precondition(skipped.fatigue == nil && skipped.plan.targetMinutes == 60)
+            attempt.fatigue = 7
+            let answered = attempt.selection()!
+            precondition(answered.fatigue == (asksForFatigue ? 7 : nil))
+            precondition(answered.plan.targetMinutes == 60)
+            attempt.fatigue = 11
+            if asksForFatigue { precondition(attempt.selection() == nil) }
+        }
 
         for minutes in [1, 30, 60, 90, 480] {
             var boundary = SessionWorkPlan(targetMinutes: minutes)
@@ -70,9 +94,8 @@ struct SessionWorkPlanTests {
         update(4000, working: false) // Time outside recording remains excluded.
         precondition(session.workSeconds == 1800 && session.reminderPending)
         precondition(daily.days.values.reduce(0) { $0 + $1.workSeconds } == session.workSeconds)
-        preferences.enabled = true
-        session = preferences.snapshot // New session, no carryover from the old plan.
+        session = SessionStartDraft(asksForFatigue: false).selection()!.plan // New session, no carryover.
         precondition(session.workSeconds == 0 && !session.acknowledged)
-        print("Session target boundaries, shared clock, exclusions, snapshots and one-time completion passed")
+        print("Per-session planning, survey choices, reset, shared work credit and one-time completion passed")
     }
 }
