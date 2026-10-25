@@ -2,6 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- Public client settings only: use a project in a Free-plan organization. -->
+    <key>FocusFixAccountURL</key>
+    <string></string>
+    <key>FocusFixAccountPublicKey</key>
+    <string></string>
+    <key>FocusFixStudyInformationURL</key>
+    <string></string>
+    <!-- Enable only after deploying the private bucket and reviewing study consent. -->
+    <key>FocusFixResearchSharingEnabled</key>
+    <false/>
 	<key>FocusFixBuildChannel</key>
 	<string>$(FOCUSFIX_BUILD_CHANNEL)</string>
 	<key>FocusFixSourceRevision</key>
