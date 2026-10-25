@@ -24,6 +24,7 @@ struct SharingView: View {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
+            QuickTourButton(beforeOpen: { dismiss() })
             AccountControls()
             Divider()
             ProfileEditor()
