@@ -1,11 +1,9 @@
 import SwiftUI
 import AppKit
 
-// All entry points route to the collector, never to a separate tutorial window.
 struct QuickTourButton: View {
     @Environment(\.openWindow) private var openWindow
     var beforeOpen: () -> Void = {}
-
     var body: some View {
         Button {
             beforeOpen()
@@ -14,139 +12,150 @@ struct QuickTourButton: View {
             NSApp.activate(ignoringOtherApps: true)
         } label: {
             Label("Quick tour", systemImage: "book.closed")
-        }.help("Explore FocusFix with comments and arrows, from the beginning")
+        }.help("Try a short spotlight practice tour")
     }
 }
 
-// Anchors follow the actual controls as the main screen scrolls and changes layout.
-struct QuickTourAnchorKey: PreferenceKey {
-    static var defaultValue: [QuickTourTarget: Anchor<CGRect>] { [:] }
-    static func reduce(value: inout [QuickTourTarget: Anchor<CGRect>],
-                       nextValue: () -> [QuickTourTarget: Anchor<CGRect>]) {
+struct PracticeAnchorKey: PreferenceKey {
+    static var defaultValue: [QuickTourPhase: Anchor<CGRect>] { [:] }
+    static func reduce(value: inout [QuickTourPhase: Anchor<CGRect>],
+                       nextValue: () -> [QuickTourPhase: Anchor<CGRect>]) {
         value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
 
 extension View {
-    @ViewBuilder func quickTourTarget(_ target: QuickTourTarget, enabled: Bool = true) -> some View {
-        if enabled {
-            self.anchorPreference(key: QuickTourAnchorKey.self, value: .bounds) { [target: $0] }
-                .id(target)
-        } else { self }
+    func practiceTarget(_ phase: QuickTourPhase) -> some View {
+        anchorPreference(key: PracticeAnchorKey.self, value: .bounds) { [phase: $0] }.id(phase)
     }
 }
 
+// The root installs this as an overlay: it never participates in window sizing.
 struct QuickTourView: View {
-    @ObservedObject var tracker: ActivityTracker
     @ObservedObject private var tour = QuickTourController.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var practiceNameFocused: Bool
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Label("Quick tour", systemImage: "book.closed").font(.headline)
-                Spacer()
-                Text(tour.position).font(.caption).foregroundStyle(.secondary)
-                Button("Close tour") { tour.finish() }.keyboardShortcut(.cancelAction)
-            }.padding(.horizontal, 24).padding(.vertical, 14)
-            Divider()
+        GeometryReader { container in
             ScrollViewReader { reader in
                 ScrollView {
-                    guidedScreen
-                        // Even VoiceOver and keyboard activation cannot trigger real actions here.
-                        .disabled(true).allowsHitTesting(false).accessibilityHidden(true)
-                        .padding(.vertical, 14).frame(maxWidth: .infinity)
+                    QuickTourDemoView(tour: tour, nameFocus: $practiceNameFocused)
+                        .padding(.horizontal, 24).padding(.top, 64).padding(.bottom, 24)
+                        .frame(maxWidth: .infinity, minHeight: container.size.height)
                 }
-                .overlayPreferenceValue(QuickTourAnchorKey.self) { anchors in
+                .scrollDisabled(true)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlayPreferenceValue(PracticeAnchorKey.self) { anchors in
                     GeometryReader { geometry in
-                        if let anchor = anchors[tour.step.target] {
-                            highlight(geometry[anchor], in: geometry.size)
-                        }
-                    }.allowsHitTesting(false).accessibilityHidden(true)
-                }
-                .task(id: "\(tour.visit.uuidString)-\(tour.index)-\(tracker.isRecording)-\(tracker.breakPhase)") {
-                    // Resolve the new screen's layout before revealing the target.
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
-                    reader.scrollTo(tour.step.target, anchor: .center)
-                }
-            }.frame(height: 310).clipped()
-            Divider()
-            comments
-        }
-        .frame(width: 680, height: 720)
-        .background(Color(nsColor: .windowBackgroundColor)).tint(teal)
-    }
-
-    @ViewBuilder private var guidedScreen: some View {
-        switch tour.step.target {
-        case .profile:
-            SharingView()
-        case .sessions:
-            SessionLibraryView(tracker: tracker).frame(width: 660, height: 410)
-        default:
-            ContentView(tracker: tracker)
-        }
-    }
-
-    private var comments: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: tour.step.symbol).foregroundStyle(teal).accessibilityHidden(true)
-                Text(tour.step.title).font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .accessibilityAddTraits(.isHeader)
-            }
-            Text(tour.step.subtitle).foregroundStyle(.secondary)
-            Text(tracker.isRecording
-                 ? "Recording continues. Close the tour to use the highlighted controls."
-                 : "Follow the arrow above. Close the tour to use the highlighted controls.")
-                .font(.caption).foregroundStyle(teal)
-            if tracker.isRecording && tour.step.target == .start {
-                Text("This button currently says Stop & save. Start session appears here when you're idle.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(tour.step.tips.indices, id: \.self) { index in
-                        let tip = tour.step.tips[index]
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(tip.title).font(.callout.weight(.semibold)).accessibilityAddTraits(.isHeader)
-                            Text(tip.detail).font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                        if let anchor = anchors[tour.phase] {
+                            let hole = QuickTourLayout.spotlight(geometry[anchor], in: geometry.size)
+                            if !hole.isNull && !hole.isEmpty {
+                                let bubble = QuickTourLayout.caption(target: hole, in: geometry.size,
+                                    hasButton: tour.phase.offersNext || tour.phase.offersDone)
+                                spotlight(hole)
+                                caption.frame(width: bubble.width, height: bubble.height)
+                                    .position(x: bubble.midX, y: bubble.midY)
+                            } else {
+                                Color.black.opacity(0.45).onTapGesture { }
+                            }
+                        } else {
+                            Color.black.opacity(0.45).onTapGesture { }
                         }
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.id("\(tour.visit.uuidString)-\(tour.index)")
-            HStack {
-                Button("Back") { tour.back() }.disabled(tour.isFirst)
-                    .keyboardShortcut("[", modifiers: .command)
-                Spacer()
-                Button(tour.isLast ? "Done" : "Next") {
-                    if tour.isLast { tour.finish() } else { tour.next() }
-                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .accessibilityValue(tour.position)
-            }.controlSize(.large)
-        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .overlay(alignment: .top) { navigation.padding(12) }
+                .task(id: "\(tour.visit.uuidString)-\(tour.phase.rawValue)") {
+                    let phase = tour.phase
+                    let visit = tour.visit
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    reader.scrollTo(phase, anchor: .center)
+                    practiceNameFocused = false
+                    if phase == .name {
+                        await Task.yield()
+                        guard !Task.isCancelled, tour.phase == phase, tour.visit == visit else { return }
+                        practiceNameFocused = true
+                    }
+                    if phase == .work {
+                        if reduceMotion { tour.illustrate(phase: phase, visit: visit, reducedMotion: true) }
+                        else {
+                            for _ in 0..<5 {
+                                do { try await Task.sleep(nanoseconds: 140_000_000) } catch { return }
+                                guard !Task.isCancelled else { return }
+                                withAnimation(.easeOut(duration: 0.14)) { tour.illustrate(phase: phase, visit: visit) }
+                            }
+                        }
+                    } else if phase == .progress {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.8)) {
+                            tour.illustrate(phase: phase, visit: visit)
+                        }
+                    }
+                }
+            }
+        }.tint(teal)
     }
 
-    private func highlight(_ bounds: CGRect, in size: CGSize) -> some View {
-        let visible = bounds.insetBy(dx: -5, dy: -5)
-            .intersection(CGRect(origin: .zero, size: size).insetBy(dx: 6, dy: 6))
-        return ZStack {
-            if !visible.isNull && !visible.isEmpty {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(teal, lineWidth: 3)
-                    .frame(width: visible.width, height: visible.height)
-                    .position(x: visible.midX, y: visible.midY)
-                let tip = CGPoint(x: visible.midX, y: min(size.height - 28, visible.maxY + 8))
-                Path { path in
-                    path.move(to: CGPoint(x: tip.x, y: size.height - 4))
-                    path.addLine(to: tip)
-                    path.move(to: CGPoint(x: tip.x - 7, y: tip.y + 9))
-                    path.addLine(to: tip)
-                    path.addLine(to: CGPoint(x: tip.x + 7, y: tip.y + 9))
-                }.stroke(teal, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+    private var navigation: some View {
+        HStack(spacing: 12) {
+            Text("Practice · nothing saved").font(.caption.weight(.medium))
+            Spacer(minLength: 4)
+            Text(tour.position).font(.caption).monospacedDigit().accessibilityLabel("Step \(tour.index + 1) of 7")
+            Button("Back") { tour.back() }.disabled(tour.isFirst)
+                .keyboardShortcut("[", modifiers: .command)
+            Button { tour.finish() } label: { Image(systemName: "xmark") }
+                .accessibilityLabel("Close practice tour").keyboardShortcut(.cancelAction)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var caption: some View {
+        let phase = tour.phase
+        let visit = tour.visit
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(phase.caption).font(.system(size: 16, weight: .medium, design: .rounded))
+                .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+            if phase.offersNext || phase.offersDone {
+                HStack {
+                    Spacer()
+                    Button(phase.offersDone ? "Done" : "Next") {
+                        tour.perform(phase.offersDone ? .done : .next, phase: phase, visit: visit)
+                    }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                }
             }
         }
+        .padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(teal.opacity(0.3), lineWidth: 1))
+        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+    }
+
+    private func spotlight(_ rect: CGRect) -> some View {
+        let mask = PracticeSpotlight(hole: rect)
+        return ZStack {
+            mask.fill(.black.opacity(0.48), style: FillStyle(eoFill: true))
+                .contentShape(mask, eoFill: true).onTapGesture { }
+                .accessibilityHidden(true)
+            RoundedRectangle(cornerRadius: 12).stroke(teal.opacity(0.85), lineWidth: 1.5)
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY).allowsHitTesting(false).accessibilityHidden(true)
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: rect)
+    }
+}
+
+private struct PracticeSpotlight: Shape {
+    var hole: CGRect
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { .init(.init(hole.minX, hole.minY), .init(hole.width, hole.height)) }
+        set { hole = CGRect(x: newValue.first.first, y: newValue.first.second,
+                            width: newValue.second.first, height: newValue.second.second) }
+    }
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        path.addRoundedRect(in: hole, cornerSize: CGSize(width: 12, height: 12))
+        return path
     }
 }
