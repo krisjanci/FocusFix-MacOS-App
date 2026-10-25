@@ -112,6 +112,7 @@ private struct RecordingMenu: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         Divider()
+        QuickTourButton()
         Button("About, privacy & support") {
             openWindow(id: "about")
             NSApp.activate(ignoringOtherApps: true)
@@ -130,6 +131,7 @@ private struct FocusFixCommands: Commands {
             Button("About FocusFix") { openWindow(id: "about") }
         }
         CommandGroup(replacing: .help) {
+            QuickTourButton()
             Button("Privacy & support") { openWindow(id: "about") }
             Link("FocusFix support", destination: AppLinks.support)
         }
