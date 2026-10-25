@@ -84,11 +84,35 @@ Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
 
+### Welcome and guest access
+
+After the intro animation, the first launch offers **Create account**, **Log in**,
+and **Use as guest**. Guest mode is remembered: later launches open the main app
+directly, and account options remain in Profile. Guest mode includes local profiles,
+recording, surveys, saved sessions and progress. It never opts into research sharing.
+The checked-in build has no account service configured, so account buttons explain
+that online access is unavailable and Guest remains usable.
+
+**Keep me signed in** is checked by default in account forms. After a successful
+sign-in with that choice, future launches restore the account from Keychain after
+the intro; macOS may ask for Keychain access. Failed restoration offers retry,
+login or Guest. Choosing Guest cancels pending authentication and ignores late
+responses. Leaving the choice off keeps the new session in memory only, without
+saving its tokens for automatic restoration. Signing out disables automatic restore
+and leaves local recording available as a guest.
+
+Newly created accounts offer optional name/avatar setup after email confirmation;
+**Skip for now** enters the app. Nothing starts recording or requests Input Monitoring
+before a recording action. A menu-bar Start action during onboarding shows the
+welcome window first.
+
 ### Personal profile
 
 Open the profile button at the top left and choose **Create profile**. Add a display
 name (1–40 characters), choose an avatar icon and color, or import a PNG, JPEG, HEIC,
-or TIFF photo under 10 MB. Photos are cropped to a 256×256 PNG and re-encoded without
+or TIFF photo under 10 MB by clicking the avatar circle's camera-plus badge.
+Click the same circle to replace a photo; Remove photo restores the avatar icon.
+Photos are cropped to a 256×256 PNG and re-encoded without
 source photo metadata. Save applies the avatar to the main window; Cancel discards
 your edits. Name and avatar choices persist after relaunch.
 
@@ -98,8 +122,9 @@ private account profile sync, sign-out and account deletion. The checked-in buil
 has blank public service settings, so online controls explain that it isn't connected.
 Local and account profiles stay separate; signing in never silently uploads an old
 local name/photo. Explicit Save syncs an account profile. Session tokens use Keychain;
-passwords are not persisted. After relaunch, Restore saved sign-in is an explicit
-action. Names and photos are excluded from research ZIPs and recording metadata.
+passwords are not persisted. Automatic restoration only follows a successful sign-in
+with Keep me signed in selected. Continue with saved account is also available
+as an explicit action in the account form. Names and photos are excluded from research ZIPs and recording metadata.
 
 Optional per-session research delivery uses a separate opt-in for new sessions. It sends
 one ZIP per completed session to private Supabase storage while signed in and running.
@@ -483,6 +508,8 @@ test runs twice, once with Debug enabled and once without it). A failed assertio
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
+- `LaunchCoordinatorTests`: first launch, remembered guest mode, automatic restoration,
+  failed restoration, registration/profile setup, menu-bar gating and cancelled responses.
 - `AccountTests`: fake signup/confirmation/sign-in, private profile sync, recovery,
   Keychain boundaries, cross-service restore rejection and deletion requests.
 - `ResearchSharingTests` and `ResearchDeliveryTests`: consent snapshots, safe ZIPs,
