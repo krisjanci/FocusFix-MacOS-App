@@ -116,12 +116,18 @@ struct CollectorRootView: View {
 
     var body: some View {
         Group {
-            if tour.isPresented && canShowTour { QuickTourView(tracker: tracker) }
-            else if launch.page == .app { ContentView(tracker: tracker) }
+            if launch.page == .app { ContentView(tracker: tracker) }
             else { WelcomeView(launch: launch, account: account) }
         }
-        .allowsHitTesting(launchFinished)
-        .accessibilityHidden(!launchFinished)
+        .disabled(tour.isPresented && canShowTour)
+        .opacity(tour.isPresented && canShowTour ? 0 : 1)
+        .allowsHitTesting(launchFinished && !(tour.isPresented && canShowTour))
+        .accessibilityHidden(!launchFinished || (tour.isPresented && canShowTour))
+        .overlay {
+            if tour.isPresented && canShowTour && launchFinished {
+                QuickTourView()
+            }
+        }
         .overlay {
             if !launchFinished {
                 LaunchScreen { finishIntro() }.transition(.identity)
