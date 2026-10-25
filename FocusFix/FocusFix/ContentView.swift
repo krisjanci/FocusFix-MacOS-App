@@ -8,6 +8,7 @@ struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
     @ObservedObject private var profile = ProfileController.shared
     @ObservedObject private var account = AccountController.shared
+    @ObservedObject private var tour = QuickTourController.shared
     @Environment(\.openWindow) private var openWindow
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
@@ -39,6 +40,7 @@ struct ContentView: View {
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(teal.opacity(0.08), in: Capsule())
             }
+            .quickTourTarget(.overview)
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
                     Image(systemName: "leaf").font(.system(size: 28, weight: .light)).foregroundStyle(teal)
@@ -77,9 +79,24 @@ struct ContentView: View {
                 Color.mint.opacity(onBreak ? 0.12 : 0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 in: RoundedRectangle(cornerRadius: 18))
 
-            DailyProgressCard(tracker: tracker)
+            .quickTourTarget(.timer)
+            .quickTourTarget(.breaks, enabled: onBreak)
 
-            if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
+            DailyProgressCard(tracker: tracker).quickTourTarget(.progress)
+
+            if tracker.isRecording && !onBreak {
+                BreakControls(tracker: tracker).tint(teal).quickTourTarget(.breaks)
+            } else if !tracker.isRecording && tour.isPresented && tour.step.target == .breaks {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Break controls · example", systemImage: "leaf").font(.headline)
+                    Text("Take a break → Choose a duration and activity → I'm back")
+                        .font(.callout)
+                    Text("These controls appear during a recording. This example starts no session or break.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    .quickTourTarget(.breaks)
+            }
 
             if tracker.timedCheckInPending && !onBreak {
                 HStack {
@@ -140,6 +157,7 @@ struct ContentView: View {
                           systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
                         .frame(minWidth: 124)
                 }.buttonStyle(.bordered).tint(teal).controlSize(.large)
+                    .quickTourTarget(.start)
                 Button { openWindow(id: "sessions") } label: {
                     Label("Sessions", systemImage: "folder")
                 }.controlSize(.large)
