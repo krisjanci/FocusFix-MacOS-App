@@ -81,6 +81,41 @@ Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
 
+### Daily progress and breaks
+
+The main window shows today's progress toward **60 minutes of work**, a weekday
+streak, and the number of completed breaks. Work adds up across sessions, including
+quiet reading. Breaks, break setup/check-in screens, sleep, screen lock, and time
+outside a recording do not count. The session timer still shows total session time.
+
+Monday–Friday require the goal to continue a streak. Saturdays and Sundays show
+optional progress and neither increase nor break it. Today's unfinished goal keeps
+the previous streak visible until a weekday is missed. Days use the Mac's local
+calendar and time zone; work crossing midnight is split between days.
+
+A break earns one count when you return after at least **one minute**, using
+**I'm back** or the existing automatic return detection. Returning before or after
+the planned timer is fine. Stopping a session during a break earns no count.
+Completing the daily goal and returning from a qualifying break show brief inline
+encouragement without opening a dialog or sending a notification.
+
+Progress starts with this feature; old recordings aren't backfilled. It lives in
+`FocusFix/progress.json` under the app's Application Support directory, separately
+from session files, exports, and research uploads. Deleting a recording doesn't
+remove earned progress. Progress saves atomically every 15 seconds while recording
+and at phase changes, Stop, and normal quit. Unexpected termination can lose up to
+15 seconds since the last successful save. Save failures show a notice and retry;
+an unreadable file is backed up before starting fresh progress. No recording files
+are changed during recovery.
+
+Manual reward check: record work in two sessions and confirm their daily totals add
+up; open/cancel a check-in and confirm that time does not count. Return from a
+one-minute break both early relative to a longer plan and after its timer expires;
+check one count and the recharge message. Stop during another break and check no
+count is added. Check the menu-bar totals, relaunch persistence, light/dark layouts,
+and VoiceOver's daily-goal description. Use synthetic tests for the one-hour,
+weekday, midnight and daylight-saving boundaries rather than altering the Mac clock.
+
 ### Survey choices
 
 The account icon opens **Surveys**, with separate switches for:
@@ -414,11 +449,13 @@ Run all synthetic tests from the repository root (macOS with Xcode command-line 
 bash scripts/test.sh
 ```
 
-The script compiles and runs ten small Swift test programs (the release-configuration
+The script compiles and runs small Swift test programs (the release-configuration
 test runs twice, once with Debug enabled and once without it). A failed assertion
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
+- `DailyProgressTests`: work accounting, weekday streaks, midnight/DST boundaries,
+  break credit/deduplication, persistence, failed writes and unreadable-file recovery.
 - `RecordingDataTests`: timing, CSV schemas, saving/reloading, export names and guards.
 - `BreakPolicyTests`: separate idle gaps, Skip/Snooze, early/late return and break records.
 - `SurveyDataTests`: rating validation, skipped/cancelled answers, timestamps,
