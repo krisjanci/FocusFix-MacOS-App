@@ -12,19 +12,33 @@ configured on this Mac. Do not commit, push or publish without explicit authoriz
 - Both distribution paths use App Sandbox and passive Input Monitoring. No
   Accessibility permission, input injection or event modification is used for capture.
   App switches use NSWorkspace notifications. Disabled taps stop recording visibly.
-- Release has hardened runtime, no debugger/network entitlement, no enrollment and
-  no upload endpoint. User-selected read/write access supports explicit exports.
+- Release has hardened runtime, no debugger entitlement, and outgoing HTTPS for
+  optional accounts. It has no legacy research enrollment or upload endpoint.
+  Supabase public settings are blank and research sharing is off in the checked-in
+  configuration; see `supabase/SETUP.md` before enabling either feature. User-selected read/write access supports explicit exports.
   Debug has its own `.debug` ID/container and permits the enrolled research receiver.
   Never distribute Debug. Research access is locked on launch; unlocking in the
   profile can restore opted-in uploads.
 - The privacy manifest declares preferences (`CA92.1`) and app-container timestamps
   (`C617.1`). Empty off-device collection applies to local-only Release, not research
   builds or website hosting logs. Reassess it whenever data handling changes.
-- Recording notice version 2 covers Input Monitoring, secure-input gaps, local
+- Recording notice version 3 covers optional local/account profiles and per-session
+  research opt-in separately from recording, as well as Input Monitoring, secure-input gaps, local
   storage, backups, exports, custom break labels and Trash deletion. Acceptance
   and permission alone never start recording.
 - About/Help includes privacy, offline GPL text, source and public GitHub support.
   Never request recordings, credentials or private information in public Issues.
+
+## Account/research sharing release gate
+
+The account client and server schema/function are prepared, not deployed or
+end-to-end verified. Keep the Supabase organization on Free; no paid trial/add-ons
+or management credentials are used by the app. Before a configured release, apply
+the setup guide, test access isolation with two disposable accounts, test recovery
+and deletion, verify real per-session delivery/export, and review privacy declarations,
+App Store answers, study consent and support instructions. The current empty
+collection declaration is only appropriate for the unconfigured build. Enabling
+accounts or research collection requires revisiting it before distribution.
 
 ## Local verification
 
