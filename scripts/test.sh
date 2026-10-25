@@ -15,6 +15,8 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test LaunchCoordinatorTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" \
+    "$source_dir/AccountController.swift" "$source_dir/LaunchCoordinator.swift"
 run_test AccountTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
 run_test ResearchDeliveryTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift" \
     "$source_dir/ResearchSharing.swift" "$source_dir/ResearchSharingController.swift" "$source_dir/SavedSession.swift"
