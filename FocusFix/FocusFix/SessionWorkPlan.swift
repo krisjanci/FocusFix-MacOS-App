@@ -1,6 +1,6 @@
 import Foundation
 
-// A session owns a value snapshot. Preferences cannot change an active plan.
+// A session owns a value snapshot. Later start-window edits cannot change an active plan.
 struct SessionWorkPlan: Equatable {
     let targetMinutes: Int?
     private(set) var workSeconds: Double = 0
@@ -13,7 +13,7 @@ struct SessionWorkPlan: Equatable {
     var isComplete: Bool { targetMinutes.map { workSeconds >= Double($0) * 60 } ?? false }
     var reminderPending: Bool { isComplete && !acknowledged }
     var summary: String {
-        "Session work · \(Int(min(workSeconds / 60, Double(Int.max / 2)))) / \(targetMinutes ?? 0) min"
+        "Planned session · \(Int(min(workSeconds / 60, Double(Int.max / 2)))) / \(targetMinutes ?? 0) min"
     }
 
     mutating func credit(_ seconds: Double) {
