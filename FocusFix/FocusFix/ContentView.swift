@@ -59,6 +59,8 @@ struct ContentView: View {
                 Color.mint.opacity(onBreak ? 0.12 : 0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 in: RoundedRectangle(cornerRadius: 18))
 
+            DailyProgressCard(tracker: tracker)
+
             if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
 
             if tracker.timedCheckInPending && !onBreak {
