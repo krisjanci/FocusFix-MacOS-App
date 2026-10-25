@@ -1,104 +1,143 @@
 import Foundation
 import Combine
+import CoreGraphics
 
-// Offline teaching content only. No recording, authentication, or sharing dependencies.
-struct QuickTourStep: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let symbol: String
-    let exampleTitle: String
-    let exampleDetail: String
-    let tips: [Tip]
+// Practice data only. This model has no recording, storage, credentials, or service dependencies.
+enum QuickTourPhase: String, CaseIterable {
+    case start, plan, duration, confirmStart, work, takeBreak, startBreak, returned
+    case progress, save, sessions, savedSession, profile, editName, name
 
-    struct Tip {
-        let title: String
-        let detail: String
-    }
-
-    var target: QuickTourTarget {
-        switch id {
-        case "start": return .start
-        case "work": return .timer
-        case "break": return .breaks
-        case "progress": return .progress
-        case "sessions": return .sessions
-        case "personalize": return .profile
-        default: return .overview
+    var index: Int {
+        switch self {
+        case .start: return 0
+        case .plan, .duration, .confirmStart: return 1
+        case .work: return 2
+        case .takeBreak, .startBreak, .returned: return 3
+        case .progress: return 4
+        case .save, .sessions, .savedSession: return 5
+        case .profile, .editName, .name: return 6
         }
     }
-
-    static let all: [QuickTourStep] = [
-        .init(id: "meet", title: "Meet FocusFix", subtitle: "A little structure for work and recovery.",
-            symbol: "leaf.circle", exampleTitle: "Focus → Recharge → Return",
-            exampleDetail: "You decide when to start, take a break, and stop.", tips: [
-                .init(title: "Build your rhythm", detail: "Record work, plan breaks, and reflect with optional check-ins. FocusFix records activity timing—not typed text or screenshots—and does not diagnose fatigue."),
-                .init(title: "Guest is ready", detail: "Use as guest gives you local recording, profiles, and progress. Accounts are optional and available only in connected builds."),
-                .init(title: "Sharing is a separate choice", detail: "Recordings stay on this Mac unless you export or enable approved research sharing. Creating an account does not opt you into research.")
-            ]),
-        .init(id: "start", title: "Start and plan", subtitle: "Set an intention for this session, if you like.",
-            symbol: "calendar.badge.clock", exampleTitle: "Planned session · 0 / 60 min",
-            exampleDetail: "A fresh, optional plan for each start.", tips: [
-                .init(title: "Get set up", detail: "On first use, review Before recording, then press Start session again. If monitoring is unavailable, choose Enable Input Monitoring and allow FocusFix in System Settings → Privacy & Security."),
-                .init(title: "Choose your plan", detail: "Before you start offers Plan session: choose 30, 60, 90 minutes, or Custom (1–480 whole minutes). Remove plan clears the target; Cancel discards this start attempt."),
-                .init(title: "Answer or skip", detail: "If the fatigue survey is on, choose a rating or Skip & start. Skipping keeps your plan. With the survey off, simply choose Start session. Nothing records until a session starts.")
-            ]),
-        .init(id: "work", title: "Work normally", subtitle: "Reading quietly is work, too.",
-            symbol: "book", exampleTitle: "Session time · 00:25:00",
-            exampleDetail: "Planned session · 18 / 60 min. Credited work excludes breaks.", tips: [
-                .init(title: "Know your timers", detail: "The main timer shows total session time. Planned work and daily progress include quiet reading but exclude breaks, open check-ins, sleep, and screen lock."),
-                .init(title: "Keep the window out of your way", detail: "Closing the main window leaves recording running. Use the FocusFix menu-bar icon to reopen it, take a break, or Stop & save. Stop before tasks you don't want recorded."),
-                .init(title: "Check in when it suits you", detail: "An optional check-in becomes available about 10 minutes after starting or returning from a break. Choose Answer or Skip; notifications are optional, and controls remain in the app.")
-            ]),
-        .init(id: "break", title: "Take a break", subtitle: "Choose something that helps you recharge.",
-            symbol: "cup.and.saucer", exampleTitle: "5 minutes · Stretch",
-            exampleDetail: "A walk, water, or a moment away from the screen.", tips: [
-                .init(title: "Make room to recharge", detail: "Choose Take a break, then an activity and 5, 10, 15, or Custom minutes (1–120). Answer optional ratings or use Skip ratings & start break."),
-                .init(title: "Return your way", detail: "Choose I'm back when ready. Meaningful typing, clicking, scrolling, or pointer movement in another app can also finish the break automatically, including an early return."),
-                .init(title: "Understand the timer", detail: "Detailed activity tracking pauses during the planned break. It resumes when the timer ends or you return early. Your break remains open until a return is detected or you choose I'm back.")
-            ]),
-        .init(id: "progress", title: "Understand your progress", subtitle: "Small, consistent steps add up.",
-            symbol: "chart.bar", exampleTitle: "Today · 32 / 60 min",
-            exampleDetail: "Daily progress adds work across all your sessions.", tips: [
-                .init(title: "Build a weekday streak", detail: "Reach 60 minutes of work to earn a weekday streak day. Weekends are optional: they neither increase nor break your streak. The daily goal stays separate from your session plan."),
-                .init(title: "Give breaks credit", detail: "A break lasting at least one minute counts when you return, early or late. Stopping the session during a break doesn't earn break credit."),
-                .init(title: "Finish on your terms", detail: "At your session target, Plan complete offers Stop & save or Keep going. Recording continues until you stop; Keep going acknowledges the reminder without resetting your work.")
-            ]),
-        .init(id: "sessions", title: "Save and find sessions", subtitle: "Your recordings are already being saved locally.",
-            symbol: "folder", exampleTitle: "Stop & save → Sessions",
-            exampleDetail: "Export only when you want a separate copy.", tips: [
-                .init(title: "Finish your recording", detail: "Choose Stop & save from the main window or menu bar. Sessions are saved automatically on this Mac; exporting after every session is unnecessary."),
-                .init(title: "Find or export", detail: "Open Sessions and select a recording. Show in Finder reveals its folder. Export… creates a separate copy of a finished session in a location you choose."),
-                .init(title: "Delete deliberately", detail: "Delete… moves a saved session to Trash. Exports, backups, and already uploaded copies remain separate. Deleting a recording does not remove earned daily progress.")
-            ]),
-        .init(id: "personalize", title: "Make it yours", subtitle: "Adjust the details, then get back to your day.",
-            symbol: "person.crop.circle", exampleTitle: "Profile · Your name, your photo",
-            exampleDetail: "Click your name to edit it in place.", tips: [
-                .init(title: "Personalize your profile", detail: "Click the profile button, then your name or Add your name. Click the photo circle to add or replace a picture; Remove photo clears it. Save profile applies changes; Cancel discards them."),
-                .init(title: "Choose your preferences", detail: "Profile lets you switch surveys on or off for your next session. The main window's appearance menu offers System, Light, and Dark. Account profiles sync only when connected and saved."),
-                .init(title: "Come back anytime", detail: "Profile → Advanced → Preview welcome screen lets you explore account layouts without changing your account or history. Replay this Quick tour from Profile, Welcome, Help, or the menu bar.")
-            ])
-    ]
+    var caption: String {
+        switch self {
+        case .start: return "Click Start to begin."
+        case .plan: return "Want a goal? Click Plan session."
+        case .duration: return "Pick a time."
+        case .confirmStart: return "Ready? Click Start."
+        case .work: return "Your work time grows here."
+        case .takeBreak: return "Time for a little break."
+        case .startBreak: return "Click Start break."
+        case .returned: return "Back? Click I’m back."
+        case .progress: return "Aim for one hour each day."
+        case .save: return "Click Stop to save."
+        case .sessions: return "Find your work in Sessions."
+        case .savedSession: return "Your work is saved here."
+        case .profile: return "Make it yours."
+        case .editName: return "Click your name to change it."
+        case .name: return "All set!"
+        }
+    }
+    var offersNext: Bool { self == .work || self == .progress || self == .savedSession }
+    var offersDone: Bool { self == .name }
 }
 
-enum QuickTourTarget: String, CaseIterable {
-    case overview, start, timer, breaks, progress, sessions, profile
+enum QuickTourAction: Equatable {
+    case start, plan, minutes(Int), confirmStart, takeBreak, startBreak, returned
+    case save, sessions, profile, editName, next, done
 }
 
 @MainActor
 final class QuickTourController: ObservableObject {
     static let shared = QuickTourController()
     @Published private(set) var isPresented = false
-    @Published private(set) var index = 0
-    // Each entry creates a fresh guided visit, without saving a preference.
+    @Published private(set) var phase: QuickTourPhase = .start
     @Published private(set) var visit = UUID()
-    var step: QuickTourStep { QuickTourStep.all[index] }
-    var isFirst: Bool { index == 0 }
-    var isLast: Bool { index == QuickTourStep.all.count - 1 }
-    var position: String { "Step \(index + 1) of \(QuickTourStep.all.count)" }
+    @Published private(set) var minutes = 60
+    @Published private(set) var elapsed = 0
+    @Published private(set) var dailyMinutes = 32
+    @Published private(set) var breaks = 0
+    @Published private(set) var saved = false
+    @Published private(set) var demoName = "Alex"
 
-    func restart() { index = 0; visit = UUID(); isPresented = true }
-    func finish() { isPresented = false; index = 0 }
-    func next() { if isPresented && !isLast { index += 1 } }
-    func back() { if isPresented && !isFirst { index -= 1 } }
+    var index: Int { phase.index }
+    var isFirst: Bool { index == 0 }
+    var position: String { "\(index + 1)/7" }
+
+    func restart() { reset(to: .start); isPresented = true }
+    func finish() { isPresented = false; reset(to: .start) }
+    func back() {
+        guard isPresented, !isFirst else { return }
+        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile]
+        reset(to: starts[index - 1])
+    }
+
+    // A callback belongs to exactly one rendered phase of one visit.
+    func perform(_ action: QuickTourAction, phase expected: QuickTourPhase, visit token: UUID) {
+        guard isPresented, phase == expected, visit == token else { return }
+        switch (phase, action) {
+        case (.start, .start): phase = .plan
+        case (.plan, .plan): phase = .duration
+        case (.duration, .minutes(let value)) where [30, 60, 90].contains(value):
+            minutes = value; phase = .confirmStart
+        case (.confirmStart, .confirmStart): elapsed = 0; phase = .work
+        case (.work, .next): phase = .takeBreak
+        case (.takeBreak, .takeBreak): phase = .startBreak
+        case (.startBreak, .startBreak): phase = .returned
+        case (.returned, .returned): breaks = 1; phase = .progress
+        case (.progress, .next): phase = .save
+        case (.save, .save): saved = true; phase = .sessions
+        case (.sessions, .sessions): phase = .savedSession
+        case (.savedSession, .next): phase = .profile
+        case (.profile, .profile): phase = .editName
+        case (.editName, .editName): phase = .name
+        case (.name, .done): finish()
+        default: break
+        }
+    }
+
+    func illustrate(phase expected: QuickTourPhase, visit token: UUID, reducedMotion: Bool = false) {
+        guard isPresented, phase == expected, visit == token else { return }
+        if phase == .work { elapsed = reducedMotion ? 5 : min(5, elapsed + 1) }
+        if phase == .progress { dailyMinutes = 60 }
+    }
+
+    func editName(_ value: String) {
+        guard isPresented, phase == .name else { return }
+        demoName = String(value.prefix(40))
+    }
+
+    private func reset(to value: QuickTourPhase) {
+        visit = UUID(); phase = value; minutes = 60; demoName = "Alex"
+        elapsed = value.index > 2 ? 5 : 0
+        breaks = value.index > 3 ? 1 : 0
+        dailyMinutes = value.index > 4 ? 60 : 32
+        saved = value.index == 6
+    }
+}
+
+// Pure placement and hit-area calculations, shared with synthetic tests.
+struct QuickTourLayout {
+    static func spotlight(_ target: CGRect, in size: CGSize) -> CGRect {
+        target.insetBy(dx: -6, dy: -6).intersection(
+            CGRect(origin: .zero, size: size).insetBy(dx: 8, dy: 8))
+    }
+
+    static func caption(target: CGRect, in size: CGSize, hasButton: Bool) -> CGRect {
+        let available = CGRect(x: 12, y: 56, width: max(0, size.width - 24), height: max(0, size.height - 68))
+        let width = min(248, available.width)
+        let height: CGFloat = hasButton ? 112 : 76
+        let x = min(max(available.minX, target.midX - width / 2), available.maxX - width)
+        let candidates = [
+            CGRect(x: x, y: target.maxY + 12, width: width, height: height),
+            CGRect(x: x, y: target.minY - height - 12, width: width, height: height)
+        ]
+        if let result = candidates.first(where: { available.contains($0) }) { return result }
+        // Compact targets always leave room on one side in the supported demo layouts.
+        let above = max(0, target.minY - 12 - available.minY)
+        let below = max(0, available.maxY - target.maxY - 12)
+        if above > below {
+            return CGRect(x: x, y: available.minY, width: width, height: min(height, above))
+        }
+        return CGRect(x: x, y: target.maxY + 12, width: width, height: min(height, below))
+    }
 }
