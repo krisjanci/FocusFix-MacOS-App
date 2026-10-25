@@ -134,6 +134,35 @@ stay local and can be exported. The integration doesn't enable billing, use emai
 to transport recordings, or delete the old Cloudflare service. Deployment, free-tier
 limits, privacy review and end-to-end verification are in [supabase/SETUP.md](supabase/SETUP.md).
 
+### Optional session work target and welcome preview
+
+Open **Profile → Advanced → Use a session work target** to choose 30, 60 or 90
+minutes, or a custom whole-minute target from 1–480. It is off by default and starts
+at 60 minutes. Choices stay on this Mac and are captured when each session starts;
+changes while recording apply to the next session. Work uses the daily progress
+clock, including quiet reading and excluding breaks, surveys, sleep and screen lock.
+The timer and menu show session work separately from the fixed daily goal.
+
+At the target, **Plan complete** offers **Stop & save** (the normal save flow) or
+**Keep going**. Recording continues until stopped. Keep going acknowledges this
+session's reminder; completion remains visible without prompting again.
+
+Use **Profile → Advanced → Preview welcome screen** while stopped to explore the
+welcome, Create account and Log in screens. Sample fields are editable, but account
+submission, recovery and saved-account restoration are disabled. The preview has no
+account API, Keychain provider or persistent preferences. **Use as guest**, Escape,
+or **Close preview** returns to Profile without changing real sign-in, local data or
+sharing choices. No history deletion is needed. Real account creation still requires
+Supabase configuration.
+
+Manual checks passed for collapsed Advanced, presets/custom input validation,
+preview navigation and dismissal, editable fields with disabled account actions,
+keyboard field navigation, accessibility labels, and light/dark preview layouts.
+The isolated unsigned test build lacks Input Monitoring permission: live recording
+through completion, Keep going and Stop & save still needs a check on a permitted
+build. Synthetic tests cover the shared work clock, boundaries, snapshots and
+one-time completion. These additions use no animation and respect Reduce Motion.
+
 ### Daily progress and breaks
 
 The main window shows today's progress toward **60 minutes of work**, a weekday
@@ -508,7 +537,9 @@ test runs twice, once with Debug enabled and once without it). A failed assertio
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
-- `LaunchCoordinatorTests`: first launch, remembered guest mode, automatic restoration,
+- `SessionWorkPlanTests`: target limits, persistence, settings snapshots, shared work
+  credit across work/excluded intervals, completion boundaries and acknowledgement.
+- `LaunchCoordinatorTests`: offline preview isolation plus first launch, remembered guest mode, automatic restoration,
   failed restoration, registration/profile setup, menu-bar gating and cancelled responses.
 - `AccountTests`: fake signup/confirmation/sign-in, private profile sync, recovery,
   Keychain boundaries, cross-service restore rejection and deletion requests.
