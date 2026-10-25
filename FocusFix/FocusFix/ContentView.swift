@@ -6,6 +6,8 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
+    @ObservedObject private var profile = ProfileController.shared
+    @ObservedObject private var account = AccountController.shared
     @Environment(\.openWindow) private var openWindow
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
@@ -18,9 +20,10 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 26) {
             HStack(spacing: 14) {
                 Button { sharingPresented = true } label: {
-                    Image(systemName: "person.crop.circle").font(.title2)
+                    ProfileAvatar(profile: account.session == nil ? profile.profile : account.profile, size: 30)
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .help("Profile, surveys and privacy").accessibilityLabel("Profile, surveys and privacy")
+                    .help("Profile, surveys and privacy")
+                    .accessibilityLabel((account.session == nil ? profile.profile : account.profile).map { "Profile for \($0.name), surveys and privacy" } ?? "Profile, surveys and privacy")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable().scaledToFit().frame(width: 54, height: 54)
                     .accessibilityHidden(true)
