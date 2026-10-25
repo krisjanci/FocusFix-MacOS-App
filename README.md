@@ -84,6 +84,31 @@ Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
 
+### Quick tour
+
+Choose **Quick tour** from Welcome, Profile, Help, or the menu bar for a guided tour
+inside the main window. Comments explain the highlighted controls, and arrows point
+to them as the tour scrolls into position. The Sessions and Profile steps show those
+existing views in the main window. Break controls unavailable while idle use a clearly
+labeled, read-only example. No separate tutorial window opens.
+
+Every entry starts at step one. Back/Next navigate, Return activates Next/Done,
+Command-[ goes back, and Close tour or Escape exits. Both the app preview and comments
+scroll, with accessible headings and labels. No animation is used. The tour never
+opens automatically and can be revisited from Profile at any time.
+
+Preview controls are disabled so they cannot start sessions, change settings, request
+permissions, or submit account forms. Close the tour to use the app. Existing recording
+continues, and menu-bar Stop & save remains available. Opening from Welcome does not
+choose guest mode or change sign-in; closing returns to the current launch screen.
+Pending recording notices or check-in sheets finish before the requested tour appears.
+
+The guided tour was checked in the main window across all seven targets, including
+inline Sessions/Profile, the idle break example, light/dark appearance, keyboard
+navigation, finishing back to Welcome, and replay from Profile. Existing synthetic
+recording tests pass. Live recording while touring still needs verification on a
+build with Input Monitoring permission; the isolated UI build does not have it.
+
 ### Welcome and guest access
 
 After the intro animation, the first launch offers **Create account**, **Log in**,
@@ -549,6 +574,7 @@ test runs twice, once with Debug enabled and once without it). A failed assertio
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
+- `QuickTourTests`: page boundaries, ordered content, restart while open, and isolated navigation.
 - `SessionWorkPlanTests`: target limits, fresh start/cancel reset, survey choices, plan snapshots, shared work
   credit across work/excluded intervals, completion boundaries and acknowledgement.
 - `LaunchCoordinatorTests`: offline preview isolation plus first launch, remembered guest mode, automatic restoration,
