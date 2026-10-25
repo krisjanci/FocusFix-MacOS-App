@@ -15,6 +15,11 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test AccountTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
+run_test ResearchDeliveryTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift" \
+    "$source_dir/ResearchSharing.swift" "$source_dir/ResearchSharingController.swift" "$source_dir/SavedSession.swift"
+run_test ResearchSharingTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/ResearchSharing.swift"
+run_test UserProfileTests "$source_dir/UserProfile.swift" "$source_dir/ProfileController.swift"
 run_test DailyProgressTests "$source_dir/DailyProgress.swift" "$source_dir/BreakPolicy.swift" \
     "$source_dir/RecordingData.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test RecordingDataTests "$source_dir/RecordingData.swift" \
