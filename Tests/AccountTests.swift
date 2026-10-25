@@ -10,6 +10,9 @@ struct AccountTests {
         precondition(AccountConfiguration(url: "https://example.com", publicKey: "sb_secret_bad") == nil)
         let encodedRole = Data("{\"role\":\"service_role\"}".utf8).base64EncodedString().replacingOccurrences(of: "=", with: "")
         precondition(AccountConfiguration(url: "https://example.com", publicKey: "header.\(encodedRole).signature") == nil)
+        let suite = "focusfix.test.account.\(UUID().uuidString)"
+        let preferences = UserDefaults(suiteName: suite)!
+        defer { preferences.removePersistentDomain(forName: suite) }
         let owner = UUID()
         let remote = UserProfile(name: "Test user", symbol: "leaf.fill", color: "teal")
         let session = AccountSession(access_token: "test-access", refresh_token: "test-refresh",
@@ -44,7 +47,7 @@ struct AccountTests {
             return (data, HTTPURLResponse(url: request.url!, statusCode: statusOverride ?? status, httpVersion: nil, headerFields: nil)!)
         }
         let controller = AccountController(configuration: config, transport: transport,
-            readCredential: { reads += 1; return stored }, writeCredential: { stored = $0 })
+            readCredential: { reads += 1; return stored }, writeCredential: { stored = $0 }, defaults: preferences)
         precondition(reads == 0 && requests.isEmpty) // Launch never touches Keychain or network.
         await controller.authenticate(email: "bad", password: "short", create: true)
         precondition(requests.isEmpty)
