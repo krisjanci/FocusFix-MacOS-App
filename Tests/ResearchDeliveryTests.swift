@@ -11,6 +11,9 @@ struct ResearchDeliveryTests {
     }
 
     static func main() async throws {
+        let suite = "focusfix.test.account.\(UUID().uuidString)"
+        let preferences = UserDefaults(suiteName: suite)!
+        defer { preferences.removePersistentDomain(forName: suite) }
         let owner = UUID()
         let configuration = AccountConfiguration(url: "https://example.supabase.co", publicKey: "sb_publishable_test", researchSharingEnabled: true, studyURL: "https://example.invalid/study")!
         let session = AccountSession(access_token: "test-access", refresh_token: "test-refresh",
@@ -44,7 +47,7 @@ struct ResearchDeliveryTests {
             } else if path == "/auth/v1/token" { data = try JSONEncoder().encode(session) }
             else if path.contains("account_profiles") { data = Data("[]".utf8) }
             return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
-        }, readCredential: { nil }, writeCredential: { _ in })
+        }, readCredential: { nil }, writeCredential: { _ in }, defaults: preferences)
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let recordings = root.appendingPathComponent("Sessions")
