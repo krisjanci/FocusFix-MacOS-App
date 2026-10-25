@@ -56,6 +56,21 @@ struct ContentView: View {
                     Text(tracker.formattedTime)
                         .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
                 }
+                if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
+                    Text(tracker.sessionWorkPlan.summary)
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    if tracker.sessionWorkPlan.isComplete {
+                        HStack {
+                            Label("Plan complete", systemImage: "checkmark.circle.fill")
+                                .font(.callout.weight(.medium)).foregroundStyle(teal)
+                            if tracker.sessionWorkPlan.reminderPending {
+                                Spacer()
+                                Button("Stop & save") { tracker.stop() }
+                                Button("Keep going") { tracker.keepGoingAfterPlan() }
+                            }
+                        }
+                    }
+                }
             }
             .frame(maxWidth: .infinity).padding(26)
             .background(LinearGradient(colors: [teal.opacity(onBreak ? 0.16 : 0.06),
