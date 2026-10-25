@@ -56,6 +56,7 @@ final class ActivityTracker: ObservableObject {
     private var returnDistance: Double = 0
     private var returnWindowStart: Double = 0
     private var suspendedBy: Set<String> = []
+    private var researchConsent: ResearchConsent?
     private var writer: RecordingWriter?
     private var mouse = MouseAccumulator(initialPosition: .zero)
     private var keys = KeyTiming()
@@ -197,6 +198,7 @@ final class ActivityTracker: ObservableObject {
         do {
             let root = try SessionFiles.root()
             startedAt = Date()
+            researchConsent = ResearchSharingController.shared.capturedConsent
             let sharing = SharingController.shared
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
                 participantID: sharing.participantID.isEmpty ? nil : sharing.participantID,
@@ -280,6 +282,10 @@ final class ActivityTracker: ObservableObject {
             }
             try record(type: "session_stop", at: end)
             try writer?.finish(startedAt: startedAt, duration: end, reason: reason)
+            if let sessionFolder, reason != "recording_error", reason != "monitor_unavailable" {
+                ResearchSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: researchConsent)
+            }
+            researchConsent = nil
             message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
             if let checkInSaveError {
                 hasError = true
