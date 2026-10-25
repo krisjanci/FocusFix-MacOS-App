@@ -109,6 +109,7 @@ struct ProfileEditor: View {
             }
             if let notice = controller.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
         }.disabled(account.busy)
+            .quickTourTarget(.profile)
             .onAppear { draft = savedProfile ?? UserProfile() }
             .onChange(of: account.session?.user.id) { _, _ in editing = false; photoError = nil }
     }
