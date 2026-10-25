@@ -17,6 +17,7 @@ struct WelcomeView: View {
                         Text("Make room for focus and a good break.").font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                QuickTourButton()
                 if launch.isPreview {
                     Label("Welcome screen preview", systemImage: "eye").font(.headline)
                     Text("Try the forms without changing your account or history. Sign-in, registration, password recovery and saved-account access are disabled. Nothing is sent or saved.")
@@ -104,11 +105,19 @@ struct CollectorRootView: View {
     @ObservedObject var launch: LaunchCoordinator
     @ObservedObject var account: AccountController
     @Binding var launchFinished: Bool
+    @ObservedObject private var tour = QuickTourController.shared
+
+    // Keep existing modal check-ins intact; the requested tour waits until they close.
+    private var canShowTour: Bool {
+        !tracker.sessionCheckInPresented && !tracker.recordingNoticePresented &&
+        !tracker.breakSetupPresented && !tracker.timedCheckInPresented
+    }
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
-            if launch.page == .app { ContentView(tracker: tracker) }
+            if tour.isPresented && canShowTour { QuickTourView(tracker: tracker) }
+            else if launch.page == .app { ContentView(tracker: tracker) }
             else { WelcomeView(launch: launch, account: account) }
         }
         .allowsHitTesting(launchFinished)
