@@ -57,6 +57,13 @@ final class AccountController: ObservableObject {
     @Published private(set) var enrollment: ResearchEnrollment?
     private let readCredential: () throws -> Data?
     private let writeCredential: (Data?) throws -> Void
+    @Published private(set) var remembersSignIn: Bool
+    private(set) var isNewAccount = false
+    private var pendingRegistration = false
+    private var rememberSession = false
+    private let defaults: UserDefaults
+    private static let rememberKey = "focusfix.account.keepSignedIn"
+    private var authenticationTask: Task<AccountSession?, Error>?
     private var refreshTask: Task<AccountSession, Error>?
     private var generation = UUID()
 
@@ -66,56 +73,103 @@ final class AccountController: ObservableObject {
 
     init(configuration: AccountConfiguration?, transport: @escaping AccountAPI.Transport = AccountAPI.send,
          readCredential: @escaping () throws -> Data? = AccountKeychain.read,
-         writeCredential: @escaping (Data?) throws -> Void = AccountKeychain.write) {
+         writeCredential: @escaping (Data?) throws -> Void = AccountKeychain.write,
+         defaults: UserDefaults = .standard) {
         api = configuration.map { AccountAPI(configuration: $0, transport: transport) }
+        self.defaults = defaults
+        remembersSignIn = defaults.bool(forKey: Self.rememberKey)
         self.readCredential = readCredential
         self.writeCredential = writeCredential
-        // No Keychain reads, authentication, or network requests at launch.
+        // Construction performs no Keychain or network work; the coordinator restores opted-in sign-ins later.
     }
 
-    func authenticate(email: String, password: String, create: Bool) async {
+    func authenticate(email: String, password: String, create: Bool, remember: Bool = true) async {
         guard !busy, let api, session == nil else { return }
         let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard email.contains("@"), password.count >= (create ? 8 : 1) else {
             notice = "Enter an email address and a password\(create ? " of at least 8 characters" : "")."
             return
         }
-        busy = true
-        defer { busy = false }
+        let token = beginAuthentication()
+        defer { finishAuthentication(token) }
+        pendingRegistration = create
+        rememberSession = remember
         do {
-            let result: AccountSession?
-            if create { result = try await api.signUp(email: email, password: password) }
-            else { result = try await api.signIn(email: email, password: password) }
+            let task = Task<AccountSession?, Error> {
+                if create { return try await api.signUp(email: email, password: password) }
+                return try await api.signIn(email: email, password: password)
+            }
+            authenticationTask = task
+            let result = try await task.value
+            guard token == generation, !Task.isCancelled else { return }
             needsConfirmation = create && result == nil
-            if let result { await accept(result) }
+            if let result { await accept(result, token: token, newAccount: create) }
             else { notice = "Check your email for a confirmation code. If you already have an account, sign in instead." }
-        } catch { notice = error.localizedDescription }
+        } catch { if token == generation { notice = error.localizedDescription } }
     }
 
-    func restore() async {
+    func restore(remember: Bool = true) async {
         guard !busy, let api, session == nil else { return }
-        busy = true
-        defer { busy = false }
+        let token = beginAuthentication()
+        defer { finishAuthentication(token) }
+        rememberSession = remember
         do {
             guard let data = try readCredential() else { notice = "No saved sign-in. Enter your email and password."; return }
             let stored = try JSONDecoder().decode(StoredAccount.self, from: data)
             guard stored.origin == api.configuration.origin.absoluteString else {
                 throw AccountFailure(message: "The saved sign-in belongs to another account service. Sign in again.")
             }
-            let refreshed = try await api.refresh(stored.session.refresh_token)
-            await accept(refreshed)
-        } catch { notice = error.localizedDescription }
+            let task = Task<AccountSession?, Error> { try await api.refresh(stored.session.refresh_token) }
+            authenticationTask = task
+            let refreshed = try await task.value
+            guard token == generation, !Task.isCancelled, let refreshed else { return }
+            await accept(refreshed, token: token, newAccount: false)
+        } catch { if token == generation { notice = error.localizedDescription } }
     }
 
-    private func accept(_ value: AccountSession) async {
+    private func beginAuthentication() -> UUID {
         generation = UUID()
-        session = value
+        busy = true
+        notice = nil
+        return generation
+    }
+
+    private func finishAuthentication(_ token: UUID) {
+        guard token == generation else { return }
+        busy = false
+        authenticationTask = nil
+    }
+
+    // Guest selection never opens Keychain. Cancelled responses cannot publish a session.
+    func continueAsGuest() {
+        authenticationTask?.cancel()
+        authenticationTask = nil
+        clearSession()
+        rememberSession = false
+        setRemembered(false)
+        busy = false
+        notice = nil
+    }
+
+    private func setRemembered(_ value: Bool) {
+        remembersSignIn = value
+        defaults.set(value, forKey: Self.rememberKey)
+    }
+
+    private func accept(_ value: AccountSession, token: UUID, newAccount: Bool) async {
+        guard token == generation else { return }
+        isNewAccount = newAccount
         profile = nil
         profileLoaded = false
         needsConfirmation = false
+        pendingRegistration = false
         notice = nil
-        do { try persist(value) } catch { notice = "Signed in for this launch; Keychain could not save the sign-in." }
+        // Persist the choice before publishing the session to the launch coordinator.
+        do { try persist(value); setRemembered(rememberSession) }
+        catch { setRemembered(false); notice = "Signed in for this launch; Keychain could not save the sign-in." }
+        session = value
         await loadProfile()
+        guard token == generation else { return }
         if researchAvailable { _ = await refreshResearchAccess() }
     }
 
@@ -140,7 +194,7 @@ final class AccountController: ObservableObject {
     }
 
     private func persist(_ value: AccountSession) throws {
-        guard let api else { return }
+        guard rememberSession, let api else { return }
         try writeCredential(JSONEncoder().encode(StoredAccount(origin: api.configuration.origin.absoluteString, session: value)))
     }
 
@@ -170,27 +224,38 @@ final class AccountController: ObservableObject {
 
     func requestRecovery(email: String) async {
         guard !busy, let api, session == nil, email.contains("@") else { return }
-        busy = true
-        defer { busy = false }
+        let token = beginAuthentication()
+        defer { finishAuthentication(token) }
         do {
             try await api.resetPassword(email: email.trimmingCharacters(in: .whitespacesAndNewlines))
+            guard token == generation, !Task.isCancelled else { return }
             recovering = true
             notice = "If the account exists, a recovery code will arrive by email."
-        } catch { notice = error.localizedDescription }
+        } catch { if token == generation { notice = error.localizedDescription } }
     }
 
-    func verify(email: String, code: String, newPassword: String) async {
+    func verify(email: String, code: String, newPassword: String, remember: Bool? = nil) async {
         guard !busy, let api, session == nil else { return }
         guard !recovering || newPassword.count >= 8 else { notice = "Choose a new password of at least 8 characters."; return }
-        busy = true
-        defer { busy = false }
+        let token = beginAuthentication()
+        defer { finishAuthentication(token) }
+        if let remember { rememberSession = remember }
+        let recovery = recovering
+        let newAccount = pendingRegistration && !recovery
         do {
-            let value = try await api.verify(email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                code: code.trimmingCharacters(in: .whitespacesAndNewlines), recovery: recovering)
-            if recovering { try await api.changePassword(newPassword, session: value) }
+            let task = Task<AccountSession?, Error> {
+                let value = try await api.verify(email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                    code: code.trimmingCharacters(in: .whitespacesAndNewlines), recovery: recovery)
+                try Task.checkCancellation()
+                if recovery { try await api.changePassword(newPassword, session: value) }
+                return value
+            }
+            authenticationTask = task
+            let value = try await task.value
+            guard token == generation, !Task.isCancelled, let value else { return }
             recovering = false
-            await accept(value)
-        } catch { notice = error.localizedDescription }
+            await accept(value, token: token, newAccount: newAccount)
+        } catch { if token == generation { notice = error.localizedDescription } }
     }
 
     @discardableResult
@@ -223,6 +288,8 @@ final class AccountController: ObservableObject {
         busy = true
         defer { busy = false }
         let old = session
+        rememberSession = false
+        setRemembered(false)
         clearSession()
         var errorText: String?
         do { try writeCredential(nil) } catch { errorText = error.localizedDescription }
@@ -239,6 +306,8 @@ final class AccountController: ObservableObject {
         defer { busy = false }
         do {
             try await api.deleteAccount(session: validSession())
+            rememberSession = false
+            setRemembered(false)
             clearSession()
             try writeCredential(nil)
             notice = "Account deleted. Local recordings and your local profile are kept."
@@ -254,6 +323,8 @@ final class AccountController: ObservableObject {
         profileLoaded = false
         enrollment = nil
         needsConfirmation = false
+        pendingRegistration = false
+        isNewAccount = false
         recovering = false
     }
 }
