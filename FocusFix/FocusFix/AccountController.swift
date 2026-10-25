@@ -61,7 +61,7 @@ final class AccountController: ObservableObject {
     private(set) var isNewAccount = false
     private var pendingRegistration = false
     private var rememberSession = false
-    private let defaults: UserDefaults
+    private let defaults: UserDefaults?
     private static let rememberKey = "focusfix.account.keepSignedIn"
     private var authenticationTask: Task<AccountSession?, Error>?
     private var refreshTask: Task<AccountSession, Error>?
@@ -74,10 +74,10 @@ final class AccountController: ObservableObject {
     init(configuration: AccountConfiguration?, transport: @escaping AccountAPI.Transport = AccountAPI.send,
          readCredential: @escaping () throws -> Data? = AccountKeychain.read,
          writeCredential: @escaping (Data?) throws -> Void = AccountKeychain.write,
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults? = .standard) {
         api = configuration.map { AccountAPI(configuration: $0, transport: transport) }
         self.defaults = defaults
-        remembersSignIn = defaults.bool(forKey: Self.rememberKey)
+        remembersSignIn = defaults?.bool(forKey: Self.rememberKey) ?? false
         self.readCredential = readCredential
         self.writeCredential = writeCredential
         // Construction performs no Keychain or network work; the coordinator restores opted-in sign-ins later.
@@ -153,7 +153,7 @@ final class AccountController: ObservableObject {
 
     private func setRemembered(_ value: Bool) {
         remembersSignIn = value
-        defaults.set(value, forKey: Self.rememberKey)
+        defaults?.set(value, forKey: Self.rememberKey)
     }
 
     private func accept(_ value: AccountSession, token: UUID, newAccount: Bool) async {
