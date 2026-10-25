@@ -126,6 +126,36 @@ struct LaunchCoordinatorTests {
         pending = nil
         await loginTask.value
         precondition(login.session == nil && loginLaunch.canRecord && writes == writesBeforeGuest)
+        // Preview reuses navigation but has no API, credentials or persistent preferences.
+        let preferencesBeforePreview = defaults.dictionaryRepresentation() as NSDictionary
+        let tokenBeforePreview = stored
+        let sessionBeforePreview = transient.session?.access_token
+        let countersBeforePreview = [reads, writes, requests]
+        let preview = LaunchCoordinator.preview()
+        precondition(preview.isPreview && !preview.account.configured && preview.account.api == nil)
+        preview.begin()
+        preview.restore()
+        precondition(preview.page == .welcome)
+        preview.showAccount(create: true)
+        precondition(preview.page == .createAccount)
+        await preview.account.authenticate(email: "sample@example.invalid", password: "sample-password", create: true)
+        await preview.account.verify(email: "sample@example.invalid", code: "123456", newPassword: "")
+        preview.showWelcome()
+        preview.showAccount(create: false)
+        precondition(preview.page == .login)
+        await preview.account.authenticate(email: "sample@example.invalid", password: "sample-password", create: false)
+        await preview.account.requestRecovery(email: "sample@example.invalid")
+        await preview.account.restore()
+        preview.useGuest()
+        precondition(preview.page == .app && preview.account.session == nil)
+        let startsBeforePreview = starts
+        preview.requestStart(start: { starts += 1 }, showWindow: {})
+        precondition(starts == startsBeforePreview)
+        precondition(LaunchCoordinator.preview().page == .welcome)
+        precondition(countersBeforePreview == [reads, writes, requests])
+        precondition(defaults.dictionaryRepresentation() as NSDictionary == preferencesBeforePreview)
+        precondition(stored == tokenBeforePreview && transient.session?.access_token == sessionBeforePreview)
+        print("Offline preview navigation preserved real account, preferences and credentials")
         print("First launch, guest persistence, registration, remembered sign-in, menu gating and cancellation passed")
     }
 }
