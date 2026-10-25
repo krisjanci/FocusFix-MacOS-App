@@ -4,10 +4,6 @@ import UniformTypeIdentifiers
 
 struct AccountControls: View {
     @ObservedObject var account = AccountController.shared
-    @State private var email = ""
-    @State private var password = ""
-    @State private var code = ""
-    @State private var creating = false
     @State private var confirmDeletion = false
 
     var body: some View {
@@ -28,30 +24,12 @@ struct AccountControls: View {
                 Text("Account profiles sync privately. Creating an account does not enable research sharing or publish your activity.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                TextField("Email", text: $email).textFieldStyle(.roundedBorder)
-                if !account.recovering { SecureField("Password", text: $password).textFieldStyle(.roundedBorder) }
-                if account.needsConfirmation || account.recovering {
-                    TextField("Code from your email", text: $code).textFieldStyle(.roundedBorder)
-                    if account.recovering { SecureField("New password (at least 8 characters)", text: $password).textFieldStyle(.roundedBorder) }
-                    Button(account.recovering ? "Verify & reset password" : "Confirm email") {
-                        Task { await account.verify(email: email, code: code, newPassword: password); password = ""; code = "" }
-                    }.disabled(code.isEmpty)
-                }
-                HStack {
-                    Button(creating ? "Create account" : "Sign in") {
-                        Task { await account.authenticate(email: email, password: password, create: creating); password = "" }
-                    }.buttonStyle(.borderedProminent).disabled(email.isEmpty || password.isEmpty)
-                    Button(creating ? "Use existing account" : "Create an account") { creating.toggle() }
-                }
-                HStack {
-                    Button("Restore saved sign-in") { Task { await account.restore() } }
-                    Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(email.isEmpty)
-                }
-                Text("Your sign-in is saved in macOS Keychain. Restoring it may ask for Keychain access. Local recording doesn't require an account.")
-                    .font(.caption).foregroundStyle(.secondary)
+                AccountSignInForm(account: account)
             }
-            if account.busy { ProgressView().controlSize(.small) }
-            if let notice = account.notice { Text(notice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+            if account.session != nil {
+                if account.busy { ProgressView().controlSize(.small) }
+                if let notice = account.notice { Text(notice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+            }
         }
         .disabled(account.busy)
         .confirmationDialog("Delete your online account?", isPresented: $confirmDeletion, titleVisibility: .visible) {
@@ -60,6 +38,66 @@ struct AccountControls: View {
         } message: {
             Text("This permanently deletes your online account, profile and research ZIPs still held in this service. Copies already downloaded by the researcher and recordings on this Mac are not deleted.")
         }
+    }
+}
+
+
+struct AccountSignInForm: View {
+    @ObservedObject var account: AccountController
+    @State private var email = ""
+    @State private var password = ""
+    @State private var code = ""
+    @State private var creating: Bool
+    @State private var remember = true
+    private let onModeChange: (Bool) -> Void
+
+    init(account: AccountController, create: Bool = false, onModeChange: @escaping (Bool) -> Void = { _ in }) {
+        self.account = account
+        self.onModeChange = onModeChange
+        _creating = State(initialValue: create)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Email", text: $email).textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Email address")
+            if !account.recovering {
+                SecureField("Password", text: $password).textFieldStyle(.roundedBorder)
+            }
+            Toggle("Keep me signed in", isOn: $remember)
+            Text("Saved sign-in uses macOS Keychain and restores automatically next time. macOS may ask for Keychain access.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if account.needsConfirmation || account.recovering {
+                TextField("Code from your email", text: $code).textFieldStyle(.roundedBorder)
+                if account.recovering {
+                    SecureField("New password (at least 8 characters)", text: $password).textFieldStyle(.roundedBorder)
+                }
+                Button(account.recovering ? "Verify & reset password" : "Confirm email") {
+                    Task {
+                        await account.verify(email: email, code: code, newPassword: password, remember: remember)
+                        password = ""; code = ""
+                    }
+                }.disabled(code.isEmpty)
+            }
+            HStack {
+                Button(creating ? "Create account" : "Log in") {
+                    Task {
+                        await account.authenticate(email: email, password: password, create: creating, remember: remember)
+                        password = ""
+                    }
+                }.buttonStyle(.borderedProminent).disabled(email.isEmpty || password.isEmpty)
+                Button(creating ? "Use existing account" : "Create an account") {
+                    creating.toggle()
+                    onModeChange(creating)
+                }
+            }
+            HStack {
+                Button("Continue with saved account") { Task { await account.restore(remember: remember) } }
+                Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(email.isEmpty)
+            }
+            if account.busy { ProgressView().controlSize(.small) }
+            if let notice = account.notice { Text(notice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+        }.disabled(account.busy)
     }
 }
 
