@@ -50,9 +50,11 @@ struct AccountSignInForm: View {
     @State private var creating: Bool
     @State private var remember = true
     private let onModeChange: (Bool) -> Void
+    private let isPreview: Bool
 
-    init(account: AccountController, create: Bool = false, onModeChange: @escaping (Bool) -> Void = { _ in }) {
+    init(account: AccountController, create: Bool = false, isPreview: Bool = false, onModeChange: @escaping (Bool) -> Void = { _ in }) {
         self.account = account
+        self.isPreview = isPreview
         self.onModeChange = onModeChange
         _creating = State(initialValue: create)
     }
@@ -77,7 +79,7 @@ struct AccountSignInForm: View {
                         await account.verify(email: email, code: code, newPassword: password, remember: remember)
                         password = ""; code = ""
                     }
-                }.disabled(code.isEmpty)
+                }.disabled(isPreview || code.isEmpty)
             }
             HStack {
                 Button(creating ? "Create account" : "Log in") {
@@ -85,15 +87,15 @@ struct AccountSignInForm: View {
                         await account.authenticate(email: email, password: password, create: creating, remember: remember)
                         password = ""
                     }
-                }.buttonStyle(.borderedProminent).disabled(email.isEmpty || password.isEmpty)
+                }.buttonStyle(.borderedProminent).disabled(isPreview || email.isEmpty || password.isEmpty)
                 Button(creating ? "Use existing account" : "Create an account") {
                     creating.toggle()
                     onModeChange(creating)
                 }
             }
             HStack {
-                Button("Continue with saved account") { Task { await account.restore(remember: remember) } }
-                Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(email.isEmpty)
+                Button("Continue with saved account") { Task { await account.restore(remember: remember) } }.disabled(isPreview)
+                Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(isPreview || email.isEmpty)
             }
             if account.busy { ProgressView().controlSize(.small) }
             if let notice = account.notice { Text(notice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
