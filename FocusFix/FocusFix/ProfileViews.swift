@@ -37,6 +37,7 @@ struct ProfileEditor: View {
     @State private var draft = UserProfile()
     @State private var editing = false
     @State private var photoError: String?
+    @FocusState private var nameFocused: Bool
     var onSaved: () -> Void = {}
 
     private var savedProfile: UserProfile? { account.session == nil ? controller.profile : account.profile }
@@ -45,11 +46,7 @@ struct ProfileEditor: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
                 Button {
-                    if !editing {
-                        draft = savedProfile ?? UserProfile()
-                        photoError = nil
-                        editing = true
-                    }
+                    beginEditing()
                     choosePhoto()
                 } label: {
                     ZStack {
@@ -70,38 +67,25 @@ struct ProfileEditor: View {
                     .help((editing ? draft : savedProfile)?.photo == nil ? "Add profile photo" : "Change profile photo")
                     .disabled(account.busy || (account.session != nil && !account.profileLoaded))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(savedProfile?.name ?? "Make FocusFix yours").font(.headline)
-                    Text(account.session == nil ? "Profile on this Mac" : "Private account profile").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if !editing {
-                    Button(savedProfile == nil ? "Create profile" : "Edit") {
-                        draft = savedProfile ?? UserProfile()
-                        photoError = nil
-                        editing = true
-                    }.disabled(account.session != nil && !account.profileLoaded)
-                }
+                    if editing {
+                        TextField("Display name", text: $draft.name)
+                            .textFieldStyle(.roundedBorder).font(.headline)
+                            .accessibilityLabel("Display name")
+                            .focused($nameFocused)
+                    } else {
+                        Button(savedProfile?.name ?? "Add your name") {
+                            beginEditing()
+                            nameFocused = true
+                        }.buttonStyle(.plain).font(.headline)
+                            .accessibilityLabel(savedProfile.map { "Edit name, \($0.name)" } ?? "Add your name")
+                            .help("Edit your name")
+                            .disabled(account.session != nil && !account.profileLoaded)
+                    }
+                    Text(account.session == nil ? "Profile on this Mac" : "Private account profile")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             if editing {
-                TextField("Display name", text: $draft.name)
-                    .textFieldStyle(.roundedBorder)
-                Text("Choose an avatar").font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    ForEach(UserProfile.symbols, id: \.self) { symbol in
-                        Button {
-                            draft.symbol = symbol
-                            draft.photo = nil
-                        } label: {
-                            Image(systemName: symbol).frame(width: 28, height: 28)
-                        }
-                        .tint(draft.symbol == symbol && draft.photo == nil ? .accentColor : .secondary)
-                        .accessibilityLabel(avatarLabel(symbol))
-                        .accessibilityAddTraits(draft.symbol == symbol && draft.photo == nil ? .isSelected : [])
-                    }
-                }
-                Picker("Avatar color", selection: $draft.color) {
-                    ForEach(UserProfile.colors, id: \.self) { Text($0.capitalized).tag($0) }
-                }
                 HStack {
                     if draft.photo != nil { Button("Remove photo") { draft.photo = nil } }
                 }
@@ -115,7 +99,12 @@ struct ProfileEditor: View {
                         } else if controller.save(draft) { editing = false; onSaved() }
                     }.buttonStyle(.borderedProminent)
                         .disabled((try? draft.validated()) == nil || account.busy)
-                    Button("Cancel") { editing = false; photoError = nil }
+                    Button("Cancel") {
+                        draft = savedProfile ?? UserProfile()
+                        editing = false
+                        nameFocused = false
+                        photoError = nil
+                    }
                 }
             }
             if let notice = controller.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
@@ -124,15 +113,11 @@ struct ProfileEditor: View {
             .onChange(of: account.session?.user.id) { _, _ in editing = false; photoError = nil }
     }
 
-    private func avatarLabel(_ symbol: String) -> String {
-        switch symbol {
-        case "leaf.fill": return "Leaf avatar"
-        case "sun.max.fill": return "Sun avatar"
-        case "moon.stars.fill": return "Moon avatar"
-        case "bolt.fill": return "Lightning avatar"
-        case "book.fill": return "Book avatar"
-        default: return "Person avatar"
-        }
+    private func beginEditing() {
+        guard !editing else { return }
+        draft = savedProfile ?? UserProfile()
+        photoError = nil
+        editing = true
     }
 
     private func choosePhoto() {
