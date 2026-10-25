@@ -72,6 +72,7 @@ private struct RecordingMenu: View {
     // Expose session, break and survey controls while the main window is closed.
     var body: some View {
         Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
+        ProgressMenuSummary(tracker: tracker)
         Button("Show FocusFix") {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
