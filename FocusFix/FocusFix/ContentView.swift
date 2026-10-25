@@ -40,7 +40,6 @@ struct ContentView: View {
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(teal.opacity(0.08), in: Capsule())
             }
-            .quickTourTarget(.overview)
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
                     Image(systemName: "leaf").font(.system(size: 28, weight: .light)).foregroundStyle(teal)
@@ -54,9 +53,7 @@ struct ContentView: View {
                     Text(tracker.breakPhase == .resting ? "Activity logging paused" : "Tracking resumed · waiting for your return")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("SESSION TIME").font(.caption2.weight(.medium)).tracking(2).foregroundStyle(.secondary)
-                    Text(tracker.formattedTime)
-                        .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
+                    SessionClockFace(time: tracker.formattedTime)
                 }
                 if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
                     Text(tracker.sessionWorkPlan.summary)
@@ -79,24 +76,9 @@ struct ContentView: View {
                 Color.mint.opacity(onBreak ? 0.12 : 0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 in: RoundedRectangle(cornerRadius: 18))
 
-            .quickTourTarget(.timer)
-            .quickTourTarget(.breaks, enabled: onBreak)
+            DailyProgressCard(tracker: tracker)
 
-            DailyProgressCard(tracker: tracker).quickTourTarget(.progress)
-
-            if tracker.isRecording && !onBreak {
-                BreakControls(tracker: tracker).tint(teal).quickTourTarget(.breaks)
-            } else if !tracker.isRecording && tour.isPresented && tour.step.target == .breaks {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Break controls · example", systemImage: "leaf").font(.headline)
-                    Text("Take a break → Choose a duration and activity → I'm back")
-                        .font(.callout)
-                    Text("These controls appear during a recording. This example starts no session or break.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                    .quickTourTarget(.breaks)
-            }
+            if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
 
             if tracker.timedCheckInPending && !onBreak {
                 HStack {
@@ -157,7 +139,6 @@ struct ContentView: View {
                           systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
                         .frame(minWidth: 124)
                 }.buttonStyle(.bordered).tint(teal).controlSize(.large)
-                    .quickTourTarget(.start)
                 Button { openWindow(id: "sessions") } label: {
                     Label("Sessions", systemImage: "folder")
                 }.controlSize(.large)
@@ -176,6 +157,7 @@ struct ContentView: View {
         }
         .padding(30).frame(width: 490)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
         .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal) }
         .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
