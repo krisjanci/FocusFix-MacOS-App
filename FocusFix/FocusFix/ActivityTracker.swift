@@ -150,25 +150,17 @@ final class ActivityTracker: ObservableObject {
         needsPermission = false
         message = "Input Monitoring is enabled. Press Start when you are ready."
     }
-    // Check permission and open the fatigue check-in before starting a new session.
+    // Open planning, with an optional fatigue check-in, before every session.
     func requestStart() {
         guard !isRecording, !sessionCheckInPresented, !recordingNoticePresented else { return }
         guard !RecordingNotice().needsAcknowledgement else {
             recordingNoticePresented = true
             return
         }
-        guard InputMonitor.hasPermission else {
-            requestPermission()
-            return
-        }
-        needsPermission = false
+        // Planning needs no monitoring permission. start() checks again before creating files or recording.
         // Freeze the choices before any survey opens; changes during a session wait until the next one.
         sessionSurveyOptions = SurveyPreferences.shared.snapshot
-        guard sessionSurveyOptions.beforeSession else {
-            start(fatigue: nil, prompt: nil)
-            return
-        }
-        sessionCheckIn = CheckInPrompt(elapsed: 0)
+        sessionCheckIn = sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: 0) : nil
         sessionCheckInPresented = true
     }
     // Close the starting check-in without recording a session or an answer.
@@ -180,14 +172,18 @@ final class ActivityTracker: ObservableObject {
         recordingNoticePresented = false
     }
     // Accept a selected fatigue score, or an explicit skip, then start the session.
-    func completeSessionCheckIn(fatigue: Int?) {
-        guard let prompt = sessionCheckIn, fatigue.map({ (0...10).contains($0) }) ?? true else { return }
+    func completeSessionCheckIn(_ selection: SessionStartSelection) {
+        guard sessionCheckInPresented, !isRecording,
+              selection.fatigue.map({ (0...10).contains($0) }) ?? true else { return }
+        let prompt = sessionCheckIn
+        guard !sessionSurveyOptions.beforeSession || prompt != nil else { return }
         sessionCheckIn = nil
         sessionCheckInPresented = false
-        start(fatigue: fatigue, prompt: prompt)
+        start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
+              prompt: prompt, plan: selection.plan)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt?) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan) {
         guard !isRecording, !RecordingNotice().needsAcknowledgement else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
@@ -232,7 +228,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: 0)
             mouse = MouseAccumulator(initialPosition: CGEvent(source: nil)?.location ?? .zero)
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
-            sessionWorkPlan = SessionWorkPlanPreferences.shared.snapshot
+            sessionWorkPlan = plan
             isRecording = true
             progressClock = ProgressClock()
             lastProgressSave = 0
