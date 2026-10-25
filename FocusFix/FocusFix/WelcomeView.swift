@@ -17,6 +17,11 @@ struct WelcomeView: View {
                         Text("Make room for focus and a good break.").font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                if launch.isPreview {
+                    Label("Welcome screen preview", systemImage: "eye").font(.headline)
+                    Text("Try the forms without changing your account or history. Sign-in, registration, password recovery and saved-account access are disabled. Nothing is sent or saved.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
                 switch launch.page {
                 case .restoring:
                     ProgressView("Restoring your account…")
@@ -28,7 +33,7 @@ struct WelcomeView: View {
                         Spacer()
                         Button("Back") { launch.showWelcome() }.disabled(account.busy)
                     }
-                    AccountSignInForm(account: account, create: launch.page == .createAccount,
+                    AccountSignInForm(account: account, create: launch.page == .createAccount, isPreview: launch.isPreview,
                         onModeChange: { launch.showAccount(create: $0) })
                 case .profileSetup:
                     Text("Make it yours").font(.title2.weight(.semibold))
@@ -51,11 +56,11 @@ struct WelcomeView: View {
                         Button { launch.showAccount(create: false) } label: {
                             Text("Log in").frame(maxWidth: .infinity)
                         }.buttonStyle(.bordered)
-                    }.controlSize(.large).disabled(!account.configured)
-                    if account.configured && account.remembersSignIn {
+                    }.controlSize(.large).disabled(!account.configured && !launch.isPreview)
+                    if !launch.isPreview && account.configured && account.remembersSignIn {
                         Button("Retry saved sign-in") { launch.restore() }
                     }
-                    if !account.configured {
+                    if !account.configured && !launch.isPreview {
                         Text("Online accounts aren't connected in this build. Guest mode is ready to use.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -68,13 +73,29 @@ struct WelcomeView: View {
                     Button("Use as guest") { launch.useGuest() }
                         .buttonStyle(.bordered).controlSize(.large)
                         .keyboardShortcut(.cancelAction)
-                    Text("Sessions, breaks and daily progress work without an account. Guest mode is remembered; you can sign in later from Profile.")
+                    Text(launch.isPreview ? "Use as guest returns to your app without changing your saved choice." : "Sessions, breaks and daily progress work without an account. Guest mode is remembered; you can sign in later from Profile.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(30).frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(width: 490, height: 650)
         .background(Color(nsColor: .windowBackgroundColor)).tint(teal)
+    }
+}
+
+struct WelcomePreviewView: View {
+    @StateObject private var launch = LaunchCoordinator.preview()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button("Close preview") { dismiss() }.padding(12)
+            }
+            WelcomeView(launch: launch, account: launch.account)
+        }
+        .onChange(of: launch.page) { _, page in if page == .app { dismiss() } }
     }
 }
 
