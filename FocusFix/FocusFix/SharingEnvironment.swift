@@ -18,8 +18,10 @@ import Foundation
 
     // Wire up Keychain, local folders, background ZIP preparation and the real HTTPS sender.
     static var live: SharingEnvironment {
-        SharingEnvironment(researchUploadsAllowed: UploadConfiguration.researchUploadsAllowed,
-            serviceURL: UploadConfiguration.serviceURL,
+        // A research-enabled build never also resumes the legacy Cloudflare queue.
+        let research = Bundle.main.object(forInfoDictionaryKey: "FocusFixResearchSharingEnabled") as? Bool == true
+        return SharingEnvironment(researchUploadsAllowed: UploadConfiguration.researchUploadsAllowed && !research,
+            serviceURL: research ? "" : UploadConfiguration.serviceURL,
             identity: { try SharingIdentity.participantID() },
             readCredential: { try SharingIdentity.read("upload-credential") },
             saveCredential: { try SharingIdentity.save($0, account: "upload-credential") },
