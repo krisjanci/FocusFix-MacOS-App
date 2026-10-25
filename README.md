@@ -9,8 +9,11 @@ This version collects local behavior data and recommends breaks using a timing/i
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
 ML. Optional research uploads require enrollment and explicit opt-in. The included
 upload service is deployed and enabled for a controlled development test. Debug builds
-contain its URL and sharing defaults to off. **Release builds are local-only**: research
-uploads and enrollment are disabled, even if a development build previously had sharing on.
+contain its URL and sharing defaults to off. **Release has no legacy research receiver**:
+legacy uploads and enrollment are disabled even after a development opt-in. Optional
+Supabase accounts and per-session ZIP delivery are prepared but unconfigured; see
+[the Free-plan setup guide](supabase/SETUP.md). Outgoing HTTPS is allowed for those
+features, but no account request occurs until configuration and explicit sign-in.
 A full app-session upload test is still needed before any research release.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
@@ -36,7 +39,7 @@ operation, and it doesn't start recording or change any session timers.
 1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac.
    Debug supports enrolled research tests; do not distribute it. Research setup stays
    locked at launch until explicitly unlocked in the profile.
-   Use Release for local-only checks. Both configurations target macOS 14 or later;
+   Use an unconfigured Release for local recording checks. Both configurations target macOS 14 or later;
    runtime compatibility still needs testing on each supported system.
 2. Press **Start session**. On first use, review the recording/privacy notice and
    choose **I understand**, then press Start again. **Not now** records nothing.
@@ -80,6 +83,31 @@ one. Old sessions appear in the Sessions window after relaunching the app.
 Keep recordings out of the repository and personal cloud storage if your study
 or dataset agreement prohibits it. Git ignore rules cover these output filenames,
 but renamed data could still be staged accidentally.
+
+### Personal profile
+
+Open the profile button at the top left and choose **Create profile**. Add a display
+name (1–40 characters), choose an avatar icon and color, or import a PNG, JPEG, HEIC,
+or TIFF photo under 10 MB. Photos are cropped to a 256×256 PNG and re-encoded without
+source photo metadata. Save applies the avatar to the main window; Cancel discards
+your edits. Name and avatar choices persist after relaunch.
+
+Without an account, the editor saves only on this Mac in `FocusFix/profile.json`.
+Configured builds also offer email/password accounts, confirmation/recovery codes,
+private account profile sync, sign-out and account deletion. The checked-in build
+has blank public service settings, so online controls explain that it isn't connected.
+Local and account profiles stay separate; signing in never silently uploads an old
+local name/photo. Explicit Save syncs an account profile. Session tokens use Keychain;
+passwords are not persisted. After relaunch, Restore saved sign-in is an explicit
+action. Names and photos are excluded from research ZIPs and recording metadata.
+
+Optional per-session research delivery uses a separate opt-in for new sessions. It sends
+one ZIP per completed session to private Supabase storage while signed in and running.
+Sharing requires researcher approval (50 selected participants by default) and an
+explicit participant opt-in; interest requests alone share no recordings. Failed deliveries
+stay local and can be exported. The integration doesn't enable billing, use email
+to transport recordings, or delete the old Cloudflare service. Deployment, free-tier
+limits, privacy review and end-to-end verification are in [supabase/SETUP.md](supabase/SETUP.md).
 
 ### Daily progress and breaks
 
@@ -137,7 +165,7 @@ for these choices when comparing sessions; opting out can change which labels I 
 
 ### Optional research sharing
 
-This section applies to **Debug development builds**, not the local-only Release build.
+This section applies to **Debug development builds**, not the legacy-upload-disabled Release build.
 Release neither reads enrollment secrets nor touches the saved development upload queue.
 Changing Release into a research build needs the separate review described in RELEASE.md.
 
@@ -425,8 +453,9 @@ pseudonymous ID to a real participant separately under the study's approved plan
 - Files are buffered and flushed approximately every second (earlier for a large
   event buffer), and synchronized on Stop. A crash can lose buffered data; metadata
   left with `status: recording` should be treated as an unfinished session.
-- Both production distribution paths use App Sandbox. The local-only Release build
-  grants user-selected read/write access for exports and has no network entitlement.
+- Both production distribution paths use App Sandbox. Release grants user-selected
+  read/write access for exports and outgoing HTTPS for optional accounts. The
+  checked-in account service settings are blank and research sharing is off.
   A compiled build is not proof of App Store approval or live input-monitoring coverage.
   Fresh-Mac permission and feature checks remain required; see [RELEASE.md](RELEASE.md).
 - Event timing is sensitive even without text. Obtain the required institutional
@@ -454,6 +483,12 @@ test runs twice, once with Debug enabled and once without it). A failed assertio
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
+- `AccountTests`: fake signup/confirmation/sign-in, private profile sync, recovery,
+  Keychain boundaries, cross-service restore rejection and deletion requests.
+- `ResearchSharingTests` and `ResearchDeliveryTests`: consent snapshots, safe ZIPs,
+  delivery timing, free-limit failures, stable retry paths, export and in-flight opt-out.
+- `UserProfileTests`: name/avatar validation, local persistence, failed writes,
+  invalid saved data, and bounded square photo import using generated images.
 - `DailyProgressTests`: work accounting, weekday streaks, midnight/DST boundaries,
   break credit/deduplication, persistence, failed writes and unreadable-file recovery.
 - `RecordingDataTests`: timing, CSV schemas, saving/reloading, export names and guards.
