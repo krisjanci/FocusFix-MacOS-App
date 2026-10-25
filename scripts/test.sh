@@ -15,6 +15,7 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test SessionWorkPlanTests "$source_dir/SessionWorkPlan.swift" "$source_dir/SessionWorkPlanPreferences.swift" "$source_dir/DailyProgress.swift"
 run_test LaunchCoordinatorTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" \
     "$source_dir/AccountController.swift" "$source_dir/LaunchCoordinator.swift"
 run_test AccountTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
