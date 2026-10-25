@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main struct MyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var tracker = ActivityTracker.shared
+    @StateObject private var launch = LaunchCoordinator.shared
+    @StateObject private var account = AccountController.shared
     @State private var launchFinished = false
     @AppStorage("appearance") private var appearance = "system"
     // Translate System/Light/Dark preferences into SwiftUI's appearance setting.
@@ -25,27 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Create the main window, session/test windows and menu bar, applying the remembered appearance.
     var body: some Scene {
         Window("FocusFix", id: "collector") {
-            ContentView(tracker: tracker)
-                // Keep the app rendered beneath the splash for the expanding-ring reveal.
-                .allowsHitTesting(launchFinished)
-                .accessibilityHidden(!launchFinished)
-                .overlay {
-                    if !launchFinished {
-                        LaunchScreen { launchFinished = true }.transition(.identity)
-                    }
-                }
+            CollectorRootView(tracker: tracker, launch: launch, account: account, launchFinished: $launchFinished)
                 .preferredColorScheme(colorScheme)
-                .onDisappear { launchFinished = true }
-                // An explicit menu-bar action takes priority over the introduction.
-                .onChange(of: tracker.sessionCheckInPresented) { _, shown in
-                    if shown { launchFinished = true }
-                }
-                .onChange(of: tracker.recordingNoticePresented) { _, shown in
-                    if shown { launchFinished = true }
-                }
-                .onChange(of: tracker.isRecording) { _, recording in
-                    if recording { launchFinished = true }
-                }
         }.windowResizability(.contentSize)
         .commands { FocusFixCommands() }
         Window("About, privacy & support — FocusFix", id: "about") {
@@ -58,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             TrackingTestView(tracker: tracker).preferredColorScheme(colorScheme)
         }.windowResizability(.contentSize)
         MenuBarExtra {
-            RecordingMenu(tracker: tracker)
+            RecordingMenu(tracker: tracker, launch: launch)
         } label: {
             Label(tracker.breakPhase != .work && tracker.isRecording ? "FocusFix on break" : tracker.isRecording ? "FocusFix recording" : "FocusFix",
                   systemImage: tracker.breakPhase != .work && tracker.isRecording ? "leaf.fill" : tracker.isRecording ? "record.circle.fill" : "pause.circle")
@@ -68,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct RecordingMenu: View {
     @ObservedObject var tracker: ActivityTracker
+    @ObservedObject var launch: LaunchCoordinator
     @Environment(\.openWindow) private var openWindow
     // Expose session, break and survey controls while the main window is closed.
     var body: some View {
@@ -79,7 +63,10 @@ private struct RecordingMenu: View {
         }
         Button(tracker.isRecording ? "Stop & save" : "Start session") {
             if tracker.isRecording { tracker.stop() } else {
-                tracker.requestStart()
+                launch.requestStart(start: { tracker.requestStart() }, showWindow: {
+                    openWindow(id: "collector")
+                    NSApp.activate(ignoringOtherApps: true)
+                })
                 if !tracker.isRecording {
                     openWindow(id: "collector")
                     NSApp.activate(ignoringOtherApps: true)
