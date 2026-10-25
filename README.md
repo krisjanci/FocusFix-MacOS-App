@@ -108,13 +108,13 @@ welcome window first.
 
 ### Personal profile
 
-Open the profile button at the top left and choose **Create profile**. Add a display
-name (1–40 characters), choose an avatar icon and color, or import a PNG, JPEG, HEIC,
-or TIFF photo under 10 MB by clicking the avatar circle's camera-plus badge.
-Click the same circle to replace a photo; Remove photo restores the avatar icon.
-Photos are cropped to a 256×256 PNG and re-encoded without
-source photo metadata. Save applies the avatar to the main window; Cancel discards
-your edits. Name and avatar choices persist after relaunch.
+Open the profile button at the top left, then click your name or **Add your name**
+to edit it in place (1–40 characters). Import a PNG, JPEG, HEIC or TIFF photo under
+10 MB by clicking the avatar circle's camera-plus badge. Click the same circle to
+replace a photo; **Remove photo** restores the placeholder or an existing saved icon.
+Photos are cropped to a 256×256 PNG and re-encoded without source photo metadata.
+**Save profile** applies your changes; **Cancel** discards them. Name and photo choices
+persist after relaunch. Icon and color selectors are no longer shown.
 
 Without an account, the editor saves only on this Mac in `FocusFix/profile.json`.
 Configured builds also offer email/password accounts, confirmation/recovery codes,
@@ -134,18 +134,26 @@ stay local and can be exported. The integration doesn't enable billing, use emai
 to transport recordings, or delete the old Cloudflare service. Deployment, free-tier
 limits, privacy review and end-to-end verification are in [supabase/SETUP.md](supabase/SETUP.md).
 
-### Optional session work target and welcome preview
+### Per-session planning and welcome preview
 
-Open **Profile → Advanced → Use a session work target** to choose 30, 60 or 90
-minutes, or a custom whole-minute target from 1–480. It is off by default and starts
-at 60 minutes. Choices stay on this Mac and are captured when each session starts;
-changes while recording apply to the next session. Work uses the daily progress
-clock, including quiet reading and excluding breaks, surveys, sleep and screen lock.
-The timer and menu show session work separately from the fixed daily goal.
+Starting a session opens **Before you start**, whether you use the main window or
+the menu bar. The fatigue question appears only when the pre-session survey is on.
+**Plan session** adds an optional work target: 30, 60 or 90 minutes, or a custom
+whole number from 1–480. It opens at 60 minutes; **Remove plan** clears it. Each
+start attempt begins untargeted, and cancelling discards all choices. Old global
+work-target preferences are ignored. Skipping fatigue keeps your selected plan.
 
-At the target, **Plan complete** offers **Stop & save** (the normal save flow) or
-**Keep going**. Recording continues until stopped. Keep going acknowledges this
-session's reminder; completion remains visible without prompting again.
+Work uses the daily progress clock, including quiet reading and excluding breaks,
+surveys, sleep and screen lock. The timer and menu show **Planned session** separately
+from the fixed daily goal. At the target, **Plan complete** offers **Stop & save**
+(the normal save flow) or **Keep going**. Recording continues until stopped. Keep
+going acknowledges this session's reminder without changing its work target.
+
+Click your displayed profile name (or **Add your name**) to edit it in place, then
+choose **Save profile** or **Cancel**. The photo circle opens the image picker;
+**Remove photo** is available during editing. Existing icon/color appearances are
+preserved, but new editing offers photos only. Account name/photo changes upload
+only on Save; cancelling keeps the saved profile.
 
 Use **Profile → Advanced → Preview welcome screen** while stopped to explore the
 welcome, Create account and Log in screens. Sample fields are editable, but account
@@ -155,9 +163,13 @@ or **Close preview** returns to Profile without changing real sign-in, local dat
 sharing choices. No history deletion is needed. Real account creation still requires
 Supabase configuration.
 
-Manual checks passed for collapsed Advanced, presets/custom input validation,
-preview navigation and dismissal, editable fields with disabled account actions,
-keyboard field navigation, accessibility labels, and light/dark preview layouts.
+Manual checks passed for survey-enabled and survey-disabled start windows, the
+60-minute default, invalid custom targets disabling both start actions, Remove plan,
+cancel/reopen reset, inline name focus and cancellation, unsaved photo selection,
+picker cancellation and removal, and light/dark layouts. Advanced retains the safe
+welcome preview without global work-target controls. Synthetic tests also verify
+skipping fatigue preserves the plan and disabled surveys produce no answer.
+
 The isolated unsigned test build lacks Input Monitoring permission: live recording
 through completion, Keep going and Stop & save still needs a check on a permitted
 build. Synthetic tests cover the shared work clock, boundaries, snapshots and
@@ -537,7 +549,7 @@ test runs twice, once with Debug enabled and once without it). A failed assertio
 stops the run with a nonzero exit code. It uses generated temporary data, cleans up
 its own files, and never reads participant sessions or changes system permissions.
 
-- `SessionWorkPlanTests`: target limits, persistence, settings snapshots, shared work
+- `SessionWorkPlanTests`: target limits, fresh start/cancel reset, survey choices, plan snapshots, shared work
   credit across work/excluded intervals, completion boundaries and acknowledgement.
 - `LaunchCoordinatorTests`: offline preview isolation plus first launch, remembered guest mode, automatic restoration,
   failed restoration, registration/profile setup, menu-bar gating and cancelled responses.
