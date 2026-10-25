@@ -45,21 +45,62 @@ struct FatigueSlider: View {
 struct SessionCheckInView: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.dismiss) private var dismiss
-    @State private var fatigue: Int?
+    @State private var draft: SessionStartDraft
 
-    // Ask for fatigue before a session, with skip and cancel choices.
+    init(tracker: ActivityTracker) {
+        self.tracker = tracker
+        _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Before you start").font(.title2.weight(.semibold))
-            FatigueSlider(rating: $fatigue)
+            if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
+            if draft.planning {
+                HStack {
+                    Text("Plan session").font(.headline)
+                    Spacer()
+                    Button("Remove plan") { draft.removePlan() }
+                }
+                Picker("Work target", selection: $draft.durationChoice) {
+                    Text("30 min").tag(30)
+                    Text("60 min").tag(60)
+                    Text("90 min").tag(90)
+                    Text("Custom").tag(0)
+                }
+                if draft.durationChoice == 0 {
+                    HStack {
+                        TextField("Minutes", text: $draft.customMinutes)
+                            .textFieldStyle(.roundedBorder).frame(width: 80)
+                            .accessibilityLabel("Planned session minutes")
+                        Text("minutes · 1–480").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !draft.validPlan {
+                        Text("Enter a whole number from 1 to 480, or remove the plan.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Button("Plan session") { draft.addPlan() }
+            }
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Skip & start") { tracker.completeSessionCheckIn(fatigue: nil) }
-                Button("Start session") { tracker.completeSessionCheckIn(fatigue: fatigue) }
-                    .buttonStyle(.borderedProminent).disabled(fatigue == nil)
+                if draft.asksForFatigue {
+                    Button("Skip & start") { start(skippingFatigue: true) }
+                        .disabled(!draft.validPlan)
+                }
+                Button("Start session") { start() }
+                    .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
+    }
+
+    private func start(skippingFatigue: Bool = false) {
+        guard let selection = draft.selection(skippingFatigue: skippingFatigue) else { return }
+        tracker.completeSessionCheckIn(selection)
     }
 }
 
