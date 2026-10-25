@@ -33,6 +33,13 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var sessionSurveyOptions = SurveyOptions()
     @Published var timedCheckInPresented = false
     @Published private(set) var timedCheckInPending = false
+    @Published private(set) var dailyProgress = DailyProgress()
+    @Published private(set) var progressNotice: String?
+    @Published private(set) var rechargeDate: Date?
+    private var progressStore: ProgressStore?
+    private var progressClock = ProgressClock()
+    private var lastProgressSave: Double = 0
+    private var progressDirty = false
     private var sessionCheckIn: CheckInPrompt?
     private var breakCheckIn: CheckInPrompt?
     private var timedCheckInSheet: CheckInPrompt?
@@ -76,11 +83,16 @@ final class ActivityTracker: ObservableObject {
     }
     // Load the saved-session list and arrange to finish a recording when the app quits.
     private init() {
+        loadProgress()
         refreshSessions()
         quitObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.stop(reason: "app_quit") }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.stop(reason: "app_quit")
+                self.updateProgress(at: self.now, persist: true)
+            }
         }
     }
     // Connect macOS notification actions to the same controls used by the app.
@@ -218,6 +230,9 @@ final class ActivityTracker: ObservableObject {
             mouse = MouseAccumulator(initialPosition: CGEvent(source: nil)?.location ?? .zero)
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
             isRecording = true
+            progressClock = ProgressClock()
+            lastProgressSave = 0
+            updateProgress(at: 0, persist: true)
             refreshSessions()
             // Avoid App Nap while collecting; do not prevent system sleep.
             backgroundActivity = ProcessInfo.processInfo.beginActivity(
@@ -244,6 +259,8 @@ final class ActivityTracker: ObservableObject {
     func stop(reason: String = "user_stop") {
         guard isRecording else { return }
         let end = now
+        updateProgress(at: end)
+        defer { updateProgress(at: end, persist: true) }
         // Close an abandoned break setup before finishing the recording.
         var checkInSaveError: Error?
         do { try finishBreakCheckIn(status: .cancelled, at: end) }
@@ -295,6 +312,7 @@ final class ActivityTracker: ObservableObject {
         }
         do {
             elapsed = now
+            updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
                 if let item = timedCheckInPolicy.tick(at: elapsed,
@@ -466,6 +484,8 @@ final class ActivityTracker: ObservableObject {
     func chooseBreak() {
         guard isRecording, breakPolicy.phase == .work, !checkInOpen else { return }
         let time = now
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         do {
             // Don't stack a due work check-in on top of the pre-break ratings.
             if timedCheckInPolicy.hasPending { try finishTimedCheckIn(action: "break_setup", at: time) }
@@ -486,6 +506,8 @@ final class ActivityTracker: ObservableObject {
     private func finishBreakCheckIn(status: CheckInStatus, at time: Double,
                                     breakID: String = "", fatigue: Int? = nil, productivity: Int? = nil) throws {
         guard let prompt = breakCheckIn else { return }
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         append(mouse.stop(at: time))
         // Clear before writing so an I/O failure cannot recursively try the same check-in.
         breakCheckIn = nil
@@ -511,6 +533,8 @@ final class ActivityTracker: ObservableObject {
         else { return }
         let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let time = now
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         guard let entry = breakPolicy.begin(at: time, seconds: minutes * 60, activity: label) else { return }
         do {
             try finishBreakCheckIn(status: fatigue == nil ? .skipped : .answered, at: time,
@@ -548,8 +572,16 @@ final class ActivityTracker: ObservableObject {
     }
     // Save the actual break end, resume work and schedule the next during-work check-in.
     private func finishBreak(at time: Double, reason: String) throws {
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         if breakPolicy.phase == .awaitingReturn && suspendedBy.isEmpty { append(mouse.stop(at: time)) }
         guard let entry = breakPolicy.finish(at: time, reason: reason) else { return }
+        if let record = entry.record,
+           dailyProgress.completeBreak(id: record.id, seconds: record.actualSeconds ?? 0,
+               reason: reason, at: Date(), calendar: DailyProgress.calendar()) {
+            rechargeDate = Date()
+            progressDirty = true
+        }
         try writer?.logBreak(entry)
         resetMouse(at: time, phase: "work")
         breakNotifications.clear()
@@ -567,7 +599,9 @@ final class ActivityTracker: ObservableObject {
         let time = now
         do {
             if suspendedBy.isEmpty && breakPolicy.phase == .awaitingReturn { append(mouse.stop(at: time)) }
+            updateProgress(at: time)
             guard suspendedBy.insert(reason).inserted else { return }
+            updateProgress(at: time, persist: true)
             try writer?.logBreak(breakPolicy.entry(at: time, action: "suspended_\(reason)", record: breakPolicy.activeBreak))
         } catch { fail(error) }
     }
@@ -575,6 +609,7 @@ final class ActivityTracker: ObservableObject {
     private func resumeAfterSuspension(_ reason: String) {
         guard isRecording, suspendedBy.remove(reason) != nil else { return }
         let time = now
+        updateProgress(at: time, persist: true)
         do {
             try writer?.logBreak(breakPolicy.entry(at: time, action: "resumed_\(reason)", record: breakPolicy.activeBreak))
             guard suspendedBy.isEmpty else { return }
@@ -642,6 +677,8 @@ final class ActivityTracker: ObservableObject {
               let token = timedCheckInPolicy.current?.id,
               let item = timedCheckInPolicy.open(token: token, at: now) else { return }
         let time = item.openedAt!
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         do {
             append(mouse.stop(at: time))
             timedCheckInSheet = CheckInPrompt(elapsed: time)
@@ -675,6 +712,8 @@ final class ActivityTracker: ObservableObject {
     // Close the opportunity, log its outcome and restore the work activity phase.
     private func finishTimedCheckIn(action: String, at time: Double, fatigue: Int? = nil, productivity: Int? = nil) throws {
         guard let item = timedCheckInPolicy.finish() else { return }
+        updateProgress(at: time)
+        defer { updateProgress(at: time, persist: true) }
         let sheet = timedCheckInSheet
         // Clear the state first so I/O errors and late notification clicks cannot resubmit it.
         timedCheckInSheet = nil
@@ -695,6 +734,39 @@ final class ActivityTracker: ObservableObject {
         }
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: action, time: time))
     }
+    private func loadProgress() {
+        do {
+            let store = try ProgressStore.local()
+            do { dailyProgress = try store.load() }
+            catch {
+                // Recovery never reads or changes the session library.
+                try store.preserveUnreadableFile()
+                progressNotice = "Saved progress could not be read. A backup was kept; new progress starts today."
+            }
+            progressStore = store
+        } catch {
+            progressNotice = "Progress is available for this launch, but its local file could not be opened."
+        }
+    }
+
+    private func updateProgress(at time: Double, persist: Bool = false) {
+        let previous = dailyProgress
+        progressClock.update(&dailyProgress, elapsed: time, date: Date(),
+            working: isRecording && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
+            calendar: DailyProgress.calendar())
+        progressDirty = progressDirty || previous != dailyProgress
+        guard persist || time - lastProgressSave >= 15 else { return }
+        lastProgressSave = time
+        guard progressDirty, let store = progressStore else { return }
+        do {
+            try store.save(dailyProgress)
+            progressDirty = false
+            progressNotice = nil
+        } catch {
+            progressNotice = "Progress could not be saved. FocusFix will retry; recording can continue."
+        }
+    }
+
     // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
         do {
