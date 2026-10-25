@@ -114,9 +114,12 @@ plus Intel and Apple Silicon before claiming support for both.
 
 - Install a browser download with Gatekeeper enabled. Launch must not start recording,
   research uploads, enrollment, Keychain access or permission requests.
-- Debug launch must not show Keychain prompts or resume research uploads. Explicit
-  research unlock may prompt, preserves saved consent, and must read credentials only
-  once per launch. Test denied Keychain access without losing local recording.
+- Guest/unremembered-account launches must not read account Keychain entries.
+  After a successful Keep me signed in choice, account restoration may prompt after
+  the intro. Test restoration failure, denied Keychain access and choosing Guest
+  during a delayed restore; local recording must remain available. Legacy Debug
+  research enrollment stays locked separately: only explicit research unlock may
+  read its credentials or resume its queue. Account sign-in never opts into sharing.
 - Notice cancel/accept; the single Enable Input Monitoring button registers the app
   and opens Settings without granting access. Test denied/already-granted access,
   returning from Settings, requested quit/reopen, permission
