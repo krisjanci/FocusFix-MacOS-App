@@ -83,14 +83,18 @@ struct ProgressClock {
     private var lastElapsed: Double?
     private var wasWorking = false
 
+    @discardableResult
     mutating func update(_ progress: inout DailyProgress, elapsed: Double, date: Date,
-                         working: Bool, calendar: Calendar) {
-        guard elapsed.isFinite, elapsed >= 0 else { return }
+                         working: Bool, calendar: Calendar) -> Double {
+        guard elapsed.isFinite, elapsed >= 0 else { return 0 }
+        var credited: Double = 0
         if let lastElapsed, elapsed >= lastElapsed, wasWorking {
-            progress.addWork(seconds: elapsed - lastElapsed, endingAt: date, calendar: calendar)
+            credited = elapsed - lastElapsed
+            progress.addWork(seconds: credited, endingAt: date, calendar: calendar)
         }
         lastElapsed = elapsed
         wasWorking = working
+        return credited
     }
 }
 
