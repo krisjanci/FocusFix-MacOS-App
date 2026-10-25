@@ -57,6 +57,15 @@ private struct RecordingMenu: View {
     var body: some View {
         Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
         ProgressMenuSummary(tracker: tracker)
+        if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
+            Text(tracker.sessionWorkPlan.summary)
+            if tracker.sessionWorkPlan.isComplete {
+                Text("Plan complete")
+                if tracker.sessionWorkPlan.reminderPending {
+                    Button("Keep going") { tracker.keepGoingAfterPlan() }
+                }
+            }
+        }
         Button("Show FocusFix") {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
