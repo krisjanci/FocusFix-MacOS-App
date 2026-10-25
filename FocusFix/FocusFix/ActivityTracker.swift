@@ -37,6 +37,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var progressNotice: String?
     @Published private(set) var rechargeDate: Date?
     private var progressStore: ProgressStore?
+    @Published private(set) var sessionWorkPlan = SessionWorkPlan()
     private var progressClock = ProgressClock()
     private var lastProgressSave: Double = 0
     private var progressDirty = false
@@ -231,6 +232,7 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: 0)
             mouse = MouseAccumulator(initialPosition: CGEvent(source: nil)?.location ?? .zero)
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            sessionWorkPlan = SessionWorkPlanPreferences.shared.snapshot
             isRecording = true
             progressClock = ProgressClock()
             lastProgressSave = 0
@@ -755,11 +757,14 @@ final class ActivityTracker: ObservableObject {
         }
     }
 
+    func keepGoingAfterPlan() { sessionWorkPlan.keepGoing() }
+
     private func updateProgress(at time: Double, persist: Bool = false) {
         let previous = dailyProgress
-        progressClock.update(&dailyProgress, elapsed: time, date: Date(),
+        let credited = progressClock.update(&dailyProgress, elapsed: time, date: Date(),
             working: isRecording && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
             calendar: DailyProgress.calendar())
+        sessionWorkPlan.credit(credited)
         progressDirty = progressDirty || previous != dailyProgress
         guard persist || time - lastProgressSave >= 15 else { return }
         lastProgressSave = time
