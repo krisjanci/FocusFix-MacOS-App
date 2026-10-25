@@ -5,6 +5,7 @@ import SwiftUI
 import AppKit
 
 struct SharingView: View {
+    @ObservedObject var account = AccountController.shared
     @ObservedObject var sharing = SharingController.shared
     @ObservedObject var surveys = SurveyPreferences.shared
     @Environment(\.dismiss) private var dismiss
@@ -22,7 +23,15 @@ struct SharingView: View {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
+            AccountControls()
+            Divider()
+            ProfileEditor()
+            if account.researchAvailable {
+                Divider()
+                ResearchSharingControls()
+            }
             if sharing.researchAvailable {
+            Divider()
             if !sharing.researchAccessLoaded {
                 Button("Unlock research setup") {
                     sharing.loadResearchAccess()
@@ -96,8 +105,8 @@ struct SharingView: View {
                 Button("Check pending uploads") { sharing.retryPending() }
                     .disabled(!sharing.enabled || sharing.uploading)
             }
-            } else {
-                Label("Local-only build · research uploads unavailable", systemImage: "internaldrive")
+            } else if !account.researchAvailable {
+                Label("Research uploads unavailable in this build", systemImage: "internaldrive")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }.padding(26)
