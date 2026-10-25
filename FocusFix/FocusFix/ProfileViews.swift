@@ -37,13 +37,38 @@ struct ProfileEditor: View {
     @State private var draft = UserProfile()
     @State private var editing = false
     @State private var photoError: String?
+    var onSaved: () -> Void = {}
 
     private var savedProfile: UserProfile? { account.session == nil ? controller.profile : account.profile }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                ProfileAvatar(profile: editing ? draft : savedProfile, size: 62)
+                Button {
+                    if !editing {
+                        draft = savedProfile ?? UserProfile()
+                        photoError = nil
+                        editing = true
+                    }
+                    choosePhoto()
+                } label: {
+                    ZStack {
+                        ProfileAvatar(profile: editing ? draft : savedProfile, size: 62)
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "camera.fill").font(.system(size: 11))
+                            if (editing ? draft : savedProfile)?.photo == nil {
+                                Image(systemName: "plus").font(.system(size: 7, weight: .bold))
+                                    .offset(x: 4, y: -4)
+                            }
+                        }.padding(6).foregroundStyle(.white).background(Color.accentColor, in: Circle())
+                            .offset(x: 14, y: 14)
+                    }.frame(width: 62, height: 62).contentShape(Circle())
+                }.buttonStyle(.plain)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel((editing ? draft : savedProfile)?.photo == nil ? "Add profile photo" : "Change profile photo")
+                    .help((editing ? draft : savedProfile)?.photo == nil ? "Add profile photo" : "Change profile photo")
+                    .disabled(account.busy || (account.session != nil && !account.profileLoaded))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(savedProfile?.name ?? "Make FocusFix yours").font(.headline)
                     Text(account.session == nil ? "Profile on this Mac" : "Private account profile").font(.caption).foregroundStyle(.secondary)
@@ -78,7 +103,6 @@ struct ProfileEditor: View {
                     ForEach(UserProfile.colors, id: \.self) { Text($0.capitalized).tag($0) }
                 }
                 HStack {
-                    Button("Choose photo…") { choosePhoto() }
                     if draft.photo != nil { Button("Remove photo") { draft.photo = nil } }
                 }
                 Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your private account profile. Choose a photo under 10 MB.")
@@ -87,15 +111,16 @@ struct ProfileEditor: View {
                 HStack {
                     Button("Save profile") {
                         if account.session != nil {
-                            Task { if await account.saveProfile(draft) { editing = false } }
-                        } else if controller.save(draft) { editing = false }
+                            Task { if await account.saveProfile(draft) { editing = false; onSaved() } }
+                        } else if controller.save(draft) { editing = false; onSaved() }
                     }.buttonStyle(.borderedProminent)
                         .disabled((try? draft.validated()) == nil || account.busy)
                     Button("Cancel") { editing = false; photoError = nil }
                 }
             }
             if let notice = controller.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-        }.onAppear { draft = savedProfile ?? UserProfile() }
+        }.disabled(account.busy)
+            .onAppear { draft = savedProfile ?? UserProfile() }
             .onChange(of: account.session?.user.id) { _, _ in editing = false; photoError = nil }
     }
 
