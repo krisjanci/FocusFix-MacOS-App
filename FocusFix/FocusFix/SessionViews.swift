@@ -70,7 +70,7 @@ struct SessionLibraryView: View {
                 Button("Export…") { exportSelected() }
                     .buttonStyle(.borderedProminent).tint(teal)
                     .disabled(selected == nil || selected.map(tracker.isActive) == true)
-            }.padding(18).quickTourTarget(.sessions)
+            }.padding(18)
         }
         .frame(minWidth: 650, minHeight: 400)
         .background(Color(nsColor: .windowBackgroundColor))
