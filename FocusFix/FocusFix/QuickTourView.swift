@@ -144,7 +144,7 @@ struct QuickTourView: View {
         HStack(spacing: 12) {
             Text("Practice · nothing saved").font(.caption.weight(.medium))
             Spacer(minLength: 4)
-            Text(tour.position).font(.caption).monospacedDigit().accessibilityLabel("Step \(tour.index + 1) of 10")
+            Text(tour.position).font(.caption).monospacedDigit().accessibilityLabel("Step \(tour.index + 1) of \(QuickTourController.stepCount)")
             Button("Back") { tour.back() }.disabled(tour.isFirst)
                 .keyboardShortcut("[", modifiers: .command)
             Button { tour.finish() } label: { Image(systemName: "xmark") }
