@@ -34,7 +34,7 @@ def check(app: Path, require_revision: bool = False, submission_ready: bool = Fa
     require(privacy.get('NSPrivacyTracking') is False, 'Release must not declare advertising tracking')
     declared = {v['NSPrivacyCollectedDataType']: v for v in privacy.get('NSPrivacyCollectedDataTypes', [])}
     account_enabled = bool(info.get('FocusFixAccountURL') and info.get('FocusFixAccountPublicKey'))
-    required = {'NSPrivacyCollectedDataType' + t for t in ('EmailAddress', 'Name', 'PhotosorVideos', 'UserID')} if account_enabled else set()
+    required = {'NSPrivacyCollectedDataType' + t for t in ('EmailAddress', 'Name', 'PhotosorVideos', 'UserID', 'OtherUsageData', 'OtherUserContent')} if account_enabled else set()
     if info.get('FocusFixResearchSharingEnabled'):
         required |= {'NSPrivacyCollectedDataTypeOtherUsageData', 'NSPrivacyCollectedDataTypeOtherUserContent', 'NSPrivacyCollectedDataTypeHealth'}
         require(str(info.get('FocusFixStudyInformationURL', '')).startswith('https://'), 'Missing study information URL')
