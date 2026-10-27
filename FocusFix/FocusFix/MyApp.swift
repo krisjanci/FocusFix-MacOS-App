@@ -5,6 +5,12 @@ import SwiftUI
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var progressTimer: Timer?
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { @MainActor in ActivityTracker.shared.reconcileProgress() }
+        }
+    }
     // Register notification actions before the app finishes launching.
     func applicationWillFinishLaunching(_ notification: Notification) {
         ActivityTracker.shared.configureNotifications()
@@ -31,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Window("FocusFix", id: "collector") {
             CollectorRootView(tracker: tracker, launch: launch, account: account, launchFinished: $launchFinished)
                 .preferredColorScheme(colorScheme)
-                .onAppear { research.checkDue() }
+                .onAppear { research.checkDue(); SocialController.shared.start(); tracker.reconcileProgress() }
         }.windowResizability(.contentSize)
         .commands { FocusFixCommands() }
         Window("About, privacy & support — FocusFix", id: "about") {
@@ -40,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Window("Sessions — FocusFix", id: "sessions") {
             SessionLibraryView(tracker: tracker).preferredColorScheme(colorScheme)
         }.defaultSize(width: 760, height: 520)
+        Window("Groups — FocusFix", id: "groups") {
+            GroupsView().preferredColorScheme(colorScheme)
+        }.defaultSize(width: 620, height: 580)
         Window("Test tracking — FocusFix", id: "tracking") {
             TrackingTestView(tracker: tracker).preferredColorScheme(colorScheme)
         }.windowResizability(.contentSize)
@@ -61,6 +70,7 @@ private struct RecordingMenu: View {
     var body: some View {
         Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
         ProgressMenuSummary(tracker: tracker)
+        Button("Groups") { openWindow(id: "groups"); NSApp.activate(ignoringOtherApps: true) }
         if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
             Text(tracker.sessionWorkPlan.summary)
             if tracker.sessionWorkPlan.isComplete {
