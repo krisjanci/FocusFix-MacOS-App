@@ -20,21 +20,21 @@ enum QuickTourPhase: String, CaseIterable {
     }
     var caption: String {
         switch self {
-        case .start: return "Click Start to begin."
-        case .plan: return "Want a goal? Click Plan session."
-        case .duration: return "Pick a time."
-        case .confirmStart: return "Ready? Click Start."
+        case .start: return "Click Start session to begin."
+        case .plan: return "Click Plan session to choose a goal."
+        case .duration: return "Choose 30, 60, or 90 minutes."
+        case .confirmStart: return "Click Start session when ready."
         case .work: return "Your work time grows here."
-        case .takeBreak: return "Time for a little break."
+        case .takeBreak: return "Click Take a break to recharge."
         case .startBreak: return "Click Start break."
         case .returned: return "Back? Click I’m back."
         case .progress: return "Aim for one hour each day."
-        case .save: return "Click Stop to save."
+        case .save: return "Click Stop & save to finish."
         case .sessions: return "Find your work in Sessions."
         case .savedSession: return "Your work is saved here."
-        case .profile: return "Make it yours."
+        case .profile: return "Click Profile to make it yours."
         case .editName: return "Click your name to change it."
-        case .name: return "All set!"
+        case .name: return "Try a name, then click Done."
         }
     }
     var offersNext: Bool { self == .work || self == .progress || self == .savedSession }
@@ -122,22 +122,20 @@ struct QuickTourLayout {
             CGRect(origin: .zero, size: size).insetBy(dx: 8, dy: 8))
     }
 
-    static func caption(target: CGRect, in size: CGSize, hasButton: Bool) -> CGRect {
-        let available = CGRect(x: 12, y: 56, width: max(0, size.width - 24), height: max(0, size.height - 68))
-        let width = min(248, available.width)
-        let height: CGFloat = hasButton ? 112 : 76
-        let x = min(max(available.minX, target.midX - width / 2), available.maxX - width)
+    // A missing placement requests a separate instruction panel. Never shorten text
+    // or squeeze a caption into the remaining gap.
+    static func caption(target: CGRect, in size: CGSize, measured: CGSize) -> CGRect? {
+        let available = CGRect(origin: .zero, size: size).insetBy(dx: 12, dy: 12)
+        guard !target.isNull, measured.width > 0, measured.height > 0,
+              measured.width <= available.width, measured.height <= available.height else { return nil }
+        let x = min(max(available.minX, target.midX - measured.width / 2), available.maxX - measured.width)
+        let y = min(max(available.minY, target.midY - measured.height / 2), available.maxY - measured.height)
         let candidates = [
-            CGRect(x: x, y: target.maxY + 12, width: width, height: height),
-            CGRect(x: x, y: target.minY - height - 12, width: width, height: height)
+            CGRect(origin: CGPoint(x: x, y: target.maxY + 12), size: measured),
+            CGRect(origin: CGPoint(x: x, y: target.minY - measured.height - 12), size: measured),
+            CGRect(origin: CGPoint(x: target.maxX + 12, y: y), size: measured),
+            CGRect(origin: CGPoint(x: target.minX - measured.width - 12, y: y), size: measured)
         ]
-        if let result = candidates.first(where: { available.contains($0) }) { return result }
-        // Compact targets always leave room on one side in the supported demo layouts.
-        let above = max(0, target.minY - 12 - available.minY)
-        let below = max(0, available.maxY - target.maxY - 12)
-        if above > below {
-            return CGRect(x: x, y: available.minY, width: width, height: min(height, above))
-        }
-        return CGRect(x: x, y: target.maxY + 12, width: width, height: min(height, below))
+        return candidates.first { available.contains($0) && !$0.intersects(target) }
     }
 }
