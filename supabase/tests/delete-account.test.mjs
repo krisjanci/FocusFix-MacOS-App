@@ -30,6 +30,7 @@ test('uses verified user ID; ignores a foreign user ID supplied in the request',
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
     if (url.endsWith('/auth/v1/user')) return Response.json({ id: owner });
+    if (url.endsWith('/rpc/request_research_deletion')) return Response.json('30000000-0000-4000-8000-000000000001');
     if (url.endsWith('/object/list/research-sessions')) {
       const { prefix } = JSON.parse(options.body);
       if (prefix === owner) return Response.json([{ name: 'consent', id: null }]);
