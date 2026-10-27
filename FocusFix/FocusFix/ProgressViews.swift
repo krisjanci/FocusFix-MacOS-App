@@ -3,19 +3,26 @@ import SwiftUI
 
 struct DailyProgressCard: View {
     @ObservedObject var tracker: ActivityTracker
+    @ObservedObject private var social = SocialController.shared
     var body: some View {
         // Refresh the local day even when the app is idle across midnight.
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let calendar = DailyProgress.calendar()
-            let day = tracker.dailyProgress.day(at: context.date, calendar: calendar)
-            let streak = tracker.dailyProgress.streak(at: context.date, calendar: calendar)
+            let calendar = social.enabled ? social.calendar : DailyProgress.calendar()
+            let progress = social.ledger?.progress ?? tracker.dailyProgress
+            let day = progress.day(at: context.date, calendar: calendar)
+            let streak = progress.streak(at: context.date, calendar: calendar)
             let weekend = DailyProgress.isWeekend(context.date, calendar: calendar)
             let complete = day.workSeconds >= DailyProgress.goalSeconds
             DailyProgressDisplay(workMinutes: Int(day.workSeconds / 60), streak: streak,
                 breakCount: day.completedBreakIDs.count, weekend: weekend, complete: complete,
                 recharged: tracker.rechargeDate.map {
                     calendar.isDate($0, inSameDayAs: context.date) && context.date.timeIntervalSince($0) < 20
-                } ?? false, notice: tracker.progressNotice, workSeconds: day.workSeconds)
+                } ?? false, notice: tracker.progressNotice, workSeconds: day.workSeconds,
+                freezes: progress.tokensRemaining(at: context.date, calendar: calendar), pending: social.pendingConfirmation)
+                .onChange(of: DailyProgress.key(for: context.date, calendar: calendar)) { _, _ in
+                    tracker.reconcileProgress()
+                    Task { await social.refresh() }
+                }
         }
     }
 }
@@ -29,6 +36,8 @@ struct DailyProgressDisplay: View {
     var recharged = false
     var notice: String? = nil
     var workSeconds: Double = 0
+    var freezes = 3
+    var pending = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -40,17 +49,27 @@ struct DailyProgressDisplay: View {
                 Spacer()
                 if weekend { Text("Optional").font(.caption).foregroundStyle(.secondary) }
             }
-            ProgressView(value: min(workSeconds, 3600), total: 3600)
-                .tint(teal)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(teal.opacity(0.12))
+                    Capsule().fill(teal).frame(width: geometry.size.width * min(max(workSeconds / 3600, 0), 1))
+                }
+            }.frame(height: 4)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Daily work goal")
                 .accessibilityValue("\(workMinutes) of 60 minutes")
             HStack {
                 Label(streak > 0 ? "\(streak)-day weekday streak" : "Start a new streak",
                       systemImage: "flame")
                 Spacer()
-                Label("Breaks taken today: \(breakCount)", systemImage: "leaf")
+                Label(breakCount > 0 ? "Healthy habit complete" : "Take a 1-min break", systemImage: "leaf")
             }
             .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Label("\(freezes) / 3 freezes this month", systemImage: "snowflake")
+                Spacer()
+                if pending { Text("Pending sync") }
+            }.font(.caption).foregroundStyle(.secondary)
             if complete {
                 Text("Daily goal complete. Nice work!").font(.caption).foregroundStyle(teal)
             }
@@ -73,12 +92,14 @@ struct DailyProgressDisplay: View {
 
 struct ProgressMenuSummary: View {
     @ObservedObject var tracker: ActivityTracker
+    @ObservedObject private var social = SocialController.shared
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let calendar = DailyProgress.calendar()
-            let day = tracker.dailyProgress.day(at: context.date, calendar: calendar)
-            let streak = tracker.dailyProgress.streak(at: context.date, calendar: calendar)
+            let calendar = social.enabled ? social.calendar : DailyProgress.calendar()
+            let progress = social.ledger?.progress ?? tracker.dailyProgress
+            let day = progress.day(at: context.date, calendar: calendar)
+            let streak = progress.streak(at: context.date, calendar: calendar)
             Text("Today: \(Int(day.workSeconds / 60))/60 min · \(streak)-day weekday streak")
             Text("Breaks taken today: \(day.completedBreakIDs.count)")
         }
