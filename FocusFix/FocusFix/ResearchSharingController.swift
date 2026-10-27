@@ -16,17 +16,31 @@ final class ResearchSharingController: ObservableObject {
     private var generation = UUID()
     private var retryAt = Date.distantPast
     private var previousOwner: UUID?
+    private var withdrawalTask: Task<Void, Never>?
+    @Published private(set) var synchronizingWithdrawal = false
+    @Published private(set) var deletionPending = false
+    private let defaults: UserDefaults?
+    private static let withdrawalLatch = "focusfix.research.withdrawalLatch"
+    var withdrawalPending: Bool {
+        state.pendingWithdrawals.contains { $0.owner == account.session?.user.id && $0.origin == account.api?.configuration.origin.absoluteString }
+    }
 
     var enabled: Bool { capturedConsent != nil }
     var capturedConsent: ResearchConsent? {
-        guard account.researchAvailable, account.researchEnrolled, let consent = state.consent,
+        guard !deletionPending, account.researchAvailable, account.researchEnrolled, let consent = state.consent,
               consent.owner == account.session?.user.id, consent.studyVersion == account.enrollment?.consent_version,
-              consent.origin == account.api?.configuration.origin.absoluteString else { return nil }
+              consent.origin == account.api?.configuration.origin.absoluteString,
+              account.serverResearchConsent?.consent_id == consent.id,
+              account.serverResearchConsent?.study_version == consent.studyVersion,
+              account.serverResearchConsent?.withdrawn_at == nil,
+              !(defaults?.stringArray(forKey: Self.withdrawalLatch) ?? []).contains(consent.id.uuidString),
+              !withdrawalPending else { return nil }
         return consent
     }
 
-    init(account: AccountController, root: URL? = nil, recordings: URL? = nil, startTimer: Bool = true) {
+    init(account: AccountController, root: URL? = nil, recordings: URL? = nil, startTimer: Bool = true, defaults: UserDefaults? = .standard) {
         self.account = account
+        self.defaults = defaults
         do {
             let root = try root ?? FileManager.default.url(for: .applicationSupportDirectory,
                 in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent("FocusFix/ResearchSharing", isDirectory: true)
@@ -37,6 +51,10 @@ final class ResearchSharingController: ObservableObject {
             if FileManager.default.fileExists(atPath: file.path) {
                 state = try JSONDecoder().decode(ResearchSharingState.self, from: Data(contentsOf: file))
             }
+            if let consent = state.consent, (defaults?.stringArray(forKey: Self.withdrawalLatch) ?? []).contains(consent.id.uuidString) {
+                state.disable()
+                try JSONEncoder().encode(state).write(to: file, options: .atomic)
+            }
         } catch { notice = "Research sharing could not open its saved state. Sharing remains paused."; storage = nil }
         observation = account.$session.map { $0?.user.id }.removeDuplicates().sink { [weak self] owner in
             guard let self else { return }
@@ -44,7 +62,10 @@ final class ResearchSharingController: ObservableObject {
             self.task?.cancel()
             self.task = nil
             self.busy = false
-            if self.previousOwner != nil && self.previousOwner != owner { self.disable() }
+            if (self.previousOwner != nil && self.previousOwner != owner) ||
+                (owner != nil && self.state.consent != nil && self.state.consent?.owner != owner) {
+                self.disable()
+            }
             self.previousOwner = owner
             // A matching saved opt-in can resume after an explicit Restore sign-in action.
         }
@@ -56,16 +77,49 @@ final class ResearchSharingController: ObservableObject {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    func enable() {
+    func enable(reviewedStudy: ResearchStudy? = nil) async {
         guard !busy, account.researchAvailable, account.researchEnrolled, let owner = account.session?.user.id,
-              let api = account.api, storage != nil else { return }
-        let old = state
-        state.enable(owner: owner, origin: api.configuration.origin.absoluteString, at: Date(), studyVersion: account.enrollment!.consent_version)
-        do { try persist(); notice = "Research sharing is on for new sessions. Each finished session is sent separately." }
-        catch { state = old; notice = "Could not save consent. Research sharing was not enabled." }
+              let api = account.api, storage != nil, let reviewed = reviewedStudy ?? account.study else { return }
+        guard await synchronizeWithdrawals(), state.pendingWithdrawals.allSatisfy({ $0.owner != owner || $0.origin != api.configuration.origin.absoluteString }) else { return }
+        busy = true
+        generation = UUID()
+        let token = generation
+        defer { if token == generation { busy = false } }
+        guard await account.refreshResearchAccess(), account.session?.user.id == owner, token == generation else { return }
+        guard account.study == reviewed else {
+            notice = "Study details changed. Review the current consent before enabling sharing."
+            return
+        }
+        state.enable(owner: owner, origin: api.configuration.origin.absoluteString, at: Date(), studyVersion: reviewed.version)
+        let candidate = state.consent!
+        // Persist a compensating withdrawal before sending the grant. A crash cannot leave an untracked grant.
+        state.pendingWithdrawals.append(ResearchWithdrawal(candidate))
+        do {
+            try persist()
+            try await api.setResearchConsent(id: candidate.id, version: candidate.studyVersion, enabled: true, session: account.validSession())
+            guard token == generation, state.consent == candidate, account.session?.user.id == owner else {
+                _ = await synchronizeWithdrawals(); return
+            }
+            state.pendingWithdrawals.removeAll { $0.consentID == candidate.id }
+            try persist()
+            _ = await account.refreshResearchAccess()
+            guard token == generation else { return }
+            notice = enabled ? "Research sharing is on for new sessions. Each finished session is sent separately." : "Consent could not be verified. Uploads are paused."
+        } catch {
+            guard token == generation else { return }
+            state.disable()
+            try? persist()
+            notice = "Sharing was not enabled. A pending withdrawal will be synchronized before any upload."
+        }
     }
 
     func disable() {
+        // Independent fail-closed preference protects against failure to rewrite the queue file.
+        if let consent = state.consent {
+            var latch = defaults?.stringArray(forKey: Self.withdrawalLatch) ?? []
+            if !latch.contains(consent.id.uuidString) { latch.append(consent.id.uuidString) }
+            defaults?.set(latch, forKey: Self.withdrawalLatch)
+        }
         generation = UUID()
         task?.cancel()
         task = nil
@@ -73,6 +127,47 @@ final class ResearchSharingController: ObservableObject {
         state.disable()
         do { try persist(); notice = "Research sharing is off. Pending deliveries were cancelled; local sessions are kept. Data already received may remain with the researcher." }
         catch { notice = "Sharing stopped for this launch, but its saved setting could not be updated. Keep sharing off after relaunch." }
+        withdrawalTask = Task { [weak self] in _ = await self?.synchronizeWithdrawals() }
+    }
+
+    @discardableResult
+    func synchronizeWithdrawals() async -> Bool {
+        guard !synchronizingWithdrawal else { return false }
+        guard let owner = account.session?.user.id, let api = account.api else { return state.pendingWithdrawals.isEmpty }
+        let pending = state.pendingWithdrawals.filter { $0.owner == owner && $0.origin == api.configuration.origin.absoluteString }
+        guard !pending.isEmpty else { return true }
+        synchronizingWithdrawal = true
+        defer { synchronizingWithdrawal = false }
+        do {
+            for withdrawal in pending {
+                let session = try await account.validSession()
+                guard session.user.id == owner else { return false }
+                try await api.setResearchConsent(id: withdrawal.consentID, version: withdrawal.studyVersion, enabled: false, session: session)
+                state.pendingWithdrawals.removeAll { $0 == withdrawal }
+                try persist()
+                let latch = defaults?.stringArray(forKey: Self.withdrawalLatch) ?? []
+                defaults?.set(latch.filter { $0 != withdrawal.consentID.uuidString }, forKey: Self.withdrawalLatch)
+            }
+            _ = await account.refreshResearchAccess()
+            return true
+        } catch {
+            notice = "Sharing is off. Server withdrawal is pending; reconnect and sign in to synchronize."
+            return false
+        }
+    }
+
+    func requestDeletion() async {
+        disable()
+        guard !deletionPending, let api = account.api, let owner = account.session?.user.id else { return }
+        deletionPending = true
+        defer { deletionPending = false }
+        do {
+            let session = try await account.validSession()
+            guard session.user.id == owner else { return }
+            try await api.requestResearchDeletion(session: session)
+            _ = await account.refreshResearchAccess()
+            notice = "Hosted recordings deleted. The researcher must review downloaded copies and training datasets before completing your request."
+        } catch { notice = "Deletion could not be completed. Sharing is off; reconnect and retry the deletion request." }
     }
 
     func finished(folder: URL, startedAt: Date, captured: ResearchConsent?) {
@@ -84,9 +179,29 @@ final class ResearchSharingController: ObservableObject {
         }
     }
 
-    func checkDue() {
-        guard enabled, !busy, !state.sessions.isEmpty, Date() >= retryAt else { return }
-        deliver()
+    func checkDue(at date: Date = Date()) {
+        if !busy, withdrawalPending {
+            withdrawalTask = Task { [weak self] in _ = await self?.synchronizeWithdrawals() }
+            return
+        }
+        guard !busy, !state.sessions.isEmpty, date >= retryAt, let consent = state.consent,
+              consent.owner == account.session?.user.id,
+              consent.origin == account.api?.configuration.origin.absoluteString,
+              account.researchAvailable else { return }
+        if enabled { deliver(); return }
+        // A failed access refresh clears cached approval. Retry that check too, rather than
+        // leaving a durable queue stuck forever behind the cleared cache.
+        busy = true
+        let token = generation
+        task = Task { [weak self] in
+            guard let self else { return }
+            _ = await self.account.refreshResearchAccess()
+            guard token == self.generation else { return }
+            self.busy = false
+            self.task = nil
+            if self.enabled { self.deliver() }
+            else { self.retryAt = Date().addingTimeInterval(3600) }
+        }
     }
 
     func deliver() {
@@ -104,9 +219,13 @@ final class ResearchSharingController: ObservableObject {
                 if token == self.generation { self.busy = false; self.task = nil }
             }
             do {
+                guard await self.synchronizeWithdrawals() else { return }
                 guard await self.account.refreshResearchAccess(), token == self.generation,
                       self.capturedConsent == consent else {
-                    self.notice = "Research approval is unavailable or changed. Uploads are paused; local recordings are kept."
+                    if token == self.generation {
+                        self.retryAt = Date().addingTimeInterval(3600)
+                        self.notice = "Research approval is unavailable or changed. Uploads are paused; local recordings are kept."
+                    }
                     return
                 }
                 let batch: ResearchBatch
@@ -140,6 +259,7 @@ final class ResearchSharingController: ObservableObject {
                 let oldState = self.state
                 self.state.acknowledge(batchID: batch.id, at: Date())
                 do { try self.persist() } catch { self.state = oldState; throw error }
+                self.retryAt = .distantPast
                 self.notice = "Session ZIP delivered to the researcher's private storage. Your local sessions are kept."
             } catch {
                 guard token == self.generation else { return }
