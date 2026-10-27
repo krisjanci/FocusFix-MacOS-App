@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-26",
+  "project": "ltgyhstpbiocuxvyjpcb",
+  "deployment": "Supabase dashboard, authenticated owner session",
+  "migrations": {
+    "202610270001_consent_and_lifetime_cohort.sql": "c61655b6ecc2b84f8d3db3a9e5418ef1ed08ca359c12e285215d47102b904732",
+    "202610270002_serialize_upload_withdrawal.sql": "61a0c96b02aa545ce9eb82b2c3f09444a70834f0cbef8dfac1bb088e084e8bcc",
+    "202610270003_scope_withdrawal_tombstones.sql": "c8af35c4c260f900c4907ad991fe9389e87d293a0055ba72aadf12f295b6373a"
+  },
+  "functions": [
+    "delete-account",
+    "delete-research-data"
+  ],
+  "function_deployment_note": "Dashboard sources inline the tested shared cleanup handler and append the respective Deno.serve wrapper.",
+  "production_state": {
+    "recruitment_enabled": false,
+    "collection_enabled": false,
+    "lifetime_selected": 0,
+    "bucket_public": false,
+    "storage_authorization_volatility": "v"
+  },
+  "live_participant_data_used": false,
+  "authenticated_upload_e2e": "not run: disposable test project and two confirmed fixture accounts required",
+  "code_signing_identities_available": 0,
+  "app_store_submission": "not performed"
+}
