@@ -3,9 +3,10 @@ import SwiftUI
 // Only value-driven presentation components are used here, never live app controllers.
 struct QuickTourDemoView: View {
     @ObservedObject var tour: QuickTourController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let reduceMotion: Bool
     var nameFocus: FocusState<Bool>.Binding
     @State private var leafRaised = false
+    @State private var feedbackReady = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -19,7 +20,14 @@ struct QuickTourDemoView: View {
             default: dashboard
             }
         }
-        .task(id: tour.phase) {
+        .id(scene)
+        .transition(.opacity)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: scene)
+        .task(id: "\(tour.visit)-\(tour.phase)-\(reduceMotion)") {
+            feedbackReady = false
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) { feedbackReady = true }
             leafRaised = false
             if tour.phase == .returned && !reduceMotion {
                 withAnimation(.easeOut(duration: 0.25)) { leafRaised = true }
@@ -27,6 +35,18 @@ struct QuickTourDemoView: View {
                 guard !Task.isCancelled else { return }
                 withAnimation(.easeInOut(duration: 0.25)) { leafRaised = false }
             }
+        }
+    }
+
+    // Keep related actions in the same scene so controls do not jump between clicks.
+    private var scene: String {
+        switch tour.phase {
+        case .plan, .duration, .confirmStart: return "planning"
+        case .startBreak: return "breakSetup"
+        case .returned: return "resting"
+        case .savedSession: return "library"
+        case .editName, .name: return "profile"
+        default: return "dashboard"
         }
     }
 
@@ -52,6 +72,7 @@ struct QuickTourDemoView: View {
                 Label(tour.breaks == 0 ? "Make time for a break" : "You made time to recharge.",
                       systemImage: tour.breaks == 0 ? "leaf" : "checkmark.circle.fill")
                     .font(.caption).foregroundStyle(.secondary)
+                    .scaleEffect(tour.breaks > 0 && !reduceMotion && !feedbackReady ? 0.9 : 1)
                 Spacer()
                 practiceButton("Take a break", phase: .takeBreak, action: .takeBreak)
             }
@@ -66,6 +87,8 @@ struct QuickTourDemoView: View {
             }.controlSize(.large)
             if tour.saved {
                 Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(teal)
+                    .scaleEffect(reduceMotion || feedbackReady ? 1 : 0.8)
+                    .opacity(reduceMotion || feedbackReady ? 1 : 0)
             }
         }
     }
@@ -133,6 +156,8 @@ struct QuickTourDemoView: View {
                 Text("Practice session").font(.headline)
                 Spacer()
                 Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(teal)
+                    .scaleEffect(reduceMotion || feedbackReady ? 1 : 0.8)
+                    .opacity(reduceMotion || feedbackReady ? 1 : 0)
             }.padding(18).background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                 .practiceTarget(.savedSession)
         }
