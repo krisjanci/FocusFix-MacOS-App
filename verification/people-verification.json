@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-27",
+  "feature": "Expandable People panel with shared account-scoped group selection",
+  "automated": {
+    "swift_test_executables": 23,
+    "swift": "passed",
+    "node_tests": 15,
+    "node": "passed",
+    "database": "passed in isolated PGlite PostgreSQL runtime; includes creator-inclusive 49/50/51 capacity and existing rollback-only live script executed locally",
+    "debug_build": "passed",
+    "release_build": "passed",
+    "diff_whitespace": "passed"
+  },
+  "native_synthetic_preview": {
+    "source": "Actual ContentView, PeoplePanel and GroupsView with isolated fake account and transport; recording/profile paths isolated from real data",
+    "checked": [
+      "490-to-850 expansion and collapse with timer width retained",
+      "50-member scrolling with personal rank fixed below scroll",
+      "Work / Healthy habits selection updates scores and personal rank",
+      "Group selection shared with standalone Groups window",
+      "Signed-in disabled state shows explicit Enable group progress button; clicking enables the synthetic board",
+      "Crown, medal and laurel render beside positive ranks",
+      "Light and dark appearance",
+      "Accessibility tree contains numeric rank, name, score and current-user labels"
+    ],
+    "screenshots": [
+      "people-panel-light.png",
+      "people-panel-dark.png",
+      "people-enable-native.png",
+      "people-collapsed.png"
+    ]
+  },
+  "additional_state_snapshots": [
+    "people-state-signed-out.png",
+    "people-state-enable.png",
+    "people-state-offline.png",
+    "people-state-unavailable.png"
+  ],
+  "implementation_checks": [
+    "Reduce Motion, inactive control state and inactive scene gate decorative animation",
+    "Tutorial uses value-only sample group and leaderboard components with no real group actions",
+    "Test tracking and Quick tour remain in Profile",
+    "Account changes synchronously clear old displayed members; stale responses are rejected",
+    "No progress ledger format or pending-upload migration"
+  ],
+  "limits": [
+    "Narrow-screen fallback geometry is unit-tested; physical display configuration was not changed",
+    "Accessible labels and native controls inspected; a full spoken VoiceOver session remains manual",
+    "Reduce Motion and inactive-window gates checked in source; no animation timing recording captured",
+    "No real simultaneous two-device session was run"
+  ],
+  "backend": {
+    "schema_change": false,
+    "deployment_needed": false,
+    "capacity": "Existing deployed social_state RPC retains 50-person limit including creator; new boundary fixture executed locally"
+  },
+  "preserved": [
+    "Existing accounts and recordings",
+    "Guest progress and signed-in pending summaries",
+    "Research and billing settings",
+    "Explicit opt-in for group progress"
+  ],
+  "publication": "Local commits only; no push"
+}
