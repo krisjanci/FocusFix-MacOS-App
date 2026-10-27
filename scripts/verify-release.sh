@@ -13,7 +13,9 @@ if [[ "$release_app" != /* || "$release_app" != *.app || ! -d "$release_app/Cont
     exit 1
 fi
 
-python3 "$script_dir/check-release-content.py" "$release_app" --require-revision
+release_content_args=(--require-revision)
+if [[ "$release_mode" == app-store ]]; then release_content_args+=(--submission-ready); fi
+python3 "$script_dir/check-release-content.py" "$release_app" "${release_content_args[@]}"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$release_app"
 release_signature=$(/usr/bin/codesign --display --verbose=4 "$release_app" 2>&1)
 if [[ "$release_mode" == website ]]; then
@@ -39,13 +41,19 @@ if /usr/libexec/PlistBuddy -c 'Print com.apple.security.get-task-allow' "$releas
     exit 1
 fi
 
-python3 - "$release_check_dir/entitlements.plist" <<'CHECK'
+python3 - "$release_check_dir/entitlements.plist" "$release_app/Contents/Info.plist" <<'CHECK'
 import plistlib, sys
 with open(sys.argv[1], 'rb') as stream:
     entitlements = plistlib.load(stream)
 required = {'com.apple.security.app-sandbox', 'com.apple.security.files.user-selected.read-write'}
 if not all(entitlements.get(key) is True for key in required):
     sys.exit('Not ready: sandbox and user-selected export access required')
+with open(sys.argv[2], 'rb') as stream:
+    info = plistlib.load(stream)
+if info.get('FocusFixAccountURL'):
+    required.add('com.apple.security.network.client')
+    if entitlements.get('com.apple.security.network.client') is not True:
+        sys.exit('Not ready: configured accounts require outgoing network access')
 for key, value in entitlements.items():
     if key.startswith('com.apple.security.') and key not in required:
         if value is not False:
