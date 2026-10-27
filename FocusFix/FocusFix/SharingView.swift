@@ -1,8 +1,9 @@
-// Profile contains identity only. Recording and participation live in Settings.
+// Profile contains identity and practice tools. Recording and participation live in Settings.
 import SwiftUI
 
 struct SharingView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -15,6 +16,17 @@ struct SharingView: View {
                 Divider()
                 AccountControls()
                 Divider()
+                HStack(spacing: 16) {
+                    Button {
+                        dismiss()
+                        Task { @MainActor in
+                            await Task.yield()
+                            openWindow(id: "tracking")
+                            NSApp.activate(ignoringOtherApps: true)
+                        }
+                    } label: { Label("Test tracking", systemImage: "keyboard") }
+                    QuickTourButton(beforeOpen: { dismiss() })
+                }
                 SettingsLink { Label("Privacy & Research settings", systemImage: "hand.raised") }
                 Text("Your profile is private. Signing in never enables recording or research sharing.")
                     .font(.caption).foregroundStyle(.secondary)
