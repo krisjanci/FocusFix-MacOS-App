@@ -1,4 +1,5 @@
 // Real PostgreSQL semantics in an isolated, in-memory database. No live service access.
+import { verifySocial } from './social-database.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 const { PGlite } = await import(process.env.FOCUSFIX_PGLITE_MODULE || '@electric-sql/pglite');
 const db = new PGlite();
@@ -26,5 +27,6 @@ try {
     await db.exec(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
   }
   await db.exec(await readFile(new URL('consent-access.sql', import.meta.url), 'utf8'));
+  await verifySocial(db);
   console.log('PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.');
 } finally { await db.close(); }
