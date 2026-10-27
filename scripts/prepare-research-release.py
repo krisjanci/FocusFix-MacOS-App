@@ -11,15 +11,15 @@ from urllib.parse import urlparse
 REPO = Path(__file__).resolve().parent.parent
 REQUIRED = ('version', 'determination_reference', 'eligibility_text', 'researcher_contact',
             'purpose', 'duration', 'retention_policy', 'risks', 'withdrawal_policy', 'information_url')
-ACCOUNT_TYPES = ('EmailAddress', 'Name', 'PhotosorVideos', 'UserID')
+ACCOUNT_TYPES = ('EmailAddress', 'Name', 'PhotosorVideos', 'UserID', 'OtherUsageData', 'OtherUserContent')
 RESEARCH_TYPES = ('OtherUsageData', 'OtherUserContent', 'Health')
 
 
 def declarations(research):
     rows = []
-    for name in ACCOUNT_TYPES + (RESEARCH_TYPES if research else ()):
-        purposes = ['AppFunctionality'] if name in ACCOUNT_TYPES else ['Analytics', 'Other']
-        if research and name == 'UserID':
+    for name in dict.fromkeys(ACCOUNT_TYPES + (RESEARCH_TYPES if research else ())):
+        purposes = ['AppFunctionality'] if name in ACCOUNT_TYPES else []
+        if research and (name == 'UserID' or name in RESEARCH_TYPES):
             purposes += ['Analytics', 'Other']
         rows.append({'NSPrivacyCollectedDataType': 'NSPrivacyCollectedDataType' + name,
                      'NSPrivacyCollectedDataTypeLinked': True, 'NSPrivacyCollectedDataTypeTracking': False,
