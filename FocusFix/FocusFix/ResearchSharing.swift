@@ -19,17 +19,43 @@ nonisolated struct ResearchBatch: Codable, Equatable {
     let id: UUID
     let sessionIDs: [String]
 }
+nonisolated struct ResearchWithdrawal: Codable, Equatable {
+    let owner: UUID
+    let origin: String
+    let consentID: UUID
+    let studyVersion: String
+    init(_ consent: ResearchConsent) {
+        owner = consent.owner; origin = consent.origin; consentID = consent.id; studyVersion = consent.studyVersion
+    }
+}
 nonisolated struct ResearchSharingState: Codable, Equatable {
     var consent: ResearchConsent?
     var sessions: [ResearchSession] = []
     var batch: ResearchBatch?
+    var pendingWithdrawals: [ResearchWithdrawal] = []
+
+    init() { }
+    private enum CodingKeys: String, CodingKey { case consent, sessions, batch, pendingWithdrawals }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        consent = try values.decodeIfPresent(ResearchConsent.self, forKey: .consent)
+        sessions = try values.decodeIfPresent([ResearchSession].self, forKey: .sessions) ?? []
+        batch = try values.decodeIfPresent(ResearchBatch.self, forKey: .batch)
+        pendingWithdrawals = try values.decodeIfPresent([ResearchWithdrawal].self, forKey: .pendingWithdrawals) ?? []
+    }
 
     mutating func enable(owner: UUID, origin: String, at date: Date, studyVersion: String) {
         consent = ResearchConsent(id: UUID(), owner: owner, origin: origin, startedAt: date, studyVersion: studyVersion)
         sessions = []
         batch = nil
     }
-    mutating func disable() { self = ResearchSharingState() }
+    mutating func disable() {
+        if let consent {
+            let withdrawal = ResearchWithdrawal(consent)
+            if !pendingWithdrawals.contains(withdrawal) { pendingWithdrawals.append(withdrawal) }
+        }
+        consent = nil; sessions = []; batch = nil
+    }
     mutating func enqueue(id: String, startedAt: Date, endedAt: Date, captured: ResearchConsent?) -> Bool {
         guard let consent, captured == consent, startedAt >= consent.startedAt, endedAt >= startedAt,
               UUID(uuidString: id) != nil, !sessions.contains(where: { $0.id == id }) else { return false }
