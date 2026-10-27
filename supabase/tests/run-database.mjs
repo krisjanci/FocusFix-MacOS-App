@@ -28,5 +28,7 @@ try {
   }
   await db.exec(await readFile(new URL('consent-access.sql', import.meta.url), 'utf8'));
   await verifySocial(db);
+  await db.exec(await readFile(new URL('social-live.sql', import.meta.url), 'utf8'));
+  console.log('Rollback-only live verification script passed locally.');
   console.log('PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.');
 } finally { await db.close(); }
