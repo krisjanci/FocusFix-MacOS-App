@@ -22,6 +22,7 @@ struct SocialMember: Codable, Identifiable {
     let habitsRank: Int
 }
 struct SocialGroup: Codable, Identifiable {
+    static let capacity = 50
     let id: UUID
     let name: String
     let owner: UUID
