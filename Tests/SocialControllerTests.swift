@@ -5,6 +5,12 @@ import Foundation
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("social-test-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let owner = UUID(), other = UUID()
+        let suite = "focusfix.social.selection.\(UUID())"
+        let preferences = UserDefaults(suiteName: suite)!
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let firstGroup = SocialGroup(id: UUID(), name: "Study circle", owner: owner, code: nil, members: [])
+        let secondGroup = SocialGroup(id: UUID(), name: "Weekend crew", owner: owner, code: nil, members: [])
+        var remoteGroups: [SocialGroup] = []
         var active = owner
         var offline = false
         var block = false
@@ -25,28 +31,35 @@ import Foundation
                 if block { await withCheckedContinuation { continuation = $0 } }
                 var progress = DailyProgress()
                 progress.reconcile(at: Date(), calendar: DailyProgress.calendar(timeZone: TimeZone(secondsFromGMT: 0)!))
-                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: []))
+                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: remoteGroups))
             }
             return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         let account = AccountController(configuration: config, transport: transport,
             readCredential: { nil }, writeCredential: { _ in }, defaults: nil)
-        let social = SocialController(account: account, storageDirectory: root)
+        let social = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
         social.record(kind: "work", seconds: 60)
-        precondition(!social.enabled && bodies.isEmpty)
+        precondition(!social.enabled && bodies.isEmpty && social.accessState == .signedOut)
         await account.authenticate(email: "test@example.invalid", password: "test-password", create: false)
         await social.refresh()
         precondition(!social.enabled && bodies.isEmpty) // No implicit opt-in or guest history.
+        precondition(social.accessState == .disabled)
         await social.enable()
         precondition(social.enabled && bodies.count == 1 && social.ledger?.timezone == "UTC")
+        precondition(social.accessState == .enabled)
+        remoteGroups = [firstGroup,secondGroup]
+        await social.refresh()
+        social.selectGroup(secondGroup.id); social.selectMetric(.habits)
+        precondition(social.selectedGroup?.id == secondGroup.id && social.selection.metric == .habits)
         offline = true
         social.record(kind: "work", seconds: 60, at: Date().addingTimeInterval(61))
         await social.refresh()
-        precondition(social.ledger?.pending.count == 1 && social.pendingConfirmation)
+        precondition(social.ledger?.pending.count == 1 && social.pendingConfirmation && social.accessState == .offline)
         // A fresh process reloads the same durable outbox, scoped to account and origin.
-        let restored = SocialController(account: account, storageDirectory: root)
+        let restored = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
         await restored.refresh()
         precondition(restored.ledger?.pending.count == 1)
+        precondition(restored.selection.groupID == secondGroup.id && restored.selection.metric == .habits)
         let submittedID = restored.ledger!.pending[0].id
         offline = false; block = true
         let request = Task { await restored.refresh() }
@@ -56,26 +69,30 @@ import Foundation
         precondition(restored.ledger!.pending[0].id == submittedID)
         precondition(restored.ledger!.pending[0].seconds == 60)
         await account.signOut()
+        precondition(restored.groups.isEmpty && restored.selection == GroupSelection())
+        remoteGroups = []
         active = other
         await account.authenticate(email: "other@example.invalid", password: "test-password", create: false)
         restored.record(kind: "work", seconds: 60)
         precondition(!restored.enabled && restored.groups.isEmpty)
         continuation?.resume(); continuation = nil
-        await request.value
+        _ = await request.value
         precondition(!restored.enabled && restored.groups.isEmpty) // Old response cannot repopulate another account.
         block = false
         await restored.enable()
         let payload = bodies.last!["p_payload"] as! [String: Any]
         precondition((payload["events"] as! [[String: Any]]).isEmpty)
         await account.signOut(); active = owner
+        remoteGroups = [firstGroup,secondGroup]
         await account.authenticate(email: "test@example.invalid", password: "test-password", create: false)
         await restored.refresh()
         let ownPayload = bodies.last!["p_payload"] as! [String: Any]
         precondition((ownPayload["events"] as! [[String: Any]]).count == 2)
         precondition(restored.ledger?.pending.isEmpty == true)
+        precondition(restored.selection.groupID == secondGroup.id && restored.selection.metric == .habits)
         restored.discardCache(userID: owner, origin: config.origin)
         precondition(!restored.enabled)
-        let afterDeletion = SocialController(account: account, storageDirectory: root)
+        let afterDeletion = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
         await afterDeletion.refresh()
         precondition(!afterDeletion.enabled)
         print("Social opt-in, durable offline outbox, account isolation, stale responses and retry acknowledgement passed")
