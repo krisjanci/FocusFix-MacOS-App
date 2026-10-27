@@ -60,20 +60,28 @@ struct QuickTourTests {
 
         // Complete every phase without a clock, preferences, files, permissions or services.
         let actions: [QuickTourAction] = [.start, .plan, .minutes(90), .confirmStart, .next,
-            .takeBreak, .startBreak, .returned, .next, .save, .sessions, .next, .profile, .editName, .done]
+            .takeBreak, .startBreak, .returned, .next, .save, .sessions, .next, .profile, .editName, .next, .createGroup, .next, .done]
         for action in actions { act(action) }
         precondition(!tour.isPresented && tour.demoName == "Alex")
         for phase in QuickTourPhase.allCases {
             precondition(phase.caption.split(separator: " ").count <= 8)
-            precondition((0..<7).contains(phase.index))
+            precondition((0..<10).contains(phase.index))
         }
+        let joining = QuickTourController()
+        joining.restart()
+        for action in actions.prefix(actions.count - 3) {
+            joining.perform(action, phase: joining.phase, visit: joining.visit)
+        }
+        precondition(joining.phase == .groups)
+        joining.perform(.joinGroup, phase: joining.phase, visit: joining.visit)
+        precondition(joining.phase == .rankings)
         let other = QuickTourController()
         other.restart()
         other.perform(.start, phase: .start, visit: other.visit)
         precondition(other.phase == .plan && !tour.isPresented)
 
-        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile]
-        for stop in 1..<7 {
+        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .groups, .rankings, .freezes]
+        for stop in 1..<10 {
             let replay = QuickTourController()
             replay.restart()
             for action in actions {
