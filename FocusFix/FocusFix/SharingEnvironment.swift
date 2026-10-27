@@ -18,10 +18,9 @@ import Foundation
 
     // Wire up Keychain, local folders, background ZIP preparation and the real HTTPS sender.
     static var live: SharingEnvironment {
-        // A research-enabled build never also resumes the legacy Cloudflare queue.
-        let research = Bundle.main.object(forInfoDictionaryKey: "FocusFixResearchSharingEnabled") as? Bool == true
-        return SharingEnvironment(researchUploadsAllowed: UploadConfiguration.researchUploadsAllowed && !research,
-            serviceURL: research ? "" : UploadConfiguration.serviceURL,
+        // The retired legacy path is never enabled by the live app. Existing development state is left untouched.
+        return SharingEnvironment(researchUploadsAllowed: false,
+            serviceURL: "",
             identity: { try SharingIdentity.participantID() },
             readCredential: { try SharingIdentity.read("upload-credential") },
             saveCredential: { try SharingIdentity.save($0, account: "upload-credential") },
