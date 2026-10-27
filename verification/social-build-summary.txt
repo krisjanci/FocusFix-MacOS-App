@@ -1,0 +1,7 @@
+Debug build: passed (unsigned compilation check)
+Release build: passed (unsigned compilation check)
+Normal sandbox-signed Debug build: passed (ad hoc, existing sandbox entitlements)
+Profile Test tracking: opened after sheet dismissal; no recording started
+Profile Quick tour: opened after sheet dismissal; 10-step isolated practice
+Sandboxed launch: waiting for a macOS Keychain dialog; user action required. UI tool policy prohibits operating SecurityAgent.
+Built app: /tmp/focusfix-final-setup-signed/Build/Products/Debug/FocusFix.app
