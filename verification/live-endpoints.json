@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-26",
+  "project": "ltgyhstpbiocuxvyjpcb",
+  "checks": [
+    {
+      "endpoint": "delete-account",
+      "authentication": "missing",
+      "status": 401
+    },
+    {
+      "endpoint": "delete-account",
+      "authentication": "invalid",
+      "status": 401
+    },
+    {
+      "endpoint": "delete-research-data",
+      "authentication": "missing",
+      "status": 401
+    },
+    {
+      "endpoint": "delete-research-data",
+      "authentication": "invalid",
+      "status": 401
+    }
+  ],
+  "note": "No accounts or recordings created. This verifies rejection of unauthorized requests, not authenticated cleanup."
+}
