@@ -26,6 +26,11 @@ permission allows activity measurement across apps. FocusFix does not save typed
 text, individual letter keys, app names, screenshots or exact cursor paths.
 
 Use FocusFix locally as a guest, or create a private account for your profile.
+Optionally enable progress sync and join private groups with invite codes. Work
+and Healthy habits leaderboards award daily points for 60 minutes of work and a
+completed one-minute break. Three automatic monthly freezes protect your weekday
+work streak without adding points. Group members see only names, standard avatars
+and scores.
 If an approved study is open, eligible adults can request to participate. Research
 participation requires manual approval and separate consent before new completed
 sessions upload to private storage. Declining research does not remove local features.
@@ -37,7 +42,11 @@ a medical device or a validated fatigue or productivity detector.
 ## Privacy answers by shipped configuration
 
 The checked-in configuration connects accounts but disables research. Declare
-account-linked email, user ID, and optional profile name/photo for app functionality.
+account-linked email, user ID, optional profile name/photo, and optional social
+work/break duration summaries, group membership, scores and streak freeze data for
+app functionality. Social summaries and group names are declared as Other Usage Data and Other
+User Content for App Functionality in the privacy manifest. Email and photos are never shared with
+group members. Research remains separately gated.
 Do not submit the old blanket “Data Not Collected” answer for this build.
 
 A research-enabled release additionally declares account-linked activity/usage
