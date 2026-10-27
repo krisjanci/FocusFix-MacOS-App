@@ -25,3 +25,7 @@ jobs:
         run: node --test upload-service/tests/*.test.mjs
       - name: Test account deletion with fake authentication and storage
         run: node --test supabase/tests/*.test.mjs
+      - name: Install isolated PostgreSQL test runtime
+        run: npm install --prefix supabase --ignore-scripts --no-package-lock
+      - name: Test private groups, streak freezes and research access in PostgreSQL
+        run: npm --prefix supabase run test:database
