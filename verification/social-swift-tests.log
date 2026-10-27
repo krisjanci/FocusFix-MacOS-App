@@ -1,0 +1,59 @@
+Testing SocialProgressTests
+Automatic freezes, month limits, weekday boundaries, migration, idempotent summaries and in-flight acknowledgement passed
+Testing SocialControllerTests
+Tests/SocialControllerTests.swift:64:23: warning: expression of type 'Bool' is unused [#NoUsage]
+62 |         precondition(!restored.enabled && restored.groups.isEmpty)
+63 |         continuation?.resume(); continuation = nil
+64 |         await request.value
+   |                       `- warning: expression of type 'Bool' is unused [#NoUsage]
+65 |         precondition(!restored.enabled && restored.groups.isEmpty) // Old response cannot repopulate another account.
+66 |         block = false
+
+[#NoUsage]: <https://docs.swift.org/compiler/documentation/diagnostics/no-usage>
+Social opt-in, durable offline outbox, account isolation, stale responses and retry acknowledgement passed
+Testing QuickTourTests
+Practice tour actions, stale callbacks, replay, isolation, short copy and measured placement passed
+Testing SessionWorkPlanTests
+Per-session planning, survey choices, reset, shared work credit and one-time completion passed
+Testing LaunchCoordinatorTests
+Offline preview navigation preserved real account, preferences and credentials
+First launch, guest persistence, registration, remembered sign-in, menu gating and cancellation passed
+Testing AccountTests
+Account configuration, fake authentication, private profile sync, recovery and sign-out passed
+Testing ResearchDeliveryTests
+Per-session delivery, approval checks, quota failures, durable retry keys, export and in-flight opt-out passed
+Testing ResearchSharingTests
+Research consent snapshots, cancellation, retry batches and ZIP allowlisting passed
+Testing UserProfileTests
+sandbox-exec: sandbox_apply: Operation not permitted
+sandbox-exec: sandbox_apply: Operation not permitted
+User profile validation, photo import and persistence passed
+Testing DailyProgressTests
+Daily progress tests passed
+Testing RecordingDataTests
+PASS: recording schema and timing, session reload, dated exports, duplicate protection, legacy and unfinished sessions, active-session and path guards.
+Testing BreakPolicyTests
+PASS: distinct idle gaps, 25/10 minute delays, no duplicate prompts, early/late return, activity corrections, truncated breaks, paused intervals, break CSV and escaping.
+Testing SurveyDataTests
+PASS: fatigue/productivity ranges, start vs break items, blank skipped/cancelled answers, immediate CSV persistence, timestamps, versioned metadata and check-in activity phase.
+Testing TimedCheckInTests
+PASS: ten-minute boundary, one prompt per work period, deferral, stale/duplicate actions, stop/break cancellation, actual return timing and linked prompt/answer CSVs.
+Testing NotificationAccessTests
+PASS: notification onboarding, explicit permission requests, denial, banners off, settings refresh, duplicate clicks, failure and retry.
+Testing RecordingNoticeTests
+Recording notice: defaults, explicit acknowledgement and version changes passed.
+Testing InputMonitorTests
+2026-10-26 22:59:20.637 InputMonitorTests[90237:4252876] Connection Invalid error for service com.apple.hiservices-xpcservice.
+2026-10-26 22:59:20.637 InputMonitorTests[90237:4252874] Error received in message reply handler: Connection invalid
+Input monitoring: key/repeat/delete, pointer, scroll, target routing and stale-session isolation passed.
+Testing ReleaseConfigurationTests
+Release configuration has no research upload endpoint.
+Testing ReleaseConfigurationTests
+Debug configuration retains the enrolled test receiver.
+Testing SurveyPreferencesTests
+Survey preferences: all eight combinations, persistence, snapshots, scheduling and saved data passed.
+Testing UploadPolicyTests
+Upload policy and archive tests passed
+Testing SharingQueueTests
+Sharing queue tests passed: enrollment guidance, opt-in, no backfill, cancellation, restart, offline retry, quota delay and fail-closed settings
+All FocusFix tests passed.
