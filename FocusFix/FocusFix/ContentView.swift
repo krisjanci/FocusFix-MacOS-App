@@ -13,12 +13,61 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @AppStorage("focusfix.research.invitationDeclined") private var invitationDeclined = false
     @State private var sharingPresented = false
+    @ObservedObject var social = SocialController.shared
+    @State private var peopleExpanded = false
+    @State private var peopleSheet = false
+    @State private var collectorWindow: NSWindow?
+    @State private var collectorHeight: CGFloat = 620
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
     // Choose the break appearance only while recording a break or waiting for return.
     private var onBreak: Bool { tracker.isRecording && tracker.breakPhase != .work }
 
     // Arrange the main UI and route buttons/sheets to the tracker rather than duplicating recording logic.
     var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            collectorContent
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
+                })
+                .frame(height: peopleExpanded ? expandedPanelHeight : nil, alignment: .top)
+            if peopleExpanded {
+                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: expandedPanelHeight)
+                PeoplePanel(social: social, close: { peopleExpanded = false })
+                    .frame(width: PeopleWindowLayout.panelWidth, height: expandedPanelHeight)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: true)
+        .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
+        .background(PeopleWindowBridge(expanded: peopleExpanded, resolved: { collectorWindow = $0 }))
+        .sheet(isPresented: $peopleSheet) {
+            PeoplePanel(social: social, close: { peopleSheet = false }).frame(width: 380, height: 580)
+        }
+        .onChange(of: tour.isPresented) { _, shown in
+            if shown { peopleExpanded = false; peopleSheet = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { note in
+            guard let window = note.object as? NSWindow, window === collectorWindow,
+                  peopleExpanded, let screen = window.screen,
+                  !PeopleWindowLayout.canExpand(in: screen.visibleFrame) else { return }
+            peopleExpanded = false; peopleSheet = true
+        }
+    }
+
+    private var expandedPanelHeight: CGFloat {
+        let chrome = collectorWindow.map { $0.frame.height - ($0.contentView?.frame.height ?? $0.frame.height) } ?? 28
+        let available = (collectorWindow?.screen?.visibleFrame.height ?? 900) - chrome
+        return max(collectorHeight, min(620, available))
+    }
+
+    private func togglePeople() {
+        if peopleExpanded { peopleExpanded = false; return }
+        if let screen = collectorWindow?.screen, PeopleWindowLayout.canExpand(in: screen.visibleFrame) {
+            peopleExpanded = true
+        } else { peopleSheet = true }
+    }
+
+    private var collectorContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 14) {
                 Button { sharingPresented = true } label: {
@@ -157,8 +206,11 @@ struct ContentView: View {
                 Spacer()
             }
             HStack {
-                Button { openWindow(id: "groups") } label: { Label("Groups", systemImage: "person.2") }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                Button(action: togglePeople) {
+                    Label(peopleExpanded ? "Hide people" : "Groups", systemImage: "person.2")
+                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel(peopleExpanded ? "Collapse People panel" : "Expand group People panel")
+                    .help("Show people in your selected group")
                 Spacer()
                 Picker("Appearance", selection: $appearance) {
                     Label("System", systemImage: "circle.lefthalf.filled").tag("system")
