@@ -595,6 +595,8 @@ final class ActivityTracker: ObservableObject {
            dailyProgress.completeBreak(id: record.id, seconds: record.actualSeconds ?? 0,
                reason: reason, at: Date(), calendar: DailyProgress.calendar()) {
             rechargeDate = Date()
+            SocialController.shared.record(kind: "break", seconds: record.actualSeconds ?? 0,
+                id: UUID(uuidString: record.id) ?? UUID())
             progressDirty = true
         }
         try writer?.logBreak(entry)
@@ -758,10 +760,23 @@ final class ActivityTracker: ObservableObject {
                 try store.preserveUnreadableFile()
                 progressNotice = "Saved progress could not be read. A backup was kept; new progress starts today."
             }
+            dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
             progressStore = store
+            progressDirty = true
+            try store.save(dailyProgress)
+            progressDirty = false
         } catch {
             progressNotice = "Progress is available for this launch, but its local file could not be opened."
         }
+    }
+
+    func reconcileProgress() {
+        let previous = dailyProgress
+        dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
+        progressDirty = progressDirty || previous != dailyProgress
+        guard progressDirty, let store = progressStore else { return }
+        do { try store.save(dailyProgress); progressDirty = false }
+        catch { progressNotice = "Progress could not be saved. FocusFix will retry." }
     }
 
     func keepGoingAfterPlan() { sessionWorkPlan.keepGoing() }
@@ -771,6 +786,8 @@ final class ActivityTracker: ObservableObject {
         let credited = progressClock.update(&dailyProgress, elapsed: time, date: Date(),
             working: isRecording && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
             calendar: DailyProgress.calendar())
+        if credited > 0 { SocialController.shared.record(kind: "work", seconds: credited) }
+        dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
         sessionWorkPlan.credit(credited)
         progressDirty = progressDirty || previous != dailyProgress
         guard persist || time - lastProgressSave >= 15 else { return }
