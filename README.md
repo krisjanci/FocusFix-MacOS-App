@@ -1,3 +1,28 @@
+## Research/privacy update — October 26, 2026
+
+Profile now contains identity/account actions. **Settings → Privacy & Research**
+contains the recording preference, optional surveys, complete study consent,
+manual participant approval status and per-session delivery controls. First launch
+offers Enable recording or Not now. Neither choice grants Input Monitoring or
+starts recording. Switching recording off stops the session and blocks all Start paths.
+
+The live app no longer exposes enrollment keys or starts the legacy Cloudflare
+uploader. Its saved development state is preserved. The account-based path requires
+server-recorded, versioned consent as well as approval. The lifetime cohort cap is
+50 even after account deletion. Offline withdrawal is durable and blocks subsequent
+uploads until synchronized. Research-data deletion is separate from local deletion
+and leaves a private researcher task for downloaded copies/model datasets.
+
+Accounts are configured; the privacy manifest declares account collection. Research
+remains disabled until the actual institution determination, consent, retention and
+public study URL are configured. There is no fabricated approval or retention period.
+
+Current implementation and operating instructions: [Research operations](supabase/RESEARCH-OPERATIONS.md).
+Current App Store copy, privacy categories and remaining requirements:
+[Submission package](STORE-SUBMISSION.md). The historical notes below describe earlier
+implementation stages; these current documents supersede their enrollment and
+local-only Release descriptions.
+
 ![FocusFix logo](Assets/FocusFixLong.png)
 
 # FocusFix-MacOS-App
@@ -7,7 +32,7 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 
 This version collects local behavior data and recommends breaks using a timing/idle
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
-ML. Optional research uploads require enrollment and explicit opt-in. The included
+ML. Optional research uploads require manual researcher approval and explicit versioned consent. The included
 upload service is deployed and enabled for a controlled development test. Debug builds
 contain its URL and sharing defaults to off. **Release has no legacy research receiver**:
 legacy uploads and enrollment are disabled even after a development opt-in. Optional
@@ -258,40 +283,28 @@ for these choices when comparing sessions; opting out can change which labels I 
 
 ### Optional research sharing
 
-This section applies to **Debug development builds**, not the legacy-upload-disabled Release build.
-Release neither reads enrollment secrets nor touches the saved development upload queue.
-Changing Release into a research build needs the separate review described in RELEASE.md.
+Open **Settings → Privacy & Research** to review a configured study, confirm
+eligibility and request to join. A researcher manually approves up to 50 total
+participants. Signing in or receiving approval never turns sharing on. Approved
+participants must review the full versioned consent and choose **Share new sessions**.
+There is no enrollment key to paste.
 
-- The account icon at the top left opens my research profile and sharing settings.
-  Research setup stays locked on each launch; local recording does not access Keychain.
-  Choose **Unlock research setup** only when you need enrollment or uploads. This may
-  ask for Keychain access and restores the saved sharing choice. If sharing was on,
-  pending uploads resume. Unlocking does not opt in a previously opted-out installation.
-- When research setup is unlocked, FocusFix makes or reads a random participant ID
-  and keeps it in Keychain across relaunches
-  and ordinary updates. New session metadata includes the ID, so I can group sessions
-  without recording someone's name. A second Mac has a different ID; enrollment needs
-  to account for that. This is pseudonymous data, not automatically anonymous.
-- After study enrollment and explicit opt-in, new finished sessions are zipped and
-  queued automatically. Old sessions aren't backfilled. Turning sharing off cancels
-  pending work, and turning it back on only applies to subsequently started sessions.
-- The session library shows upload status. Queued work survives quit/relaunch, retries
-  with delays after research setup is unlocked, and keeps the original files locally.
-  The upload credential is read once per unlock and reused in memory for that launch;
-  background retries do not repeatedly open Keychain. Sessions started while locked
-  remain local and are not backfilled after unlocking.
-- Limits are enforced on the server: 180 elapsed minutes (including breaks), 50 MiB
-  of compressed data and 30 newly admitted sessions per participant per UTC day.
-  Each ZIP is limited to 25 MiB. Whole sessions that don't fit wait until the next day;
-  sessions longer than 180 minutes stay local. These limits don't stop local recording.
-- The app only packages the five CSVs and session metadata. Credentials aren't included.
-  The service checks authorization, size and checksum, and protects against duplicate
-  uploads. Opt-out can't recall a transfer already received. Deleting locally doesn't
-  delete cloud copies; cloud deletion requests go to the researcher using the ID.
-- The receiver is deployed with the **focusfix-mldata** binding and a D1 quota database.
-  The configured URL takes effect after rebuilding the app. Follow
-  [the setup guide](upload-service/README.md) for enrollment and testing. Never paste
-  credentials into chat or commit them to GitHub. Server enablement isn't app consent.
+Each new completed session begun under the current consent is sent separately to
+private, account-linked Supabase storage while signed in and running. The server
+requires current approval and consent even for direct Storage calls. Receipts and
+stable archive IDs prevent duplicate deliveries. Quota/offline failures keep the
+original recording local; the app can export the next queued ZIP explicitly.
+
+Turning sharing off cancels local pending deliveries and records a durable server
+withdrawal. It cannot recall data already received. Use **Request deletion of
+research data** for hosted copies and researcher review of downloaded datasets.
+Deleting local recordings, deleting an account and handling trained models have
+different effects; read the current study terms. The app does not claim anonymous
+recordings or automatic model unlearning.
+
+Research is disabled in the checked-in configuration until the institution's actual
+determination and study terms are supplied. See [research operations](supabase/RESEARCH-OPERATIONS.md)
+for deployment, manual approval, the lifetime cap, retention/deletion and verification.
 
 ### Session library and exports
 
