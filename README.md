@@ -104,8 +104,11 @@ recordings continue underneath, and real menu-bar Stop & save stays available. P
 recording/check-in sheets finish before a requested tour appears. On exit, your actual
 onboarding, account and recording state is restored unchanged.
 
-Spotlights and feedback use brief, non-looping animations. Reduce Motion displays
-immediate/static results. The detailed recording, permissions, research, progress,
+Spotlights pulse briefly, scenes fade smoothly, and saved/finished actions show
+animated feedback. Reduce Motion displays immediate/static results. Captions use
+measured text sizes and move into a separate instruction panel when needed. The
+practice area scrolls to keep the current target reachable as the window resizes;
+the tour never resizes the window. The detailed recording, permissions, research, progress,
 and export instructions remain in the sections below.
 
 ### Welcome and guest access
