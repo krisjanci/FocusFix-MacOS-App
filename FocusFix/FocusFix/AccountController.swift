@@ -333,7 +333,10 @@ final class AccountController: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            try await api.deleteAccount(session: validSession())
+            let deleting = try await validSession()
+            try await api.deleteAccount(session: deleting)
+            NotificationCenter.default.post(name: Notification.Name("FocusFixAccountDeleted"), object: nil,
+                userInfo: ["userID": deleting.user.id, "origin": api.configuration.origin])
             rememberSession = false
             setRemembered(false)
             clearSession()
