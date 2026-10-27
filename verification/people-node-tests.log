@@ -1,0 +1,23 @@
+✔ requires authentication before any admin call (14.792167ms)
+✔ rejects an invalid user without touching storage or admin APIs (1.005208ms)
+✔ uses verified user ID; ignores a foreign user ID supplied in the request (2.067292ms)
+✔ storage failure prevents deleting the account and hides server error contents (0.915333ms)
+✔ research deletion revokes before storage cleanup and keeps the account (17.282208ms)
+✔ cleanup failure leaves the previously recorded request pending for retry (0.553167ms)
+✔ rejects unsafe storage paths and does not mark cleanup completed (0.927666ms)
+✔ closed service, missing/wrong/revoked credentials never reach R2 (38.702208ms)
+✔ uploads exactly once; a duplicate after cloud deletion is acknowledged, not recreated (8.894958ms)
+✔ three 60-minute sessions fit; fourth waits; >180 minute session is rejected (3.172666ms)
+✔ concurrent sessions cannot overspend quota; concurrent duplicates use one reservation (3.769792ms)
+✔ checksum/size/content-type mismatches never store data; conflicting retry cannot replace data (2.506625ms)
+✔ R2 failure retries with the same reservation; receipt failure recovers without a second PUT (2.346875ms)
+✔ SQL enforces bytes, session count and UTC boundary independently of client (1.903625ms)
+✔ 120 daily authenticated requests maximum, with no R2 operations after exhaustion (18.911458ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143.388292
