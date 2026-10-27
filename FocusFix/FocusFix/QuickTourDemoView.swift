@@ -17,7 +17,7 @@ struct QuickTourDemoView: View {
             case .returned: resting
             case .savedSession: library
             case .editName, .name: profile
-            case .groups, .rankings, .freezes: socialPractice
+            case .groups, .chooseGroup, .rankings, .podium, .freezes: socialPractice
             default: dashboard
             }
         }
@@ -47,7 +47,7 @@ struct QuickTourDemoView: View {
         case .returned: return "resting"
         case .savedSession: return "library"
         case .editName, .name: return "profile"
-        case .groups, .rankings, .freezes: return "social"
+        case .groups, .chooseGroup, .rankings, .podium, .freezes: return "social"
         default: return "dashboard"
         }
     }
@@ -87,6 +87,8 @@ struct QuickTourDemoView: View {
                 practiceButton("Sessions", symbol: "folder", phase: .sessions, action: .sessions)
                 Spacer(minLength: 0)
             }.controlSize(.large)
+            practiceButton("Groups", symbol: "person.2", phase: .people, action: .people)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if tour.saved {
                 Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(teal)
                     .scaleEffect(reduceMotion || feedbackReady ? 1 : 0.8)
@@ -107,18 +109,39 @@ struct QuickTourDemoView: View {
                 }
                     .padding(14).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                 Text("Practice code: ALEX-DEMO").font(.caption.monospaced()).foregroundStyle(.secondary)
-            } else if tour.phase == .rankings {
-                Text("Work: 60 minutes across sessions earns one daily point. Healthy habits: completing a one-minute break earns one daily point.")
-                HStack { Text("Work · All time"); Spacer(); Text("Healthy habits · All time") }.font(.headline)
-                HStack { Text("1  Alex"); Spacer(); Text("4 days"); Spacer(); Text("3 days") }
-                HStack { Text("2  Sam"); Spacer(); Text("2 days"); Spacer(); Text("2 days") }
-                Text("Scores start when you join. Weekends can earn points too.").font(.caption).foregroundStyle(.secondary)
+            } else if tour.phase == .chooseGroup || tour.phase == .rankings || tour.phase == .podium {
+                practiceLeaderboard
             } else {
                 Label("2 / 3 freezes remaining", systemImage: "snowflake").font(.headline).foregroundStyle(teal)
                 Text("Monday: goal met → Tuesday: frozen → Wednesday: goal met")
                 Text("A freeze preserves your streak without adding a day or points. Three tokens refill each month, without rollover. They cannot cover consecutive calendar dates. Weekends remain optional.")
             }
-        }.fixedSize(horizontal: false, vertical: true).padding(16).practiceTarget(tour.phase)
+        }.fixedSize(horizontal: false, vertical: true).padding(16)
+            .practiceTarget(tour.phase == .chooseGroup || tour.phase == .rankings || tour.phase == .podium ? .groups : tour.phase)
+    }
+
+    private var practiceLeaderboard: some View {
+        let visit = tour.visit
+        let people = [
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: tour.demoName, symbol: "leaf.fill", color: "teal", work: 8, habits: 7, workRank: 1, habitsRank: 1),
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, name: "Sam", symbol: "book.fill", color: "blue", work: 6, habits: 5, workRank: 2, habitsRank: 2),
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!, name: "Jordan", symbol: "sun.max.fill", color: "orange", work: 4, habits: 3, workRank: 3, habitsRank: 3)
+        ]
+        let group = SocialGroup(id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!, name: tour.demoGroupIndex == 0 ? "Study circle" : "Weekend crew", owner: people[0].id, code: nil, members: people)
+        return VStack(alignment: .leading, spacing: 12) {
+            GroupHeading(group: group)
+            Picker("Practice group", selection: Binding(get: { tour.demoGroupIndex }, set: { tour.perform(.group($0), phase: .chooseGroup, visit: visit) })) {
+                Text("Study circle").tag(0); Text("Weekend crew").tag(1)
+            }.disabled(tour.phase != .chooseGroup).practiceTarget(.chooseGroup)
+            Picker("Practice leaderboard", selection: Binding(get: { tour.demoMetric }, set: { tour.perform(.metric($0), phase: .rankings, visit: visit) })) {
+                ForEach(LeaderboardMetric.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented).disabled(tour.phase != .rankings).practiceTarget(.rankings)
+            Text(tour.demoMetric.explanation).font(.caption).foregroundStyle(.secondary)
+            GroupLeaderboard(group: group, metric: tour.demoMetric, currentUser: people[0].id, allowsAnimation: !reduceMotion)
+                .frame(height: 290).practiceTarget(.podium)
+            Text("One daily point. Scores start at joining. Equal scores share a rank.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var planning: some View {
