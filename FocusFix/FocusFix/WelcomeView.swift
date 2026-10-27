@@ -134,7 +134,6 @@ struct CollectorRootView: View {
             }
         }
         .onAppear {
-            SharingController.shared.resume()
             tracker.refreshNotificationPermission()
             NSApp.windows.forEach { $0.acceptsMouseMovedEvents = true }
             tracker.openMainWindow = {
@@ -144,6 +143,11 @@ struct CollectorRootView: View {
             if launchFinished { launch.begin() }
         }
         .onChange(of: launchFinished) { _, finished in if finished { launch.begin() } }
+        .task(id: launchFinished && launch.page == .app && !tour.isPresented && canShowTour) {
+            if launchFinished && launch.page == .app && !tour.isPresented && canShowTour && RecordingNotice().needsFirstLaunchChoice {
+                tracker.recordingNoticePresented = true
+            }
+        }
         .onDisappear { finishIntro() }
         .onChange(of: tracker.sessionCheckInPresented) { _, shown in if shown { finishIntro() } }
         .onChange(of: tracker.recordingNoticePresented) { _, shown in if shown { finishIntro() } }
