@@ -7,9 +7,12 @@ struct QuickTourButton: View {
     var body: some View {
         Button {
             beforeOpen()
-            QuickTourController.shared.restart()
-            openWindow(id: "collector")
-            NSApp.activate(ignoringOtherApps: true)
+            Task { @MainActor in
+                await Task.yield()
+                QuickTourController.shared.restart()
+                openWindow(id: "collector")
+                NSApp.activate(ignoringOtherApps: true)
+            }
         } label: {
             Label("Quick tour", systemImage: "book.closed")
         }.help("Try a short spotlight practice tour")
