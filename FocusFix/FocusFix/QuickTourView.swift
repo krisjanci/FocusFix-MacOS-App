@@ -33,45 +33,85 @@ extension View {
 // The root installs this as an overlay: it never participates in window sizing.
 struct QuickTourView: View {
     @ObservedObject private var tour = QuickTourController.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    // Isolated previews can exercise this mode without changing macOS settings.
+    var forceReducedMotion = false
+    private var reduceMotion: Bool { systemReduceMotion || forceReducedMotion }
     @FocusState private var practiceNameFocused: Bool
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
+    @State private var captionSize = CGSize.zero
+    @State private var docked = false
+
     var body: some View {
         GeometryReader { container in
+            let captionWidth = min(248, max(1, container.size.width - 24))
+            VStack(spacing: 0) {
+                navigation.padding(12)
+                if docked {
+                    caption.frame(width: captionWidth).padding(.bottom, 12)
+                }
+                practiceArea(size: container.size)
+            }
+            .overlay(alignment: .topLeading) {
+                // Measure the complete caption at its rendered width before placing it.
+                caption.frame(width: captionWidth).fixedSize(horizontal: false, vertical: true)
+                    .background(GeometryReader { geometry in
+                        Color.clear
+                            .onAppear { captionSize = geometry.size }
+                            .onChange(of: geometry.size) { _, value in captionSize = value }
+                    })
+                    .hidden().disabled(true).allowsHitTesting(false).accessibilityHidden(true)
+            }
+            .onChange(of: container.size) { _, _ in docked = false }
+            .onChange(of: tour.phase) { _, _ in docked = false }
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipped()
+        }.tint(teal)
+    }
+
+    private func practiceArea(size: CGSize) -> some View {
+        GeometryReader { viewport in
             ScrollViewReader { reader in
                 ScrollView {
-                    QuickTourDemoView(tour: tour, nameFocus: $practiceNameFocused)
-                        .padding(.horizontal, 24).padding(.top, 64).padding(.bottom, 24)
-                        .frame(maxWidth: .infinity, minHeight: container.size.height)
+                    QuickTourDemoView(tour: tour, reduceMotion: reduceMotion, nameFocus: $practiceNameFocused)
+                        .padding(24)
+                        .frame(maxWidth: .infinity, minHeight: viewport.size.height)
                 }
-                .scrollDisabled(true)
-                .background(Color(nsColor: .windowBackgroundColor))
                 .overlayPreferenceValue(PracticeAnchorKey.self) { anchors in
                     GeometryReader { geometry in
                         if let anchor = anchors[tour.phase] {
-                            let hole = QuickTourLayout.spotlight(geometry[anchor], in: geometry.size)
+                            let target = geometry[anchor]
+                            let hole = QuickTourLayout.spotlight(target, in: geometry.size)
+                            let measured = captionSize
+                            let bubble = QuickTourLayout.caption(target: hole, in: geometry.size,
+                                                                 measured: measured)
                             if !hole.isNull && !hole.isEmpty {
-                                let bubble = QuickTourLayout.caption(target: hole, in: geometry.size,
-                                    hasButton: tour.phase.offersNext || tour.phase.offersDone)
                                 spotlight(hole)
-                                caption.frame(width: bubble.width, height: bubble.height)
-                                    .position(x: bubble.midX, y: bubble.midY)
+                                if !docked, let bubble {
+                                    caption.frame(width: bubble.width)
+                                        .position(x: bubble.midX, y: bubble.midY)
+                                }
                             } else {
-                                Color.black.opacity(0.45).onTapGesture { }
+                                Color.black.opacity(0.45).allowsHitTesting(false)
                             }
-                        } else {
-                            Color.black.opacity(0.45).onTapGesture { }
+                            Color.clear.allowsHitTesting(false)
+                                .task(id: "\(tour.phase)-\(target)-\(captionSize)-\(docked)") {
+                                    if !docked && bubble == nil && measured.height > 0 { docked = true }
+                                }
                         }
                     }
                 }
-                .overlay(alignment: .top) { navigation.padding(12) }
-                .task(id: "\(tour.visit.uuidString)-\(tour.phase.rawValue)") {
-                    let phase = tour.phase
-                    let visit = tour.visit
+                .clipped()
+                .task(id: "\(tour.visit)-\(tour.phase)-\(size)-\(docked)-\(captionSize)") {
+                    // This also runs after resizing or docking so the target stays visible.
                     await Task.yield()
                     guard !Task.isCancelled else { return }
-                    reader.scrollTo(phase, anchor: .center)
+                    reader.scrollTo(tour.phase, anchor: .center)
+                }
+                .task(id: "\(tour.visit)-\(tour.phase)-\(reduceMotion)") {
+                    let phase = tour.phase
+                    let visit = tour.visit
                     practiceNameFocused = false
                     if phase == .name {
                         await Task.yield()
@@ -94,7 +134,7 @@ struct QuickTourView: View {
                     }
                 }
             }
-        }.tint(teal)
+        }
     }
 
     private var navigation: some View {
@@ -115,6 +155,9 @@ struct QuickTourView: View {
         let phase = tour.phase
         let visit = tour.visit
         return VStack(alignment: .leading, spacing: 12) {
+            if phase.offersDone {
+                PracticeCompletionMark(color: teal, reduceMotion: reduceMotion)
+            }
             Text(phase.caption).font(.system(size: 16, weight: .medium, design: .rounded))
                 .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
             if phase.offersNext || phase.offersDone {
@@ -126,7 +169,7 @@ struct QuickTourView: View {
                 }
             }
         }
-        .padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(teal.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
@@ -138,7 +181,7 @@ struct QuickTourView: View {
             mask.fill(.black.opacity(0.48), style: FillStyle(eoFill: true))
                 .contentShape(mask, eoFill: true).onTapGesture { }
                 .accessibilityHidden(true)
-            RoundedRectangle(cornerRadius: 12).stroke(teal.opacity(0.85), lineWidth: 1.5)
+            PracticeTargetRing(color: teal, phase: tour.phase, visit: tour.visit, reduceMotion: reduceMotion)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY).allowsHitTesting(false).accessibilityHidden(true)
         }
@@ -157,5 +200,45 @@ private struct PracticeSpotlight: Shape {
         var path = Path(rect)
         path.addRoundedRect(in: hole, cornerSize: CGSize(width: 12, height: 12))
         return path
+    }
+}
+
+private struct PracticeTargetRing: View {
+    let color: Color
+    let phase: QuickTourPhase
+    let visit: UUID
+    let reduceMotion: Bool
+    @State private var pulse = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(color.opacity(pulse ? 1 : 0.7), lineWidth: pulse ? 4 : 1.5)
+            .shadow(color: color.opacity(pulse ? 0.35 : 0), radius: 6)
+            .task(id: "\(visit)-\(phase)-\(reduceMotion)") {
+                pulse = false
+                guard !reduceMotion else { return }
+                for _ in 0..<2 {
+                    withAnimation(.easeInOut(duration: 0.3)) { pulse = true }
+                    do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeInOut(duration: 0.3)) { pulse = false }
+                    do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
+                    guard !Task.isCancelled else { return }
+                }
+            }
+    }
+}
+
+private struct PracticeCompletionMark: View {
+    let color: Color
+    let reduceMotion: Bool
+    @State private var appeared = false
+    var body: some View {
+        Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(color)
+            .scaleEffect(reduceMotion || appeared ? 1 : 0.65)
+            .accessibilityHidden(true)
+            .onAppear {
+                withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.25)) { appeared = true }
+            }
     }
 }
