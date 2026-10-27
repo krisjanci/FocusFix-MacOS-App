@@ -19,7 +19,7 @@ struct ContentView: View {
 
     // Arrange the main UI and route buttons/sheets to the tracker rather than duplicating recording logic.
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 14) {
                 Button { sharingPresented = true } label: {
                     ProfileAvatar(profile: account.session == nil ? profile.profile : account.profile, size: 30)
@@ -27,11 +27,11 @@ struct ContentView: View {
                     .help("Your profile")
                     .accessibilityLabel((account.session == nil ? profile.profile : account.profile).map { "Profile for \($0.name), your profile" } ?? "Your profile")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
-                    .resizable().scaledToFit().frame(width: 54, height: 54)
+                    .resizable().scaledToFit().frame(width: 36, height: 36)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("FocusFix").font(.system(size: 25, weight: .semibold, design: .rounded))
-                    Text("ACTIVITY COLLECTOR").font(.system(size: 10, weight: .semibold))
+                    Text("FOCUS · REST · REPEAT").font(.system(size: 10, weight: .semibold))
                         .tracking(2).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -73,9 +73,7 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity).padding(26)
-            .background(LinearGradient(colors: [teal.opacity(onBreak ? 0.16 : 0.06),
-                Color.mint.opacity(onBreak ? 0.12 : 0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 18))
+            .background(teal.opacity(onBreak ? 0.10 : 0.04), in: RoundedRectangle(cornerRadius: 16))
 
             DailyProgressCard(tracker: tracker)
             if !invitationDeclined, account.researchAvailable, account.session != nil,
@@ -159,8 +157,12 @@ struct ContentView: View {
                 Spacer()
             }
             HStack {
-                Button("Test tracking") { openWindow(id: "tracking") }
+                Button { openWindow(id: "groups") } label: { Label("Groups", systemImage: "person.2") }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
+                Menu {
+                    Button("Test tracking") { openWindow(id: "tracking") }
+                    QuickTourButton()
+                } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).frame(width: 24)
                 Spacer()
                 Picker("Appearance", selection: $appearance) {
                     Label("System", systemImage: "circle.lefthalf.filled").tag("system")
@@ -184,6 +186,8 @@ struct ContentView: View {
             WorkCheckInView(tracker: tracker).tint(teal)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            tracker.reconcileProgress()
+            Task { await SocialController.shared.refresh() }
             tracker.refreshNotificationPermission()
             tracker.refreshInputPermission()
         }
