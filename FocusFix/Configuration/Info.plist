@@ -9,6 +9,9 @@
     <string>sb_publishable_RtxKroPi6cw2Rl6ipI3RUg_n1BVgTfn</string>
     <key>FocusFixStudyInformationURL</key>
     <string></string>
+    <!-- Set to the published policy before App Store submission. -->
+    <key>FocusFixPrivacyPolicyURL</key>
+    <string></string>
     <!-- Enable only after deploying the private bucket and reviewing study consent. -->
     <key>FocusFixResearchSharingEnabled</key>
     <false/>
