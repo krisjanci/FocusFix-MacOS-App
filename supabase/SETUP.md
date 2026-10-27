@@ -1,3 +1,7 @@
+## Private group setup
+
+After the account migrations, follow [SOCIAL-SETUP.md](SOCIAL-SETUP.md) to install private groups, leaderboards and account-synchronized freezes. Group participation is independent of the research feature switch.
+
 ## Current deployment and consent flow
 
 Follow [RESEARCH-OPERATIONS.md](RESEARCH-OPERATIONS.md) for the new migration,
