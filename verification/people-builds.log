@@ -1,0 +1,11 @@
+Debug: xcodebuild, /tmp/focusfix-people-build
+PruneExplicitPrecompiledModules /tmp/focusfix-people-build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+** BUILD SUCCEEDED **
+
+
+Release: xcodebuild, /tmp/focusfix-people-release
+PruneExplicitPrecompiledModules /tmp/focusfix-people-release/SDKExplicitPrecompiledModules
+
+** BUILD SUCCEEDED **
+
