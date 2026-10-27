@@ -6,7 +6,7 @@ import CoreGraphics
 enum QuickTourPhase: String, CaseIterable {
     case start, plan, duration, confirmStart, work, takeBreak, startBreak, returned
     case progress, save, sessions, savedSession, profile, editName, name
-    case groups, rankings, freezes
+    case people, groups, chooseGroup, rankings, podium, freezes
 
     var index: Int {
         switch self {
@@ -17,9 +17,11 @@ enum QuickTourPhase: String, CaseIterable {
         case .progress: return 4
         case .save, .sessions, .savedSession: return 5
         case .profile, .editName, .name: return 6
-        case .groups: return 7
-        case .rankings: return 8
-        case .freezes: return 9
+        case .people: return 7
+        case .groups, .chooseGroup: return 8
+        case .rankings: return 9
+        case .podium: return 10
+        case .freezes: return 11
         }
     }
     var caption: String {
@@ -39,18 +41,21 @@ enum QuickTourPhase: String, CaseIterable {
         case .profile: return "Click Profile to make it yours."
         case .editName: return "Click your name to change it."
         case .name: return "Try a name, then click Next."
+        case .people: return "Click Groups to expand People."
         case .groups: return "Create or join a private group."
-        case .rankings: return "One qualifying day earns one point."
+        case .chooseGroup: return "Choose another group."
+        case .rankings: return "Switch to Healthy habits."
+        case .podium: return "Top ranks celebrate qualifying days."
         case .freezes: return "Three monthly freezes protect your weekday streak."
         }
     }
-    var offersNext: Bool { self == .work || self == .progress || self == .savedSession || self == .name || self == .rankings }
+    var offersNext: Bool { self == .work || self == .progress || self == .savedSession || self == .name || self == .podium }
     var offersDone: Bool { self == .freezes }
 }
 
 enum QuickTourAction: Equatable {
     case start, plan, minutes(Int), confirmStart, takeBreak, startBreak, returned
-    case save, sessions, profile, editName, createGroup, joinGroup, next, done
+    case save, sessions, profile, editName, people, createGroup, joinGroup, group(Int), metric(LeaderboardMetric), next, done
 }
 
 @MainActor
@@ -65,16 +70,19 @@ final class QuickTourController: ObservableObject {
     @Published private(set) var breaks = 0
     @Published private(set) var saved = false
     @Published private(set) var demoName = "Alex"
+    @Published private(set) var demoGroupIndex = 0
+    @Published private(set) var demoMetric: LeaderboardMetric = .work
+    static let stepCount = 12
 
     var index: Int { phase.index }
     var isFirst: Bool { index == 0 }
-    var position: String { "\(index + 1)/10" }
+    var position: String { "\(index + 1)/\(Self.stepCount)" }
 
     func restart() { reset(to: .start); isPresented = true }
     func finish() { isPresented = false; reset(to: .start) }
     func back() {
         guard isPresented, !isFirst else { return }
-        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .groups, .rankings, .freezes]
+        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .people, .groups, .rankings, .podium, .freezes]
         reset(to: starts[index - 1])
     }
 
@@ -97,9 +105,12 @@ final class QuickTourController: ObservableObject {
         case (.savedSession, .next): phase = .profile
         case (.profile, .profile): phase = .editName
         case (.editName, .editName): phase = .name
-        case (.name, .next): phase = .groups
-        case (.groups, .createGroup), (.groups, .joinGroup): phase = .rankings
-        case (.rankings, .next): phase = .freezes
+        case (.name, .next): phase = .people
+        case (.people, .people): phase = .groups
+        case (.groups, .createGroup), (.groups, .joinGroup): phase = .chooseGroup
+        case (.chooseGroup, .group(1)): demoGroupIndex = 1; phase = .rankings
+        case (.rankings, .metric(.habits)): demoMetric = .habits; phase = .podium
+        case (.podium, .next): phase = .freezes
         case (.freezes, .done): finish()
         default: break
         }
@@ -118,6 +129,8 @@ final class QuickTourController: ObservableObject {
 
     private func reset(to value: QuickTourPhase) {
         visit = UUID(); phase = value; minutes = 60; demoName = "Alex"
+        demoGroupIndex = value.index >= 9 ? 1 : 0
+        demoMetric = value.index >= 10 ? .habits : .work
         elapsed = value.index > 2 ? 5 : 0
         breaks = value.index > 3 ? 1 : 0
         dailyMinutes = value.index > 4 ? 60 : 32
