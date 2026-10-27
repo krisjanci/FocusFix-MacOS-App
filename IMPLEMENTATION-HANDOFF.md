@@ -1,3 +1,9 @@
+## Group setup completed — October 27, 2026
+
+Private groups, both daily-point leaderboards, automatic monthly streak freezes and account-scoped offline retries are implemented. The group migration is deployed to the existing configured Supabase project. Its function body matches the source; six private social tables and authenticated-only RPC access were verified. Live synthetic-role scoring, invite, isolation and freeze checks passed and rolled back all fixtures. Research collection remains disabled; billing was unchanged.
+
+Test tracking and Quick tour are directly in Profile and close the sheet before opening. Both were exercised without starting recording. The main-screen tools overflow was removed. All 22 Swift checks, 15 Node tests, local PostgreSQL checks, Debug/Release builds and a normally sandbox-signed Debug build passed. Evidence is in `verification/social-*` and `verification/profile-*`. A real simultaneous two-device session test remains outside these checks. The sandboxed app launch reached a macOS Keychain prompt, which requires direct user handling because UI tools cannot operate SecurityAgent. The Profile navigation checks were completed in the unsigned verification build. The implementation and setup work are committed locally; no push was requested.
+
 # FocusFix research/privacy implementation handoff
 
 October 26, 2026. Implementation changes are recorded in one-file commits; see Git history. Backend migrations and deletion
