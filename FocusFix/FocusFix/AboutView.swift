@@ -4,6 +4,12 @@ import SwiftUI
 
 enum AppLinks {
     static let support = URL(string: "https://github.com/krisjanci/FocusFix-MacOS-App/issues")!
+    static var privacy: URL? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "FocusFixPrivacyPolicyURL") as? String,
+              let url = URL(string: value), url.scheme == "https", url.host != nil,
+              url.user == nil, url.password == nil else { return nil }
+        return url
+    }
     static var source: URL {
         let root = "https://github.com/krisjanci/FocusFix-MacOS-App"
         let revision = Bundle.main.object(forInfoDictionaryKey: "FocusFixSourceRevision") as? String ?? ""
@@ -23,6 +29,7 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text("FocusFix").font(.largeTitle.bold())
                 Text("Version \(version)").foregroundStyle(.secondary)
+                if let privacy = AppLinks.privacy { Link("Privacy policy", destination: privacy) }
                 Text("Record activity patterns on your Mac, plan breaks, and reflect with optional check-ins. FocusFix does not diagnose fatigue or measure objective productivity.")
                 Divider()
                 PrivacyNoticeDetails()
