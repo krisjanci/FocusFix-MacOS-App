@@ -11,6 +11,7 @@ struct ContentView: View {
     @ObservedObject private var tour = QuickTourController.shared
     @Environment(\.openWindow) private var openWindow
     @AppStorage("appearance") private var appearance = "system"
+    @AppStorage("focusfix.research.invitationDeclined") private var invitationDeclined = false
     @State private var sharingPresented = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
     // Choose the break appearance only while recording a break or waiting for return.
@@ -23,8 +24,8 @@ struct ContentView: View {
                 Button { sharingPresented = true } label: {
                     ProfileAvatar(profile: account.session == nil ? profile.profile : account.profile, size: 30)
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .help("Profile, surveys and privacy")
-                    .accessibilityLabel((account.session == nil ? profile.profile : account.profile).map { "Profile for \($0.name), surveys and privacy" } ?? "Profile, surveys and privacy")
+                    .help("Your profile")
+                    .accessibilityLabel((account.session == nil ? profile.profile : account.profile).map { "Profile for \($0.name), your profile" } ?? "Your profile")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable().scaledToFit().frame(width: 54, height: 54)
                     .accessibilityHidden(true)
@@ -77,6 +78,19 @@ struct ContentView: View {
                 in: RoundedRectangle(cornerRadius: 18))
 
             DailyProgressCard(tracker: tracker)
+            if !invitationDeclined, account.researchAvailable, account.session != nil,
+               account.study?.recruitment_enabled == true, account.study?.complete == true,
+               account.researchInterest == nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Would you like to contribute to FocusFix research?").font(.callout.weight(.medium))
+                    Text("Review the study and request to join. Participation is optional; recordings stay local until you are approved and explicitly enable sharing.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        SettingsLink { Text("Review study") }
+                        Button("No thanks") { invitationDeclined = true }
+                    }
+                }
+            }
 
             if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
 
@@ -159,7 +173,7 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
-        .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal) }
+        .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal).interactiveDismissDisabled() }
         .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
             BreakSetupView(tracker: tracker).tint(teal)
         }
