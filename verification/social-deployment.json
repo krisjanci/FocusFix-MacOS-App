@@ -1,0 +1,38 @@
+{
+  "verified_at_utc": "2026-10-27T12:55:58.905187+00:00",
+  "project_ref": "ltgyhstpbiocuxvyjpcb",
+  "migration": "202610280001_private_groups.sql",
+  "migration_sha256": "b9225e1214ab0c015318f4296681caa89d2a373ac5781b9a20d92bc78827099e",
+  "deployed_function_body_md5": "b3f0cf718564d5b7525ac252db83a608",
+  "deployed_function_matches_source": true,
+  "private_tables": 6,
+  "all_social_tables_rls_enabled": true,
+  "direct_anon_and_authenticated_table_access_denied": true,
+  "rpc_authenticated_only": true,
+  "research_collection_enabled": false,
+  "live_checks": [
+    "private authenticated RPC and invite creation",
+    "membership privacy and no historical group credit",
+    "work and break thresholds with retry deduplication",
+    "equal ranks and photo-free member presentation",
+    "outsider isolation and persistent invite throttling",
+    "revoked codes and fresh rejoin scores",
+    "stable timezone and idempotent monthly freeze limits"
+  ],
+  "synthetic_fixtures_rolled_back": true,
+  "swift_checks": 22,
+  "node_tests": 15,
+  "local_postgresql_tests_passed": true,
+  "debug_build_passed": true,
+  "release_build_passed": true,
+  "sandbox_signed_debug_build_passed": true,
+  "profile_tools": {
+    "test_tracking_opened_after_profile_dismissal": true,
+    "quick_tour_opened_after_profile_dismissal": true,
+    "main_screen_overflow_removed": true,
+    "recording_started_during_checks": false
+  },
+  "limits": "Synthetic authenticated-role checks ran on the live PostgreSQL service in one rolled-back transaction. Real two-device concurrent-session behavior was not tested.",
+  "push_performed": false,
+  "sandboxed_runtime_status": "Launch reached macOS Keychain/SecurityAgent; user must handle the system dialog. Computer-use tools are prohibited from operating SecurityAgent."
+}
