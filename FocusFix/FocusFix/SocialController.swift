@@ -9,10 +9,21 @@ final class SocialController: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var notice: String?
     @Published private(set) var pendingConfirmation = false
+    @Published private(set) var selection = GroupSelection()
+    @Published private(set) var hasLoadedGroups = false
+    @Published private(set) var syncFailed = false
+    private let selectionDefaults: UserDefaults?
     private let account: AccountController
     private let storageDirectory: URL?
-    init(account: AccountController, storageDirectory: URL? = nil) {
-        self.account = account; self.storageDirectory = storageDirectory
+    init(account: AccountController, storageDirectory: URL? = nil, selectionDefaults: UserDefaults? = .standard) {
+        self.account = account; self.storageDirectory = storageDirectory; self.selectionDefaults = selectionDefaults
+        // The incoming session is used synchronously: old members disappear before a new account renders.
+        account.$session.sink { [weak self] incoming in
+            guard let self else { return }
+            let incomingKey = incoming.map { "\(account.api?.configuration.origin.absoluteString ?? "")|\($0.user.id)" }
+            if incomingKey != self.identity { self.clearAccountState() }
+            if self.started { Task { @MainActor in self.alignAccount(); await self.refresh() } }
+        }.store(in: &subscriptions)
     }
     private var identitySince = Date()
     private var identity: String?
@@ -28,9 +39,6 @@ final class SocialController: ObservableObject {
 
     func start() {
         guard !started else { return }; started = true
-        account.$session.sink { [weak self] _ in
-            Task { @MainActor in self?.alignAccount(); await self?.refresh() }
-        }.store(in: &subscriptions)
         Timer.publish(every: 30, on: .main, in: .common).autoconnect().sink { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }.store(in: &subscriptions)
@@ -39,6 +47,32 @@ final class SocialController: ObservableObject {
             Task { @MainActor in self?.discardCache(userID: id, origin: origin) }
         }.store(in: &subscriptions)
         alignAccount()
+        Task { await refresh() }
+    }
+
+    var selectedGroup: SocialGroup? { groups.first { $0.id == selection.groupID } ?? groups.first }
+    var accessState: GroupAccessState {
+        GroupAccessState.resolve(signedIn: userID != nil, enabled: enabled, busy: busy,
+            loaded: hasLoadedGroups, failed: syncFailed, notice: notice != nil)
+    }
+    func selectGroup(_ id: UUID) {
+        guard groups.contains(where: { $0.id == id }) else { return }
+        selection.groupID = id; saveSelection()
+    }
+    func selectMetric(_ metric: LeaderboardMetric) { selection.metric = metric; saveSelection() }
+    private func selectionKey(_ identity: String) -> String { "focusfix.groups.selection." + identity }
+    private func saveSelection() {
+        guard let identity, let data = try? JSONEncoder().encode(selection) else { return }
+        selectionDefaults?.set(data, forKey: selectionKey(identity))
+    }
+    private func clearAccountState() {
+        generation = UUID(); identitySince = Date(); identity = nil; file = nil
+        ledger = nil; groups = []; selection = GroupSelection(); notice = nil
+        busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
+    }
+    func retry() async {
+        if !enabled { identity = nil; alignAccount() }
+        await refresh()
     }
 
     func discardCache(userID: UUID, origin: URL) {
@@ -48,18 +82,19 @@ final class SocialController: ObservableObject {
             let name = Data(key.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
             let url = root.appendingPathComponent("FocusFix/Social/\(name).json")
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-            if identity == key {
-                generation = UUID(); ledger = nil; groups = []; busy = false; pendingConfirmation = false; inFlight = []
-            }
+            selectionDefaults?.removeObject(forKey: selectionKey(key))
+            if identity == key { clearAccountState() }
         } catch { notice = "The account was deleted, but its cached group progress could not be removed from this Mac." }
     }
 
     private func alignAccount() {
         let key = account.session.map { "\(account.api?.configuration.origin.absoluteString ?? "")|\($0.user.id)" }
         guard key != identity else { return }
-        generation = UUID(); identitySince = Date(); identity = key; ledger = nil; groups = []; notice = nil
-        busy = false; inFlight = []; pendingConfirmation = false; file = nil
+        clearAccountState()
+        identity = key
         guard let key else { return }
+        if let data = selectionDefaults?.data(forKey: selectionKey(key)),
+           let saved = try? JSONDecoder().decode(GroupSelection.self, from: data) { selection = saved }
         do {
             let root = try storageDirectory ?? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let name = Data(key.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
@@ -145,13 +180,15 @@ final class SocialController: ObservableObject {
             let state = try JSONDecoder().decode(SocialState.self, from: data)
             ledger?.accept(state, sent: Set(batch.map(\.id)))
             ledger?.progress.reconcile(at: Date(), calendar: calendar)
-            groups = state.groups; notice = nil
+            groups = state.groups; hasLoadedGroups = true; syncFailed = false
+            selection.reconcile(groups: groups); saveSelection()
+            notice = nil
             pendingConfirmation = ledger?.pending.isEmpty == false
             persist()
             return true
         } catch {
             guard generation == token else { return false }
-            pendingConfirmation = true
+            pendingConfirmation = true; syncFailed = true
             notice = "Groups could not sync. Progress is saved for retry. \(error.localizedDescription)"
             return false
         }
