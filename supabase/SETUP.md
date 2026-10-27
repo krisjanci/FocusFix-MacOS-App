@@ -1,3 +1,14 @@
+## Current deployment and consent flow
+
+Follow [RESEARCH-OPERATIONS.md](RESEARCH-OPERATIONS.md) for the new migration,
+manual approval, server consent, lifetime capacity and both deletion endpoints.
+The account settings are connected in the current source; research is disabled.
+The live legacy upload path is retired. The instructions below are historical
+stage-one setup notes; their direct interest inserts, profile research controls,
+legacy-uploader availability and approval-only Storage policies are superseded.
+Apply the new migration once after the original account migration. Do not replay
+the original migration on an existing project.
+
 # Free-plan accounts and per-session research ZIPs
 
 The app integration is prepared but is **not connected or deployed**. Local profiles,
