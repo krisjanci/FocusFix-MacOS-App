@@ -6,6 +6,7 @@ import CoreGraphics
 enum QuickTourPhase: String, CaseIterable {
     case start, plan, duration, confirmStart, work, takeBreak, startBreak, returned
     case progress, save, sessions, savedSession, profile, editName, name
+    case groups, rankings, freezes
 
     var index: Int {
         switch self {
@@ -16,6 +17,9 @@ enum QuickTourPhase: String, CaseIterable {
         case .progress: return 4
         case .save, .sessions, .savedSession: return 5
         case .profile, .editName, .name: return 6
+        case .groups: return 7
+        case .rankings: return 8
+        case .freezes: return 9
         }
     }
     var caption: String {
@@ -34,16 +38,19 @@ enum QuickTourPhase: String, CaseIterable {
         case .savedSession: return "Your work is saved here."
         case .profile: return "Click Profile to make it yours."
         case .editName: return "Click your name to change it."
-        case .name: return "Try a name, then click Done."
+        case .name: return "Try a name, then click Next."
+        case .groups: return "Create or join a private group."
+        case .rankings: return "One qualifying day earns one point."
+        case .freezes: return "Three monthly freezes protect your weekday streak."
         }
     }
-    var offersNext: Bool { self == .work || self == .progress || self == .savedSession }
-    var offersDone: Bool { self == .name }
+    var offersNext: Bool { self == .work || self == .progress || self == .savedSession || self == .name || self == .rankings }
+    var offersDone: Bool { self == .freezes }
 }
 
 enum QuickTourAction: Equatable {
     case start, plan, minutes(Int), confirmStart, takeBreak, startBreak, returned
-    case save, sessions, profile, editName, next, done
+    case save, sessions, profile, editName, createGroup, joinGroup, next, done
 }
 
 @MainActor
@@ -61,13 +68,13 @@ final class QuickTourController: ObservableObject {
 
     var index: Int { phase.index }
     var isFirst: Bool { index == 0 }
-    var position: String { "\(index + 1)/7" }
+    var position: String { "\(index + 1)/10" }
 
     func restart() { reset(to: .start); isPresented = true }
     func finish() { isPresented = false; reset(to: .start) }
     func back() {
         guard isPresented, !isFirst else { return }
-        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile]
+        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .groups, .rankings, .freezes]
         reset(to: starts[index - 1])
     }
 
@@ -90,7 +97,10 @@ final class QuickTourController: ObservableObject {
         case (.savedSession, .next): phase = .profile
         case (.profile, .profile): phase = .editName
         case (.editName, .editName): phase = .name
-        case (.name, .done): finish()
+        case (.name, .next): phase = .groups
+        case (.groups, .createGroup), (.groups, .joinGroup): phase = .rankings
+        case (.rankings, .next): phase = .freezes
+        case (.freezes, .done): finish()
         default: break
         }
     }
