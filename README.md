@@ -1,3 +1,9 @@
+## Private groups and automatic streak freezes
+
+Groups now supports private invite codes, creator controls, and separate all-time Work and Healthy habits leaderboards. A 60-minute work day earns one work point; a day with a completed one-minute break earns one healthy-habit point. Scores start at joining, and weekends can earn points. The existing weekday streak receives three automatic monthly freezes, without rollover or consecutive calendar-day use. Frozen days add no points or streak days.
+
+Choose **Groups → Enable group progress** to sync account-scoped summaries; guest history stays local and research participation is separate. The updated Quick tour explains groups, scoring and freezes using practice data. See [Social setup](supabase/SOCIAL-SETUP.md) for the required additive database migration and verification steps. Until that migration is applied, group sync shows a retry notice while local recording and streak protection continue working.
+
 ## Research/privacy update — October 26, 2026
 
 Profile now contains identity/account actions. **Settings → Privacy & Research**
