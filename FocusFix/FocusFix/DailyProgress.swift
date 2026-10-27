@@ -11,6 +11,54 @@ struct DailyProgress: Codable, Equatable {
     static let goalSeconds: Double = 3600
     var version = 1
     private(set) var days: [String: ProgressDay] = [:]
+    var protectionStart: String?
+    var reconciledThrough: String?
+    var frozenDays: Set<String> = []
+
+    enum CodingKeys: String, CodingKey { case version, days, protectionStart, reconciledThrough, frozenDays }
+    init() {}
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(Int.self, forKey: .version)
+        days = try values.decode([String: ProgressDay].self, forKey: .days)
+        protectionStart = try values.decodeIfPresent(String.self, forKey: .protectionStart)
+        reconciledThrough = try values.decodeIfPresent(String.self, forKey: .reconciledThrough)
+        frozenDays = try values.decodeIfPresent(Set<String>.self, forKey: .frozenDays) ?? []
+    }
+
+    mutating func reconcile(at date: Date, calendar: Calendar) {
+        let today = Self.key(for: date, calendar: calendar)
+        if protectionStart == nil { protectionStart = today }
+        guard let start = protectionStart else { return }
+        // Rebuild deterministically: late offline work replaces a freeze, returning its token.
+        frozenDays = []
+        var cursor = calendar.startOfDay(for: date)
+        while Self.key(for: cursor, calendar: calendar) > start {
+            guard let prior = calendar.date(byAdding: .day, value: -1, to: cursor) else { return }
+            cursor = prior
+        }
+        var alive = streak(at: cursor, calendar: calendar) > 0
+        var previousFrozen: String?
+        var spent: [String: Int] = [:]
+        while cursor < calendar.startOfDay(for: date) {
+            let key = Self.key(for: cursor, calendar: calendar)
+            let month = String(key.prefix(7))
+            let yesterday = calendar.date(byAdding: .day, value: -1, to: cursor)!
+            if !Self.isWeekend(cursor, calendar: calendar) {
+                if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { alive = true }
+                else if alive && previousFrozen != Self.key(for: yesterday, calendar: calendar) && spent[month, default: 0] < 3 {
+                    frozenDays.insert(key); previousFrozen = key; spent[month, default: 0] += 1
+                } else { alive = false }
+            }
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor)!
+        }
+        reconciledThrough = today
+    }
+
+    func tokensRemaining(at date: Date, calendar: Calendar) -> Int {
+        let month = String(Self.key(for: date, calendar: calendar).prefix(7))
+        return max(0, 3 - frozenDays.filter { $0.hasPrefix(month) }.count)
+    }
 
     static func calendar(timeZone: TimeZone = .current) -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -66,7 +114,7 @@ struct DailyProgress: Codable, Equatable {
         while true {
             if !Self.isWeekend(cursor, calendar: calendar) {
                 if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { count += 1 }
-                else if cursor != today { return count }
+                else if cursor != today && !frozenDays.contains(Self.key(for: cursor, calendar: calendar)) { return count }
             }
             guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else { return count }
             cursor = previous
