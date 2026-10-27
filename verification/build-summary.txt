@@ -1,0 +1,6 @@
+Universal Release build: passed
+Architectures: x86_64 arm64
+Release content passed: identity, privacy manifest, license, icon, architectures and no development endpoint.
+This is not a signature, notarization, runtime-compatibility or App Review result.
+
+Submission gate (expected failure): Not ready: App Store submission requires a published HTTPS privacy-policy URL
