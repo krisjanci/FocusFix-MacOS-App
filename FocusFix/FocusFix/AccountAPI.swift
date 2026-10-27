@@ -58,6 +58,41 @@ nonisolated struct ResearchEnrollment: Codable {
     let enabled: Bool
     let consent_version: String
 }
+nonisolated struct ResearchStudy: Codable, Equatable {
+    let version: String
+    let recruitment_enabled: Bool
+    let collection_enabled: Bool
+    let determination_reference: String
+    let eligibility_text: String
+    let allegheny_only: Bool
+    let researcher_contact: String
+    let purpose: String
+    let duration: String
+    let retention_policy: String
+    let risks: String
+    let withdrawal_policy: String
+    let future_training: Bool
+    let information_url: String
+
+    var informationURL: URL? {
+        guard let url = URL(string: information_url), url.scheme == "https", url.host != nil,
+              url.user == nil, url.password == nil else { return nil }
+        return url
+    }
+    var complete: Bool {
+        [version, determination_reference, eligibility_text, researcher_contact, purpose, duration,
+         retention_policy, risks, withdrawal_policy].allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            && informationURL != nil
+    }
+}
+nonisolated struct ResearchServerConsent: Codable {
+    let consent_id: UUID
+    let study_version: String
+    let withdrawn_at: String?
+}
+nonisolated struct ResearchInterest: Codable {
+    let status: String
+}
 nonisolated struct AccountProfileRow: Codable {
     let user_id: UUID
     let profile: UserProfile
@@ -170,11 +205,33 @@ nonisolated struct AccountAPI {
                     URLQueryItem(name: "select", value: "user_id,enabled,consent_version")])
         return try JSONDecoder().decode([ResearchEnrollment].self, from: data).first
     }
-    func requestResearch(session: AccountSession) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["user_id": session.user.id.uuidString.lowercased()])
-        _ = try await request(path: "rest/v1/research_interest", body: body, token: session.access_token,
-            query: [URLQueryItem(name: "on_conflict", value: "user_id")],
-            headers: ["Prefer": "resolution=ignore-duplicates,return=minimal"])
+    func researchStudy(session: AccountSession) async throws -> ResearchStudy? {
+        let data = try await request(path: "rest/v1/research_study", method: "GET", token: session.access_token)
+        return try JSONDecoder().decode([ResearchStudy].self, from: data).first
+    }
+    func researchConsent(session: AccountSession) async throws -> ResearchServerConsent? {
+        let data = try await request(path: "rest/v1/research_consents", method: "GET", token: session.access_token)
+        return try JSONDecoder().decode([ResearchServerConsent].self, from: data).first
+    }
+    func researchInterest(session: AccountSession) async throws -> ResearchInterest? {
+        let data = try await request(path: "rest/v1/research_interest", method: "GET", token: session.access_token)
+        return try JSONDecoder().decode([ResearchInterest].self, from: data).first
+    }
+    func researchCohortFull(session: AccountSession) async throws -> Bool {
+        let data = try await request(path: "rest/v1/rpc/research_cohort_full", body: Data("{}".utf8), token: session.access_token)
+        return try JSONDecoder().decode(Bool.self, from: data)
+    }
+    func requestResearch(version: String, adultUS: Bool, eligible: Bool, session: AccountSession) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["p_version": version, "p_adult_us": adultUS, "p_eligible": eligible])
+        _ = try await request(path: "rest/v1/rpc/request_research_participation", body: body, token: session.access_token)
+    }
+    func setResearchConsent(id: UUID, version: String, enabled: Bool, session: AccountSession) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["p_consent_id": id.uuidString.lowercased(),
+            "p_version": version, "p_enabled": enabled])
+        _ = try await request(path: "rest/v1/rpc/set_research_consent", body: body, token: session.access_token)
+    }
+    func requestResearchDeletion(session: AccountSession) async throws {
+        _ = try await request(path: "functions/v1/delete-research-data", body: Data("{}".utf8), token: session.access_token)
     }
     func researchArchiveReceived(_ id: UUID, session: AccountSession) async throws -> Bool {
         let data = try await request(path: "rest/v1/research_upload_receipts", method: "GET", token: session.access_token,
