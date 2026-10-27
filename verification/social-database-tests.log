@@ -1,0 +1,3 @@
+Private groups: invite rotation/throttling, access control, join-time scoring, ties, retry deduplication, freezes, timezone and deletion passed.
+Rollback-only live verification script passed locally.
+PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.
