@@ -1,3 +1,17 @@
+## October 26 research/privacy implementation
+
+Use [STORE-SUBMISSION.md](STORE-SUBMISSION.md) and
+[supabase/RESEARCH-OPERATIONS.md](supabase/RESEARCH-OPERATIONS.md) for current behavior.
+Accounts are configured and their collection is declared; research remains gated.
+The live legacy uploader is retired. Profile/settings, recording opt-in, versioned
+server consent, durable withdrawal and the 50-person lifetime cohort replace the
+older controls. A Release build may now use outgoing HTTPS for configured accounts.
+The earlier local-only and enrollment-key descriptions below are historical.
+
+App Store export checks now also require a configured public privacy-policy URL.
+Signing credentials, institution determination, final study terms, independent
+fresh-Mac testing, rights review and Apple approval remain external requirements.
+
 # Preparing FocusFix for distribution
 
 Updated October 21, 2026. This is release preparation,
