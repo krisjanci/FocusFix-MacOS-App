@@ -1,0 +1,6 @@
+{
+  "status": 401,
+  "code": "42501",
+  "message": "permission denied for function social_state",
+  "anonymous_access_blocked": true
+}
