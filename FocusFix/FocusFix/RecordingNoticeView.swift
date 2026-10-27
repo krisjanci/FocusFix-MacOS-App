@@ -11,9 +11,7 @@ struct PrivacyNoticeDetails: View {
             Text("Sessions stay in FocusFix's private storage on this Mac until you delete them. Use Sessions → Show in Finder to locate them. They are not separately encrypted by FocusFix. Exports and Mac backups can contain copies. Deleting a session moves the local folder to Trash; empty Trash when you want to remove that copy.")
             Text("Input Monitoring permission lets the app observe keyboard and mouse activity across apps without changing or blocking your input. You can stop with Stop & save or Quit, and revoke access in System Settings. macOS may withhold keyboard events during secure input, such as password entry. Such gaps are not proof of inactivity. During a planned break detailed logging pauses; it resumes when the break timer ends or you return early.")
             Text(AccountConfiguration.bundled?.researchSharingEnabled == true
-                ? "This build supports optional per-session research sharing with the FocusFix researcher through private Supabase storage after separate opt-in. Signing in does not enable sharing. Received data can be associated with your account; ZIPs exclude profile names and photos. This notice is not study consent. Turning sharing off cancels pending deliveries but cannot recall copies already received."
-                : UploadConfiguration.researchUploadsAllowed
-                ? "This development build supports optional research sharing after separate enrollment and opt-in. This notice is not study consent. Turning sharing off does not delete data already received; contact the researcher privately with your participant ID."
+                ? "This build supports optional per-session research sharing with the FocusFix researcher through private Supabase storage after manual researcher approval and separate, versioned consent. Signing in does not enable sharing. Received data can be associated with your account; ZIPs exclude profile names and photos. Review the full study consent in Settings → Privacy & Research before enabling sharing. Turning sharing off cancels pending deliveries but cannot recall copies already received."
                 : "This build cannot enroll in research or upload recordings. Exporting a session is a separate action you control.")
             Text("An optional account profile sends your chosen name and avatar to the configured account service when you save it. A local profile stays on this Mac. Neither kind of profile is required to record sessions.")
             Text("Custom break-activity labels are saved exactly as entered. Avoid including personal or sensitive information in them.")
@@ -25,16 +23,17 @@ struct PrivacyNoticeDetails: View {
 
 struct RecordingNoticeView: View {
     @ObservedObject var tracker: ActivityTracker
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Label("Before recording", systemImage: "hand.raised").font(.title2.weight(.semibold))
+            Label("Your activity, your choice", systemImage: "hand.raised").font(.title2.weight(.semibold))
             ScrollView { PrivacyNoticeDetails() }
             Text("After closing this notice, press Start session when you're ready.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button("Not now") { tracker.recordingNoticePresented = false }.keyboardShortcut(.cancelAction)
+                Button("Not now") { tracker.declineRecordingNotice(); dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("I understand") { tracker.acceptRecordingNotice() }
+                Button("Enable recording") { tracker.acceptRecordingNotice(); dismiss() }
                     .buttonStyle(.borderedProminent)
             }
         }.padding(26).frame(width: 510, height: 520)
