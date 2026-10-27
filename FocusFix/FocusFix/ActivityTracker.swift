@@ -128,7 +128,7 @@ final class ActivityTracker: ObservableObject {
     }
     // Ask for Input Monitoring only after the user acknowledges local recording.
     func requestPermission() {
-        guard !RecordingNotice().needsAcknowledgement else {
+        guard RecordingNotice().enabled else {
             recordingNoticePresented = true
             return
         }
@@ -171,6 +171,17 @@ final class ActivityTracker: ObservableObject {
         RecordingNotice().acknowledge()
         recordingNoticePresented = false
     }
+    func disableRecording() {
+        if isRecording { stop() }
+        sessionCheckInPresented = false
+        sessionCheckIn = nil
+        RecordingNotice().decline()
+        message = "Recording is off. Enable it in Settings → Privacy & Research when you are ready."
+    }
+    func declineRecordingNotice() {
+        disableRecording()
+        recordingNoticePresented = false
+    }
     // Accept a selected fatigue score, or an explicit skip, then start the session.
     func completeSessionCheckIn(_ selection: SessionStartSelection) {
         guard sessionCheckInPresented, !isRecording,
@@ -184,7 +195,7 @@ final class ActivityTracker: ObservableObject {
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
     private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan) {
-        guard !isRecording, !RecordingNotice().needsAcknowledgement else { return }
+        guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
             message = "Activity recording needs Input Monitoring access. Allow access, then start again."
