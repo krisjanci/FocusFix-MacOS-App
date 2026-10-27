@@ -55,6 +55,10 @@ final class AccountController: ObservableObject {
     @Published private(set) var needsConfirmation = false
     @Published private(set) var recovering = false
     @Published private(set) var enrollment: ResearchEnrollment?
+    @Published private(set) var study: ResearchStudy?
+    @Published private(set) var serverResearchConsent: ResearchServerConsent?
+    @Published private(set) var researchInterest: ResearchInterest?
+    @Published private(set) var cohortFull = false
     private let readCredential: () throws -> Data?
     private let writeCredential: (Data?) throws -> Void
     @Published private(set) var remembersSignIn: Bool
@@ -68,7 +72,10 @@ final class AccountController: ObservableObject {
     private var generation = UUID()
 
     var configured: Bool { api != nil }
-    var researchEnrolled: Bool { enrollment?.enabled == true && !(enrollment?.consent_version.isEmpty ?? true) }
+    var researchEnrolled: Bool {
+        enrollment?.enabled == true && study?.complete == true && study?.collection_enabled == true &&
+            enrollment?.consent_version == study?.version
+    }
     var researchAvailable: Bool { api?.configuration.researchSharingEnabled == true }
 
     init(configuration: AccountConfiguration?, transport: @escaping AccountAPI.Transport = AccountAPI.send,
@@ -263,24 +270,45 @@ final class AccountController: ObservableObject {
         guard let api, researchAvailable, session != nil else { enrollment = nil; return false }
         let token = generation
         do {
-            let result = try await api.researchEnrollment(session: validSession())
+            let session = try await validSession()
+            async let result = api.researchEnrollment(session: session)
+            async let study = api.researchStudy(session: session)
+            async let consent = api.researchConsent(session: session)
+            async let interest = api.researchInterest(session: session)
+            async let full = api.researchCohortFull(session: session)
+            let values = try await (result, study, consent, interest, full)
             guard token == generation else { return false }
-            enrollment = result
+            self.study = values.1
+            serverResearchConsent = values.2
+            researchInterest = values.3
+            cohortFull = values.4
+            enrollment = values.0
             return researchEnrolled
         } catch {
-            if token == generation { enrollment = nil; notice = "Research approval could not be checked. Uploads are paused." }
+            if token == generation {
+                enrollment = nil; study = nil; serverResearchConsent = nil; researchInterest = nil
+                notice = "Research access could not be checked. Uploads are paused."
+            }
             return false
         }
     }
 
-    func requestResearchParticipation() async {
-        guard !busy, let api, session != nil else { return }
+    func requestResearchParticipation(adultUS: Bool = false, eligible: Bool = false, reviewedStudy: ResearchStudy? = nil) async {
+        guard !busy, researchAvailable, let api, session != nil,
+              let study, study.complete, study.recruitment_enabled, adultUS, eligible else { return }
+        guard reviewedStudy == nil || reviewedStudy == study else {
+            notice = "Study details changed. Review the current study before applying."
+            return
+        }
+        let token = generation
         busy = true
         defer { busy = false }
         do {
-            try await api.requestResearch(session: validSession())
-            notice = "Your interest was recorded. The researcher will select participants and provide the approved consent process. No recordings are shared yet."
-        } catch { notice = error.localizedDescription }
+            try await api.requestResearch(version: study.version, adultUS: adultUS, eligible: eligible, session: validSession())
+            guard token == generation else { return }
+            _ = await refreshResearchAccess()
+            notice = "Your request is awaiting researcher review. No recordings are shared."
+        } catch { if token == generation { notice = error.localizedDescription } }
     }
 
     func signOut() async {
@@ -322,6 +350,10 @@ final class AccountController: ObservableObject {
         profile = nil
         profileLoaded = false
         enrollment = nil
+        study = nil
+        serverResearchConsent = nil
+        researchInterest = nil
+        cohortFull = false
         needsConfirmation = false
         pendingRegistration = false
         isNewAccount = false
