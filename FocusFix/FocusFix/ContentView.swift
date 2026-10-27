@@ -159,10 +159,6 @@ struct ContentView: View {
             HStack {
                 Button { openWindow(id: "groups") } label: { Label("Groups", systemImage: "person.2") }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
-                Menu {
-                    Button("Test tracking") { openWindow(id: "tracking") }
-                    QuickTourButton()
-                } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).frame(width: 24)
                 Spacer()
                 Picker("Appearance", selection: $appearance) {
                     Label("System", systemImage: "circle.lefthalf.filled").tag("system")
