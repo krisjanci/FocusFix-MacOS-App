@@ -103,11 +103,12 @@ struct QuickTourDemoView: View {
             if tour.phase == .groups {
                 Text("Create a group or enter a shared invite code. Only members see your name, standard avatar and scores.")
                 HStack {
-                    practiceButton("Create group", symbol: "plus", phase: .groups, action: .createGroup)
+                    practiceButton("Create group", symbol: "plus", phase: .groups, action: .createGroup, isTarget: false)
                     Spacer()
-                    practiceButton("Join with code", phase: .groups, action: .joinGroup)
+                    practiceButton("Join with code", phase: .groups, action: .joinGroup, isTarget: false, defaultAction: false)
                 }
                     .padding(14).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                    .practiceTarget(.groups)
                 Text("Practice code: ALEX-DEMO").font(.caption.monospaced()).foregroundStyle(.secondary)
             } else if tour.phase == .chooseGroup || tour.phase == .rankings || tour.phase == .podium {
                 practiceLeaderboard
@@ -117,7 +118,7 @@ struct QuickTourDemoView: View {
                 Text("A freeze preserves your streak without adding a day or points. Three tokens refill each month, without rollover. They cannot cover consecutive calendar dates. Weekends remain optional.")
             }
         }.fixedSize(horizontal: false, vertical: true).padding(16)
-            .practiceTarget(tour.phase == .chooseGroup || tour.phase == .rankings || tour.phase == .podium ? .groups : tour.phase)
+            .practiceTarget(tour.phase == .freezes ? .freezes : nil)
     }
 
     private var practiceLeaderboard: some View {
@@ -240,7 +241,8 @@ struct QuickTourDemoView: View {
     }
 
     @ViewBuilder private func practiceButton(_ title: String, symbol: String? = nil,
-                                            phase: QuickTourPhase, action: QuickTourAction) -> some View {
+                                            phase: QuickTourPhase, action: QuickTourAction,
+                                            isTarget: Bool = true, defaultAction: Bool = true) -> some View {
         let visit = tour.visit
         let button = Button {
             tour.perform(action, phase: phase, visit: visit)
@@ -248,8 +250,9 @@ struct QuickTourDemoView: View {
             if let symbol { Label(title, systemImage: symbol) } else { Text(title) }
         }
         Group {
-            if tour.phase == phase { button.keyboardShortcut(.defaultAction) }
+            if tour.phase == phase && defaultAction { button.keyboardShortcut(.defaultAction) }
+            else if tour.phase == phase { button }
             else { button.disabled(true) }
-        }.practiceTarget(phase)
+        }.practiceTarget(isTarget ? phase : nil)
     }
 }
