@@ -10,6 +10,7 @@ struct ContentView: View {
     @ObservedObject private var account = AccountController.shared
     @ObservedObject private var tour = QuickTourController.shared
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appearance") private var appearance = "system"
     @AppStorage("focusfix.research.invitationDeclined") private var invitationDeclined = false
     @State private var sharingPresented = false
@@ -32,14 +33,23 @@ struct ContentView: View {
                 })
                 .frame(height: peopleExpanded ? expandedPanelHeight : nil, alignment: .top)
             if peopleExpanded {
-                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: expandedPanelHeight)
-                PeoplePanel(social: social, close: { peopleExpanded = false })
-                    .frame(width: PeopleWindowLayout.panelWidth, height: expandedPanelHeight)
+                HStack(spacing: 0) {
+                    Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+                    PeoplePanel(social: social, close: { peopleExpanded = false })
+                        .frame(width: PeopleWindowLayout.panelWidth)
+                }
+                .frame(height: expandedPanelHeight)
+                .transition(.opacity)
             }
         }
-        .fixedSize(horizontal: true, vertical: true)
+        // Keep the minimum width compact so SwiftUI doesn't force the window to
+        // its expanded size before AppKit can animate the frame.
+        .frame(minWidth: PeopleWindowLayout.compactWidth, maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .clipped()
+        .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: peopleExpanded)
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
-        .background(PeopleWindowBridge(expanded: peopleExpanded, resolved: { collectorWindow = $0 }))
+        .background(PeopleWindowBridge(expanded: peopleExpanded, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
         .sheet(isPresented: $peopleSheet) {
             PeoplePanel(social: social, close: { peopleSheet = false }).frame(width: 380, height: 580)
         }
