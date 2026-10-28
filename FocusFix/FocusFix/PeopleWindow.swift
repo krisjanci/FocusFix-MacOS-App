@@ -6,6 +6,16 @@ enum PeopleWindowAnimation {
     static let duration: TimeInterval = 0.3
 }
 
+struct CollectorWindowResizeLock: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.windowResizeBehavior(.disabled)
+        } else {
+            content
+        }
+    }
+}
+
 // The width change is deferred until SwiftUI has updated its content-size constraints.
 struct PeopleWindowBridge: NSViewRepresentable {
     let expanded: Bool
@@ -20,7 +30,7 @@ struct PeopleWindowBridge: NSViewRepresentable {
     func updateNSView(_ view: WindowProbe, context: Context) {
         view.resolve = resolved
         view.reduceMotion = reduceMotion
-        view.lockManualResizing()
+        DispatchQueue.main.async { [weak view] in view?.lockManualResizing() }
         guard view.expanded != expanded else { return }
         view.expanded = expanded
         view.resize()
@@ -29,18 +39,9 @@ struct PeopleWindowBridge: NSViewRepresentable {
         var resolve: ((NSWindow) -> Void)?
         var expanded: Bool?
         var reduceMotion = false
-        private var styleObservation: NSKeyValueObservation?
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            styleObservation = nil
             guard let window else { return }
-            // SwiftUI may restore .resizable when content-size limits change.
-            // Keep the native window locked throughout those layout updates.
-            styleObservation = window.observe(\.styleMask, options: [.new]) { window, _ in
-                if window.styleMask.contains(.resizable) {
-                    window.styleMask.remove(.resizable)
-                }
-            }
             lockManualResizing()
             DispatchQueue.main.async { [weak self, weak window] in
                 guard let window else { return }
@@ -49,9 +50,11 @@ struct PeopleWindowBridge: NSViewRepresentable {
             }
         }
         func lockManualResizing() {
-            // The hosting view stays flexible during animations, but only the app
-            // controls window size. Removing this style still permits setFrame.
-            window?.styleMask.remove(.resizable)
+            // Older systems lack SwiftUI's windowResizeBehavior modifier.
+            // Avoid changing native styles while modern SwiftUI is laying out.
+            if #unavailable(macOS 15.0), let window, window.styleMask.contains(.resizable) {
+                window.styleMask.remove(.resizable)
+            }
         }
         func resize() {
             let desired = expanded ?? false
@@ -67,6 +70,8 @@ struct PeopleWindowBridge: NSViewRepresentable {
                             context.duration = PeopleWindowAnimation.duration
                             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                             window.animator().setFrame(target, display: true)
+                        } completionHandler: { [weak self] in
+                            self?.lockManualResizing()
                         }
                     }
                 }
