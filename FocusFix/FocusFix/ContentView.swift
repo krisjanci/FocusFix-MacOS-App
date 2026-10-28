@@ -50,6 +50,7 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
         .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: peopleExpanded)
+        .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
         .background(PeopleWindowBridge(expanded: peopleExpanded, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
         .sheet(isPresented: $peopleSheet) {
