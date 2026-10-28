@@ -32,6 +32,7 @@ struct ContentView: View {
                     Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
                 })
                 .frame(height: peopleExpanded ? expandedPanelHeight : nil, alignment: .top)
+                .background(Color(nsColor: .windowBackgroundColor))
             if peopleExpanded {
                 HStack(spacing: 0) {
                     Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
@@ -46,6 +47,7 @@ struct ContentView: View {
         // its expanded size before AppKit can animate the frame.
         .frame(minWidth: PeopleWindowLayout.compactWidth, maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
+        .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
         .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: peopleExpanded)
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
