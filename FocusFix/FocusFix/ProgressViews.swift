@@ -18,7 +18,8 @@ struct DailyProgressCard: View {
                 recharged: tracker.rechargeDate.map {
                     calendar.isDate($0, inSameDayAs: context.date) && context.date.timeIntervalSince($0) < 20
                 } ?? false, notice: tracker.progressNotice, workSeconds: day.workSeconds,
-                freezes: progress.tokensRemaining(at: context.date, calendar: calendar), pending: social.pendingConfirmation)
+                freezes: progress.tokensRemaining(at: context.date, calendar: calendar), pending: social.pendingConfirmation,
+                active: tracker.isRecording && tracker.breakPhase == .work)
                 .onChange(of: DailyProgress.key(for: context.date, calendar: calendar)) { _, _ in
                     tracker.reconcileProgress()
                     Task { await social.refresh() }
@@ -38,7 +39,10 @@ struct DailyProgressDisplay: View {
     var workSeconds: Double = 0
     var freezes = 3
     var pending = false
+    var active = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
+    private var fillFraction: Double { min(max(workSeconds / DailyProgress.goalSeconds, 0), 1) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -52,7 +56,24 @@ struct DailyProgressDisplay: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule().fill(teal.opacity(0.12))
-                    Capsule().fill(teal).frame(width: geometry.size.width * min(max(workSeconds / 3600, 0), 1))
+                    Capsule().fill(teal)
+                        .overlay {
+                            if active && !complete && !reduceMotion && fillFraction > 0 {
+                                TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                                    let phase = context.date.timeIntervalSinceReferenceDate
+                                        .truncatingRemainder(dividingBy: 1.8) / 1.8
+                                    let highlightWidth = max(geometry.size.width / 3, 24)
+                                    LinearGradient(colors: [.clear, .white.opacity(0.5), .clear],
+                                                   startPoint: .leading, endPoint: .trailing)
+                                        .frame(width: highlightWidth)
+                                        .offset(x: -highlightWidth + (geometry.size.width + highlightWidth) * phase)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(width: geometry.size.width * fillFraction)
+                        .clipShape(Capsule())
+                        .animation(active && !reduceMotion ? .linear(duration: 1) : nil, value: fillFraction)
                 }
             }.frame(height: 4)
                 .accessibilityElement(children: .ignore)
