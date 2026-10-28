@@ -28,8 +28,15 @@ struct PracticeAnchorKey: PreferenceKey {
 }
 
 extension View {
-    func practiceTarget(_ phase: QuickTourPhase) -> some View {
-        anchorPreference(key: PracticeAnchorKey.self, value: .bounds) { [phase: $0] }.id(phase)
+    @ViewBuilder func practiceTarget(_ phase: QuickTourPhase?) -> some View {
+        if let phase {
+            // A container target must preserve targets belonging to its controls.
+            transformAnchorPreference(key: PracticeAnchorKey.self, value: .bounds) { targets, anchor in
+                targets[phase] = anchor
+            }.id(phase)
+        } else {
+            self
+        }
     }
 }
 
