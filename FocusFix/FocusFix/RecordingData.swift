@@ -104,14 +104,10 @@ final class RecordingWriter {
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
-    private let participantID: String?
-    private let sharingConsentID: String?
     private let surveyOptions: SurveyOptions
     // Create a new session folder and CSV files, then write the initial session metadata.
-    init(root: URL, id: String, startedAt: Date, participantID: String? = nil, sharingConsentID: String? = nil,
+    init(root: URL, id: String, startedAt: Date,
          surveyOptions: SurveyOptions = SurveyOptions()) throws {
-        self.participantID = participantID
-        self.sharingConsentID = sharingConsentID
         self.surveyOptions = surveyOptions
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
@@ -222,9 +218,7 @@ final class RecordingWriter {
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
         ]
-        if let participantID { fields["participant_id"] = participantID }
-        if let sharingConsentID { fields["sharing_consent_id"] = sharingConsentID }
-        fields["sharing_policy"] = "Optional research sharing. Eligibility captured at session start; opt-out cancels queued uploads. Participant ID identifies a Keychain installation, not a verified person. 180 elapsed minutes (including breaks) per UTC upload day; no truncation."
+        fields["sharing_policy"] = "Optional account-based research sharing requires researcher approval and server-recorded, versioned consent captured at session start. Opt-out cancels queued deliveries. Local recording does not require an account."
         if let duration {
             fields["duration_seconds"] = duration
             fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration))
