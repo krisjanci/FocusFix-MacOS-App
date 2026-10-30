@@ -1,0 +1,76 @@
+Swift final suite
+Testing SocialProgressTests
+Automatic freezes, month limits, weekday boundaries, migration, idempotent summaries and in-flight acknowledgement passed
+Testing SocialControllerTests
+Social opt-in, durable offline outbox, account isolation, stale responses and retry acknowledgement passed
+Testing GroupPresentationTests
+Shared group selection, access states, tied and zero-score podium rules, and screen-clamped expansion passed
+Testing QuickTourTests
+Practice tour actions, stale callbacks, replay, isolation, short copy and measured placement passed
+Testing SessionWorkPlanTests
+Per-session planning, survey choices, reset, shared work credit and one-time completion passed
+Testing LaunchCoordinatorTests
+Offline preview navigation preserved real account, preferences and credentials
+First launch, guest persistence, registration, remembered sign-in, menu gating and cancellation passed
+Testing AccountTests
+Account configuration, fake authentication, private profile sync, recovery and sign-out passed
+Testing ResearchDeliveryTests
+Per-session delivery, approval checks, quota failures, durable retry keys, export and in-flight opt-out passed
+Testing ResearchSharingTests
+Research consent snapshots, cancellation, retry batches and ZIP allowlisting passed
+Testing UserProfileTests
+sandbox-exec: sandbox_apply: Operation not permitted
+sandbox-exec: sandbox_apply: Operation not permitted
+User profile validation, photo import and persistence passed
+Testing DailyProgressTests
+Daily progress tests passed
+Testing RecordingDataTests
+PASS: recording schema and timing, session reload, dated exports, duplicate protection, legacy and unfinished sessions, active-session and path guards.
+Testing BreakPolicyTests
+PASS: distinct idle gaps, 25/10 minute delays, no duplicate prompts, early/late return, activity corrections, truncated breaks, paused intervals, break CSV and escaping.
+Testing SurveyDataTests
+PASS: fatigue/productivity ranges, start vs break items, blank skipped/cancelled answers, immediate CSV persistence, timestamps, versioned metadata and check-in activity phase.
+Testing TimedCheckInTests
+PASS: ten-minute boundary, one prompt per work period, deferral, stale/duplicate actions, stop/break cancellation, actual return timing and linked prompt/answer CSVs.
+Testing NotificationAccessTests
+PASS: notification onboarding, explicit permission requests, denial, banners off, settings refresh, duplicate clicks, failure and retry.
+Testing RecordingNoticeTests
+Recording notice: defaults, explicit acknowledgement and version changes passed.
+Testing InputMonitorTests
+2026-10-29 23:25:29.007 InputMonitorTests[67705:5692774] Error received in message reply handler: Connection invalid
+Input monitoring: key/repeat/delete, pointer, scroll, target routing and stale-session isolation passed.
+Testing SurveyPreferencesTests
+Survey preferences: all eight combinations, persistence, snapshots, scheduling and saved data passed.
+All FocusFix tests passed.
+
+Supabase endpoint tests
+✔ requires authentication before any admin call (25.451083ms)
+✔ rejects an invalid user without touching storage or admin APIs (1.046375ms)
+✔ uses verified user ID; ignores a foreign user ID supplied in the request (2.061417ms)
+✔ storage failure prevents deleting the account and hides server error contents (0.388625ms)
+✔ research deletion revokes before storage cleanup and keeps the account (28.803167ms)
+✔ cleanup failure leaves the previously recorded request pending for retry (0.55425ms)
+✔ rejects unsafe storage paths and does not mark cleanup completed (0.828875ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 129.237042
+
+Isolated PostgreSQL checks
+
+> test:database
+> node tests/run-database.mjs
+
+Private groups: invite rotation/throttling, access control, join-time scoring, ties, retry deduplication, freezes, timezone and deletion passed.
+49/50/51-person group boundaries passed, including the creator.
+Rollback-only live verification script passed locally.
+PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.
+
+Debug and Release: BUILD SUCCEEDED; arm64 and x86_64.
+Release content checker passed.
+Both binaries checked: no workers.dev, X-Participant-ID or org.focusfix.research-sharing.
+Unsigned builds; no live service or manual UI verification.
