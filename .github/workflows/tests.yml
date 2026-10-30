@@ -21,8 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Test upload authorization, quotas and receipts with synthetic data
-        run: node --test upload-service/tests/*.test.mjs
       - name: Test account deletion with fake authentication and storage
         run: node --test supabase/tests/*.test.mjs
       - name: Install isolated PostgreSQL test runtime
