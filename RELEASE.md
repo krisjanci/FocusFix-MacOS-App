@@ -131,9 +131,9 @@ plus Intel and Apple Silicon before claiming support for both.
 - Guest/unremembered-account launches must not read account Keychain entries.
   After a successful Keep me signed in choice, account restoration may prompt after
   the intro. Test restoration failure, denied Keychain access and choosing Guest
-  during a delayed restore; local recording must remain available. Legacy Debug
-  research enrollment stays locked separately: only explicit research unlock may
-  read its credentials or resume its queue. Account sign-in never opts into sharing.
+  during a delayed restore; local recording must remain available. The retired
+  Cloudflare uploader, enrollment controls and receiver configuration have been
+  removed from both build configurations. Account sign-in never opts into sharing.
 - Notice cancel/accept; the single Enable Input Monitoring button registers the app
   and opens Settings without granting access. Test denied/already-granted access,
   returning from Settings, requested quit/reopen, permission
