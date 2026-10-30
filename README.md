@@ -14,8 +14,8 @@ manual participant approval status and per-session delivery controls. First laun
 offers Enable recording or Not now. Neither choice grants Input Monitoring or
 starts recording. Switching recording off stops the session and blocks all Start paths.
 
-The live app no longer exposes enrollment keys or starts the legacy Cloudflare
-uploader. Its saved development state is preserved. The account-based path requires
+The legacy Cloudflare uploader and its service code have been removed. Saved
+development state and received data are preserved; see [removal notes](CLOUDFLARE-REMOVAL.md). The account-based path requires
 server-recorded, versioned consent as well as approval. The lifetime cohort cap is
 50 even after account deletion. Offline withdrawal is durable and blocks subsequent
 uploads until synchronized. Research-data deletion is separate from local deletion
@@ -40,24 +40,19 @@ Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining P
 
 This version collects local behavior data and recommends breaks using a timing/idle
 rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
-ML. Optional research uploads require manual researcher approval and explicit versioned consent. The included
-upload service is deployed and enabled for a controlled development test. Debug builds
-contain its URL and sharing defaults to off. **Release has no legacy research receiver**:
-legacy uploads and enrollment are disabled even after a development opt-in. Optional
-Supabase accounts and per-session ZIP delivery are prepared but unconfigured; see
-[the Free-plan setup guide](supabase/SETUP.md). Outgoing HTTPS is allowed for those
-features, but no account request occurs until configuration and explicit sign-in.
-A full app-session upload test is still needed before any research release.
+ML. Optional research uploads require manual researcher approval and explicit versioned consent. The
+account-based Supabase path handles optional per-session ZIP delivery; see
+[research operations](supabase/RESEARCH-OPERATIONS.md). Research remains disabled
+until the study requirements are configured and verified. Both Debug and Release
+use the same Supabase path; neither contains a Cloudflare upload receiver.
 The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
 
 **Not ready for a public app download yet.** See [my release checklist](RELEASE.md)
 for signing, notarization, clean-Mac testing and the separate study approval steps.
 
 For finding/editing a feature, I use [my code map](CODE_MAP.md). It lists the searchable
-`FF:` comments, which files do what, and Xcode/VS Code shortcuts. For connecting the
-bucket, use [the beginner upload setup guide](upload-service/README.md#connect-cloudflare).
-That guide also explains why per-session uploads are reasonable and why R2's free
-allowance and budget alerts are **not** a guaranteed spending cap.
+`FF:` comments, which files do what, and Xcode/VS Code shortcuts. For cloud setup,
+use [research operations](supabase/RESEARCH-OPERATIONS.md).
 
 ### Run it
 
@@ -190,8 +185,8 @@ Optional per-session research delivery uses a separate opt-in for new sessions. 
 one ZIP per completed session to private Supabase storage while signed in and running.
 Sharing requires researcher approval (50 selected participants by default) and an
 explicit participant opt-in; interest requests alone share no recordings. Failed deliveries
-stay local and can be exported. The integration doesn't enable billing, use email
-to transport recordings, or delete the old Cloudflare service. Deployment, free-tier
+stay local and can be exported. The integration does not enable billing or use email to transport recordings.
+Removing the old Cloudflare source does not shut down deployed Cloudflare resources. Deployment, free-tier
 limits, privacy review and end-to-end verification are in [supabase/SETUP.md](supabase/SETUP.md).
 
 ### Per-session planning and welcome preview
@@ -543,10 +538,10 @@ doesn't establish that the user saw or deliberately ignored it.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason.
-Schema 7 also includes a random Keychain-backed `participant_id` when available and
-`sharing_consent_id` only for sessions started while sharing is enabled. It contains
-no name, email, enrollment credential or survey scores. Keep any mapping from that
-pseudonymous ID to a real participant separately under the study's approved plan.
+New recordings omit the retired Cloudflare `participant_id` and `sharing_consent_id`.
+Existing recordings keep their original metadata and remain readable/exportable.
+Account-based consent and delivery state are managed separately by the Supabase
+research flow. Recording metadata contains no names, emails, credentials or survey scores.
 
 ### Background behavior and limitations
 
@@ -621,23 +616,23 @@ its own files, and never reads participant sessions or changes system permission
   snapshots, enabled/disabled scheduling and matching metadata/CSV output.
 - `RecordingNoticeTests`: first-use acknowledgement, cancellation/no automatic acceptance
   and asking again when the notice version changes.
-- `ReleaseConfigurationTests`: Debug retains the test URL; Release has no upload URL.
 - `NotificationAccessTests`: fake permission responses, denial, banners disabled,
   returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
-- `UploadPolicyTests`: eligibility, whole-session limits, HTTPS configuration, ZIP
-  allowlisting, checksums and rejecting symlink inputs. Synthetic temporary files only.
-- `SharingQueueTests`: opt-in, no historical backfill, opt-out during preparation,
-  restart recovery, offline retries, quota delays and fail-closed settings. Fake
-  identity/networking; no real Keychain access or uploads. Also checks that local-only
-  builds don't read credentials, alter an existing queue or upload despite a saved opt-in.
+- `ResearchSharingTests` and `ResearchDeliveryTests`: consent snapshots, ZIP allowlisting,
+  account isolation, approval checks, durable retries and in-flight opt-out using synthetic data.
 
-The upload service also has eight Node tests using in-memory SQLite and fake R2:
+Supabase server tests use fake authentication/storage:
 
 ```sh
-node --test upload-service/tests/*.test.mjs
+node --test supabase/tests/*.test.mjs
 ```
 
-Use Node 22.13+ for those tests. Both test commands run in GitHub Actions.
+Database checks use isolated in-memory PostgreSQL:
+
+```sh
+npm install --prefix supabase --ignore-scripts --no-package-lock
+npm --prefix supabase run test:database
+```
 
 The same command is configured in `.github/workflows/tests.yml` for pushes and pull
 requests using [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
