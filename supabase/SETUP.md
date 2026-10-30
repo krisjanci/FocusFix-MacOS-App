@@ -98,11 +98,10 @@ In `FocusFix/Configuration/Info.plist`, set:
   **true** only after deploying/testing the private bucket and reviewing the study
   information, research consent, privacy declarations and participant distribution.
 
-Both build configurations allow outgoing HTTPS. The legacy Cloudflare uploader is
-still available in Debug builds when the research-sharing flag is off. With the research-sharing flag
-on, its live environment is disabled and its existing credentials/queue are left
-untouched: a recording cannot be sent through both paths by this build. Release
-still has no legacy upload endpoint. Neither path is opted into by signing in.
+Both build configurations allow outgoing HTTPS and use only the account-based
+Supabase delivery path. The Cloudflare uploader has been removed from the source;
+old development credentials and queue files are left untouched and never resumed.
+Signing in does not opt into research sharing. See [removal notes](../CLOUDFLARE-REMOVAL.md).
 
 Build and open the profile screen. Create an account, enter the emailed code,
 then create an account profile. Existing local names/photos are NOT automatically
