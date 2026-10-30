@@ -12,7 +12,7 @@ Three freeze tokens are available per calendar month, with no rollover. An accou
 
 ## Verification
 
-Run `bash scripts/test.sh` for Swift rules, migration, outbox/account isolation and tutorial checks. Run `npm install --prefix supabase --ignore-scripts --no-package-lock` and `npm --prefix supabase run test:database` for isolated PostgreSQL access/scoring/freeze checks. `node --test supabase/tests/*.test.mjs upload-service/tests/*.test.mjs` covers existing deletion and upload paths. No real account, recording or network is used by these tests.
+Run `bash scripts/test.sh` for Swift rules, migration, outbox/account isolation and tutorial checks. Run `npm install --prefix supabase --ignore-scripts --no-package-lock` and `npm --prefix supabase run test:database` for isolated PostgreSQL access/scoring/freeze checks. `node --test supabase/tests/*.test.mjs` covers the Supabase deletion and consent endpoints. Swift delivery tests cover the active account-based upload path. No real account, recording or network is used by these tests.
 
 Before distribution, apply the migration to the intended project and verify with two disposable accounts: create/join, rotate code, complete goals and breaks, compare leaderboards, disconnect/reconnect, remove/rejoin, sign out/switch account, and delete the owner. Confirm only group members see scores and no profile photo or email is exposed. Test VoiceOver, keyboard navigation and long names in the Groups window, both appearances, the compact main screen, and the replayable reduced-motion tutorial. PostgreSQL tests use a serialized in-memory runtime; the row-lock implementation still needs a real two-device concurrency check against the deployed service.
 
