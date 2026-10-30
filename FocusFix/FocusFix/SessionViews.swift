@@ -6,7 +6,6 @@ import AppKit
 
 struct SessionLibraryView: View {
     @ObservedObject var tracker: ActivityTracker
-    @ObservedObject private var sharing = SharingController.shared
     @State private var selection: SavedSession.ID?
     @State private var pendingDeletion: SavedSession?
     @State private var confirmDeletion = false
@@ -16,7 +15,7 @@ struct SessionLibraryView: View {
     private var selected: SavedSession? { tracker.sessions.first { $0.id == selection } }
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
-    // List saved sessions with selection, export/delete controls and upload status.
+    // List local saved sessions with selection and export/delete controls.
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -50,7 +49,6 @@ struct SessionLibraryView: View {
                         VStack(alignment: .trailing, spacing: 5) {
                             Text(durationLabel(session)).monospacedDigit()
                             Text(statusLabel(session)).font(.caption).foregroundStyle(.secondary)
-                            Text(sharing.status(for: session.id)).font(.caption2).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 10).tag(session.id)
                 }.listStyle(.inset)
@@ -87,9 +85,7 @@ struct SessionLibraryView: View {
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: {
             Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to Trash. Exported copies and backups stay unchanged.")
-            if sharing.researchAvailable {
-                Text("Pending uploads will be cancelled, but already uploaded copies stay unchanged. Contact the researcher privately to request deletion from cloud storage.")
-            }
+            Text("Deleting a local session does not delete research data already received. Use Settings → Privacy & Research to request research-data deletion.")
         }
         .alert("FocusFix", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
