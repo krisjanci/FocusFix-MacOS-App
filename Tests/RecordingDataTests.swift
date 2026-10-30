@@ -78,6 +78,13 @@ struct RecordingDataTests {
             preconditionFailure("Existing session must never be overwritten")
         } catch { /* Expected. */ }
 
+        // Previously recorded enrollment metadata stays readable and exports unchanged.
+        var historical = info
+        historical["participant_id"] = "synthetic-retired-installation"
+        historical["sharing_consent_id"] = "synthetic-retired-consent"
+        let historicalData = try JSONSerialization.data(withJSONObject: historical, options: [.sortedKeys])
+        try historicalData.write(to: writer.folder.appendingPathComponent("session.json"))
+
         // Saved sessions survive reopening; exports are named and never replace earlier copies.
         let saved = try SavedSession(folder: writer.folder)
         precondition(saved.exportName(timeZone: TimeZone(secondsFromGMT: 0)!) ==
@@ -92,6 +99,8 @@ struct RecordingDataTests {
         precondition(copy != secondCopy && secondCopy.lastPathComponent.hasSuffix(" (2)"))
         let exported = try String(contentsOf: copy.appendingPathComponent("events.csv"), encoding: .utf8)
         precondition(exported == events)
+        let exportedMetadata = try Data(contentsOf: copy.appendingPathComponent("session.json"))
+        precondition(exportedMetadata == historicalData)
         let breakCSV = try String(contentsOf: copy.appendingPathComponent("breaks.csv"), encoding: .utf8)
         precondition(breakCSV == BreakLogEntry.header)
         let surveys = try String(contentsOf: copy.appendingPathComponent("surveys.csv"), encoding: .utf8)
