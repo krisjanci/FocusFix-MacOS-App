@@ -207,10 +207,8 @@ final class ActivityTracker: ObservableObject {
             let root = try SessionFiles.root()
             startedAt = Date()
             researchConsent = ResearchSharingController.shared.capturedConsent
-            let sharing = SharingController.shared
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
-                participantID: sharing.participantID.isEmpty ? nil : sharing.participantID,
-                sharingConsentID: sharing.consentID, surveyOptions: sessionSurveyOptions)
+                surveyOptions: sessionSurveyOptions)
             writer = newWriter
             sessionFolder = newWriter.folder
             startInstant = clock.now
@@ -311,7 +309,6 @@ final class ActivityTracker: ObservableObject {
         updateBreakUI(at: end)
         suspendedBy = []
         refreshSessions()
-        SharingController.shared.retryPending()
     }
     // Update the clock, mouse summaries and reminder rules once per timer tick.
     private func tick() {
@@ -813,12 +810,11 @@ final class ActivityTracker: ObservableObject {
     func isActive(_ session: SavedSession) -> Bool {
         isRecording && session.folder == sessionFolder
     }
-    // Move an inactive local session to Trash and cancel any pending upload for it.
+    // Move an inactive local session to Trash. Cloud research-data deletion is separate.
     func deleteSession(_ session: SavedSession) throws {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
         try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
-        SharingController.shared.cancelSession(session.id)
         if sessionFolder == session.folder { sessionFolder = nil }
         refreshSessions()
     }
