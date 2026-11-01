@@ -51,6 +51,24 @@ struct SessionTagChips: View {
     }
 }
 
+// The timer and library use the same direct chip interaction and empty state.
+struct SessionTagButton: View {
+    let tags: [String]
+    let colors: [String: String]
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            if tags.isEmpty {
+                Label("Add tags", systemImage: "plus").font(.caption)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.06), in: Capsule())
+            } else { SessionTagChips(tags: tags, colors: colors) }
+        }.buttonStyle(.plain)
+            .help("Click to change this session's tags and colors")
+            .accessibilityLabel(tags.isEmpty ? "Add tags" : "Edit tags: \(tags.joined(separator: ", "))")
+    }
+}
+
 @MainActor
 struct SessionTagEditor: View {
     @ObservedObject var library: SessionTagLibrary
