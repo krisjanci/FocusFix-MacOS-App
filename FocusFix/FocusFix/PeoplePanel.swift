@@ -47,11 +47,25 @@ struct GroupSelectionControls: View {
     var body: some View {
         VStack(spacing: 12) {
             if social.groups.count > 1 {
-                Picker("Selected group", selection: Binding(get: { social.selectedGroup?.id }, set: { if let id = $0 { social.selectGroup(id) } })) {
+                Picker("Selected group", selection: Binding(get: { social.selectedGroup?.id }, set: { id in
+                    guard let id else { return }
+                    let userID = social.userID
+                    // Native pickers can write their binding during a SwiftUI update.
+                    Task { @MainActor in
+                        guard social.userID == userID else { return }
+                        social.selectGroup(id)
+                    }
+                })) {
                     ForEach(social.groups) { Text($0.name).tag(Optional($0.id)) }
                 }.labelsHidden()
             }
-            Picker("Leaderboard", selection: Binding(get: { social.selection.metric }, set: { social.selectMetric($0) })) {
+            Picker("Leaderboard", selection: Binding(get: { social.selection.metric }, set: { metric in
+                let userID = social.userID
+                Task { @MainActor in
+                    guard social.userID == userID else { return }
+                    social.selectMetric(metric)
+                }
+            })) {
                 ForEach(LeaderboardMetric.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented).labelsHidden()
         }
