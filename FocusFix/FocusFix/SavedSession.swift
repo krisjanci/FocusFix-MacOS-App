@@ -12,6 +12,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     let duration: Double?
     let status: String
     let tags: [String]
+    let tagColors: [String: String]
     // Use the unique session folder name as the library row's identity.
     var id: String { folder.lastPathComponent }
 
@@ -32,6 +33,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
             ?? start.flatMap { date in validDuration.map { date.addingTimeInterval($0) } }
         status = metadata["status"] as? String ?? "metadata_unavailable"
         tags = metadata["tags"] as? [String] ?? []
+        tagColors = (try? SessionTags.colors(metadata["tag_colors"] as? [String: String] ?? [:], for: tags)) ?? [:]
     }
 
     // Build the readable FocusFix Session name from local start and end dates.
@@ -50,9 +52,10 @@ nonisolated struct SavedSession: Identifiable, Hashable {
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
     // Edit labels without recreating metadata or touching activity/survey files.
-    static func updateTags(_ tags: [String], for session: SavedSession, root: URL, active: URL?) throws {
+    static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
         try validate(session.folder, in: root, active: active)
         let valid = try SessionTags.validated(tags)
+        let validColors = try SessionTags.colors(colors, for: valid)
         let url = session.folder.appendingPathComponent("session.json")
         var metadata: [String: Any]
         if FileManager.default.fileExists(atPath: url.path) {
@@ -71,6 +74,7 @@ nonisolated enum SessionFiles {
                         "status": session.status]
         }
         metadata["tags"] = valid
+        metadata["tag_colors"] = validColors
         try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
             .write(to: url, options: .atomic)
     }
