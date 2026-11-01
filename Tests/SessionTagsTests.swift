@@ -19,21 +19,39 @@ struct SessionTagsTests {
         let library = SessionTagLibrary(file: file)
         precondition(library.loaded && library.names == SessionTags.defaults)
         precondition(SessionTags.defaults.contains("Repetitive work") && SessionTags.defaults.contains("Creative work"))
-        precondition(SessionTags.defaults.contains("Distracted work") && SessionTags.defaults.contains("Focused work"))
-        let custom = try library.add("  Data analysis  ")
+        precondition(SessionTags.defaults.count == 3 && SessionTags.defaults.contains("Focused work"))
+        let custom = try library.add("  Data analysis  ", color: "#123abc")
         precondition(custom == "Data analysis")
+        precondition(library.color(for: custom) == "#123ABC")
         let duplicate = try library.add("data ANALYSIS")
         precondition(duplicate == custom && library.names.count == SessionTags.defaults.count + 1)
         let reopened = SessionTagLibrary(file: file)
         precondition(reopened.names == library.names)
+        precondition(reopened.color(for: custom) == "#123ABC")
         try reopened.rename(custom, to: "Writing & review")
         precondition(SessionTagLibrary(file: file).names.last == "Writing & review")
+        precondition(SessionTagLibrary(file: file).color(for: "Writing & review") == "#123ABC")
+        try reopened.rename("Writing & review", to: "Writing & review", color: "#C64B66")
+        precondition(SessionTagLibrary(file: file).color(for: "Writing & review") == "#C64B66")
+        fails { try reopened.rename("Writing & review", to: "Writing & review", color: "red") }
         fails { try reopened.rename("Writing & review", to: "Focused work") }
         for invalid in ["", "   ", "two\nlines", String(repeating: "x", count: 41)] {
             fails { try reopened.add(invalid) }
         }
-        try reopened.remove("Meetings")
-        precondition(!SessionTagLibrary(file: file).names.contains("Meetings"))
+        try reopened.remove("Repetitive work")
+        precondition(!SessionTagLibrary(file: file).names.contains("Repetitive work"))
+        // Upgrade the old unmodified starter list, keeping custom labels and session snapshots.
+        let legacyCatalog = root.appendingPathComponent("legacy-tags.json")
+        try JSONEncoder().encode(SessionTags.legacyDefaults + ["My old custom tag"]).write(to: legacyCatalog)
+        let migrated = SessionTagLibrary(file: legacyCatalog)
+        precondition(migrated.names == SessionTags.defaults + ["My old custom tag"])
+        _ = try migrated.add("New colored tag", color: "#367CC5")
+        precondition(SessionTagLibrary(file: legacyCatalog).color(for: "New colored tag") == "#367CC5")
+        let customCatalog = root.appendingPathComponent("customized-list.json")
+        try JSONEncoder().encode(["Learning", "My chosen default"]).write(to: customCatalog)
+        precondition(SessionTagLibrary(file: customCatalog).names == ["Learning", "My chosen default"])
+        fails { _ = try SessionTags.color("#GGGGGG") }
+        fails { _ = try SessionTags.color("#123") }
         let normalized = try SessionTags.validated([" Focused work ", "focused WORK", "Research, \"notes\" 🧠"])
         precondition(normalized == ["Focused work", "Research, \"notes\" 🧠"])
         fails { _ = try SessionTags.validated((0...20).map { "Tag \($0)" }) }
@@ -66,9 +84,11 @@ struct SessionTagsTests {
         try JSONSerialization.data(withJSONObject: original).write(to: metadataURL)
         let untagged = try SavedSession(folder: folder)
         precondition(untagged.tags.isEmpty)
-        try SessionFiles.updateTags(normalized, for: untagged, root: storage, active: nil)
+        let selectedColors = [normalized[0]: "#168B80", normalized[1]: "#C64B66"]
+        try SessionFiles.updateTags(normalized, colors: selectedColors, for: untagged, root: storage, active: nil)
         let edited = try SavedSession(folder: folder)
         precondition(edited.tags == normalized)
+        precondition(edited.tagColors == selectedColors)
         let metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as! [String: Any]
         precondition(metadata["participant_id"] as? String == "historical-id")
         precondition(metadata["duration_seconds"] as? Int == 60 && metadata["schema_version"] as? Int == 8)
@@ -82,9 +102,13 @@ struct SessionTagsTests {
         try manager.createDirectory(at: exports, withIntermediateDirectories: false)
         let single = try SessionFiles.export(edited, to: exports, root: storage, active: nil)
         try checkTags(single, normalized)
+        let singleSession = try SavedSession(folder: single)
+        precondition(singleSession.tagColors == selectedColors)
         let batch = try SessionFiles.exportAll(to: exports, root: storage, active: nil)
         let batchCopy = batch.folder.appendingPathComponent(edited.exportName())
         try checkTags(batchCopy, normalized)
+        let batchSession = try SavedSession(folder: batchCopy)
+        precondition(batchSession.tagColors == selectedColors)
         // Catalog edits never silently rewrite the historical labels of a session.
         try reopened.rename("Writing & review", to: "Deep writing")
         try checkTags(folder, normalized)
