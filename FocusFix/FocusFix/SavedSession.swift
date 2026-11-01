@@ -51,6 +51,12 @@ nonisolated struct SavedSession: Identifiable, Hashable {
 
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
+    // Directory URLs may differ only by a trailing slash or a parent-directory alias.
+    static func sameFolder(_ first: URL, _ second: URL?) -> Bool {
+        guard let second else { return false }
+        return first.resolvingSymlinksInPath().standardizedFileURL.path
+            == second.resolvingSymlinksInPath().standardizedFileURL.path
+    }
     // Edit labels without recreating metadata or touching activity/survey files.
     static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
         try validate(session.folder, in: root, active: active)
@@ -104,9 +110,9 @@ nonisolated enum SessionFiles {
     static func validate(_ folder: URL, in root: URL, active: URL?) throws {
         let source = folder.standardizedFileURL
         let values = try source.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-        guard source.deletingLastPathComponent() == root.standardizedFileURL,
+        guard sameFolder(source.deletingLastPathComponent(), root),
               values.isDirectory == true, values.isSymbolicLink != true,
-              source != active?.standardizedFileURL else {
+              !sameFolder(source, active) else {
             throw NSError(domain: "FocusFix", code: 1, userInfo: [NSLocalizedDescriptionKey:
                 "This session is recording or is not a valid saved session."])
         }
@@ -132,7 +138,7 @@ nonisolated enum SessionFiles {
     // Remove an incomplete batch if any copy fails, leaving originals untouched.
     static func exportAll(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
         let target = try exportDestination(destination, root: root)
-        let sessions = try list(in: root).filter { $0.folder.standardizedFileURL != active?.standardizedFileURL }
+        let sessions = try list(in: root).filter { !sameFolder($0.folder, active) }
         guard !sessions.isEmpty else {
             throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
                 "There are no saved sessions to export. Stop and save the current recording first."])
@@ -158,7 +164,7 @@ nonisolated enum SessionFiles {
     private static func exportDestination(_ destination: URL, root: URL) throws -> URL {
         let target = destination.resolvingSymlinksInPath().standardizedFileURL
         let storage = root.resolvingSymlinksInPath().standardizedFileURL
-        guard target != storage, !target.path.hasPrefix(storage.path + "/") else {
+        guard target.path != storage.path, !target.path.hasPrefix(storage.path + "/") else {
             throw NSError(domain: "FocusFix", code: 2, userInfo: [NSLocalizedDescriptionKey:
                 "Choose an export location outside FocusFix's session storage."])
         }
