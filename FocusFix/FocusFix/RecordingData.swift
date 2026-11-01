@@ -105,10 +105,12 @@ final class RecordingWriter {
     private var mouseBuffer = ""
     private var breakBuffer = ""
     private let surveyOptions: SurveyOptions
+    private let tags: [String]
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         surveyOptions: SurveyOptions = SurveyOptions()) throws {
+         surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = []) throws {
         self.surveyOptions = surveyOptions
+        self.tags = try SessionTags.validated(tags)
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
             throw CocoaError(.fileWriteFileExists)
@@ -197,7 +199,8 @@ final class RecordingWriter {
     // Write session timing, schema, participant identity and consent information into session.json.
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 8, "session_id": folder.lastPathComponent,
+            "schema_version": 9, "session_id": folder.lastPathComponent,
+            "tags": tags,
             "survey_options": surveyOptions.metadata,
             "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
             "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
