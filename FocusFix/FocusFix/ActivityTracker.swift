@@ -818,6 +818,26 @@ final class ActivityTracker: ObservableObject {
         if sessionFolder == session.folder { sessionFolder = nil }
         refreshSessions()
     }
+    // Keep destination access alive while the background copy runs.
+    func exportAllSavedSessions() async throws -> (folder: URL, count: Int)? {
+        let panel = NSOpenPanel()
+        panel.title = "Export all saved sessions"
+        panel.message = "Copies all saved sessions into one folder. The current recording is skipped."
+        panel.prompt = "Export here"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let destination = panel.url else { return nil }
+        let scopedAccess = destination.startAccessingSecurityScopedResource()
+        defer { if scopedAccess { destination.stopAccessingSecurityScopedResource() } }
+        let root = try SessionFiles.root()
+        let active = isRecording ? sessionFolder : nil
+        return try await Task.detached(priority: .userInitiated) {
+            try SessionFiles.exportAll(to: destination, root: root, active: active)
+        }.value
+    }
+
     // Ask for an export destination and copy an inactive session without moving its originals.
     func exportSavedSession(_ session: SavedSession) throws -> URL? {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
