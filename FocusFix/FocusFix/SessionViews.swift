@@ -10,6 +10,7 @@ struct SessionLibraryView: View {
     @State private var pendingDeletion: SavedSession?
     @State private var confirmDeletion = false
     @State private var notice: String?
+    @State private var exportingAll = false
 
     // Find the saved session matching the current list selection.
     private var selected: SavedSession? { tracker.sessions.first { $0.id == selection } }
@@ -64,10 +65,13 @@ struct SessionLibraryView: View {
                 Button("Delete…", role: .destructive) {
                     pendingDeletion = selected
                     confirmDeletion = true
-                }.disabled(selected == nil || selected.map(tracker.isActive) == true)
+                }.disabled(exportingAll || selected == nil || selected.map(tracker.isActive) == true)
+                Button(exportingAll ? "Exporting…" : "Export All…") { exportAll() }
+                    .disabled(exportingAll || tracker.libraryError != nil || !tracker.sessions.contains { !tracker.isActive($0) })
+                    .help("Export all saved sessions into one folder. The current recording is skipped.")
                 Button("Export…") { exportSelected() }
                     .buttonStyle(.borderedProminent).tint(teal)
-                    .disabled(selected == nil || selected.map(tracker.isActive) == true)
+                    .disabled(exportingAll || selected == nil || selected.map(tracker.isActive) == true)
             }.padding(18)
         }
         .frame(minWidth: 650, minHeight: 400)
@@ -116,6 +120,19 @@ struct SessionLibraryView: View {
         do {
             if let url = try tracker.exportSavedSession(selected) { notice = "Exported to \(url.path)" }
         } catch { notice = "Export failed: \(error.localizedDescription)" }
+    }
+
+    private func exportAll() {
+        exportingAll = true
+        Task { @MainActor in
+            defer { exportingAll = false }
+            do {
+                if let result = try await tracker.exportAllSavedSessions() {
+                    let noun = result.count == 1 ? "session" : "sessions"
+                    notice = "Exported \(result.count) \(noun) to \(result.folder.path)"
+                }
+            } catch { notice = "Export failed: \(error.localizedDescription)" }
+        }
     }
 }
 
