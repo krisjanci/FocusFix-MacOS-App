@@ -21,6 +21,8 @@ run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/So
 run_test GroupPresentationTests "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
 run_test QuickTourTests "$source_dir/QuickTour.swift" "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
 run_test SessionWorkPlanTests "$source_dir/SessionWorkPlan.swift" "$source_dir/SessionStartDraft.swift" "$source_dir/DailyProgress.swift"
+run_test SessionRetentionTests "$source_dir/SavedSession.swift" "$source_dir/DailyProgress.swift" \
+    "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test SessionTagsTests "$source_dir/SavedSession.swift"
 run_test LaunchCoordinatorTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" \
     "$source_dir/AccountController.swift" "$source_dir/LaunchCoordinator.swift"
