@@ -65,7 +65,8 @@ struct SessionLibraryView: View {
                             Text(durationLabel(session)).monospacedDigit()
                             Text(statusLabel(session)).font(.caption).foregroundStyle(.secondary)
                         }
-                    }.padding(.vertical, 10).padding(.horizontal, 8)
+                    }.accessibilityElement(children: .contain)
+                        .padding(.vertical, 10).padding(.horizontal, 8)
                         .background {
                             if !session.tags.isEmpty {
                                 TagTintBackground(colors: session.tags.map { tagLibrary.color(for: $0, saved: session.tagColors) }, opacity: 0.18)
