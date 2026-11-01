@@ -24,7 +24,7 @@ struct SessionLibraryView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your sessions").font(.title2.weight(.semibold))
-                    Text("Saved automatically on this Mac").font(.callout).foregroundStyle(.secondary)
+                    Text("All time counts toward your daily goal. Sessions of 15+ minutes are saved in your history.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text("\(tracker.sessions.count)").font(.title2.monospacedDigit()).foregroundStyle(teal)
@@ -35,7 +35,7 @@ struct SessionLibraryView: View {
                     description: Text(error))
             } else if tracker.sessions.isEmpty {
                 ContentUnavailableView("No sessions yet", systemImage: "clock",
-                    description: Text("Start a session in FocusFix. It will appear here automatically."))
+                    description: Text("Complete a session of 15 minutes or longer to see it here."))
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
