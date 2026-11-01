@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @main @MainActor struct SocialControllerTests {
     static func main() async throws {
@@ -51,6 +52,21 @@ import Foundation
         await social.refresh()
         social.selectGroup(secondGroup.id); social.selectMetric(.habits)
         precondition(social.selectedGroup?.id == secondGroup.id && social.selection.metric == .habits)
+        // Native pickers may echo their current selection during a view update.
+        // Unchanged/invalid selections must not trigger another UI publication.
+        var selectionPublications = 0
+        let selectionSubscription = social.$selection.dropFirst().sink { _ in selectionPublications += 1 }
+        social.selectMetric(.habits)
+        social.selectGroup(secondGroup.id)
+        social.selectGroup(UUID())
+        precondition(selectionPublications == 0)
+        social.selectMetric(.work)
+        social.selectGroup(firstGroup.id)
+        precondition(selectionPublications == 2)
+        social.selectMetric(.habits)
+        social.selectGroup(secondGroup.id)
+        precondition(selectionPublications == 4)
+        selectionSubscription.cancel()
         offline = true
         social.record(kind: "work", seconds: 60, at: Date().addingTimeInterval(61))
         await social.refresh()
