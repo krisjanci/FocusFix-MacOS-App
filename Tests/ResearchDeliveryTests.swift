@@ -93,13 +93,17 @@ struct ResearchDeliveryTests {
         await research.enable()
         precondition(research.enabled)
         let consent = research.capturedConsent!
-        func enqueue() throws {
+        func enqueue(duration: Double = 900) throws {
             let id = UUID().uuidString
             let folder = recordings.appendingPathComponent(id)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for name in ResearchArchive.files { try Data("synthetic".utf8).write(to: folder.appendingPathComponent(name)) }
+            try JSONSerialization.data(withJSONObject: ["duration_seconds": duration])
+                .write(to: folder.appendingPathComponent("session.json"))
             research.finished(folder: folder, startedAt: Date(), captured: consent)
         }
+        try enqueue(duration: 899.999)
+        precondition(uploads.isEmpty && research.state.sessions.isEmpty && !research.busy)
         try enqueue()
         await waitUntil { !research.busy } // Finishing the session starts delivery immediately.
         precondition(uploads.count == 1 && research.state.sessions.isEmpty)
@@ -145,6 +149,8 @@ struct ResearchDeliveryTests {
         let folder = recordings.appendingPathComponent(id)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic".utf8).write(to: folder.appendingPathComponent(name)) }
+        try JSONSerialization.data(withJSONObject: ["duration_seconds": 900])
+            .write(to: folder.appendingPathComponent("session.json"))
         pause = true
         restored.finished(folder: folder, startedAt: Date(), captured: consent)
         await waitUntil { pending != nil }
