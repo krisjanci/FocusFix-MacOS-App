@@ -4,6 +4,7 @@ import Foundation
 struct SessionStartDraft {
     let asksForFatigue: Bool
     var fatigue: Int?
+    var tags: [String] = []
     var planning = false
     // Zero represents Custom; all other choices are preset minutes.
     var durationChoice = 60
@@ -34,11 +35,13 @@ struct SessionStartDraft {
         let answer = asksForFatigue && !skippingFatigue ? fatigue : nil
         if asksForFatigue && !skippingFatigue && answer == nil { return nil }
         guard answer.map({ (0...10).contains($0) }) ?? true else { return nil }
-        return SessionStartSelection(fatigue: answer, plan: SessionWorkPlan(targetMinutes: targetMinutes))
+        guard let validTags = try? SessionTags.validated(tags) else { return nil }
+        return SessionStartSelection(fatigue: answer, plan: SessionWorkPlan(targetMinutes: targetMinutes), tags: validTags)
     }
 }
 
 struct SessionStartSelection {
     let fatigue: Int?
     let plan: SessionWorkPlan
+    var tags: [String] = []
 }
