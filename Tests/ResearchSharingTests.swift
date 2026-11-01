@@ -35,6 +35,8 @@ struct ResearchSharingTests {
         let folder = sessions.appendingPathComponent(first)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic fixture".utf8).write(to: folder.appendingPathComponent(name)) }
+        let tagMetadata = try JSONSerialization.data(withJSONObject: ["tags": ["Focused work", "My custom tag"]])
+        try tagMetadata.write(to: folder.appendingPathComponent("session.json"))
         try Data("private name and photo".utf8).write(to: folder.appendingPathComponent("profile.json"))
         let records = [ResearchSession(id: first, consentID: consent.id, startedAt: now, endedAt: now)]
         let ids = try ResearchArchive.select(records, root: sessions)
@@ -53,6 +55,15 @@ struct ResearchSharingTests {
         precondition(process.terminationStatus == 0)
         precondition(Set(listing.split(separator: "\n").map(String.init)) == Set(ResearchArchive.files.map { "\(first)/\($0)" }))
         precondition(!listing.contains("profile.json"))
+        let metadataPipe = Pipe()
+        let extract = Process()
+        extract.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        extract.arguments = ["-p", destination.path, "\(first)/session.json"]
+        extract.standardOutput = metadataPipe
+        try extract.run()
+        let archivedMetadata = metadataPipe.fileHandleForReading.readDataToEndOfFile()
+        extract.waitUntilExit()
+        precondition(extract.terminationStatus == 0 && archivedMetadata == tagMetadata)
         let linkID = UUID().uuidString
         try FileManager.default.createSymbolicLink(at: sessions.appendingPathComponent(linkID), withDestinationURL: folder)
         do { _ = try ResearchArchive.prepare(ids: [linkID], root: sessions, destination: destination); preconditionFailure("Symlink accepted") } catch { }
