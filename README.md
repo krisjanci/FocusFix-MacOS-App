@@ -84,8 +84,11 @@ operation, and it doesn't start recording or change any session timers.
 3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
    Then work normally. Close the window if you like: recording continues, with controls
    in the menu bar. Nothing starts automatically on launch.
-4. Choose **Stop & save**. Sessions are saved automatically; you don't need to export
-   after every recording. Open **Sessions** to browse previous recordings, select one,
+4. Choose **Stop & save**. All session work time counts toward the daily 60-minute
+   goal. Sessions lasting at least 15 minutes (including exactly 15 minutes) are
+   saved in history and eligible for optional research delivery to Supabase.
+   Shorter recordings are discarded while their earned daily progress is kept.
+   Existing saved sessions are preserved. You don't need to export after every recording. Open **Sessions** to browse previous recordings, select one,
    then choose **Export…**, **Show in Finder**, or **Delete…**.
    Choose **Export All…** to copy every saved session into one **FocusFix Sessions**
    folder at your chosen destination, without selecting each recording. Any current
