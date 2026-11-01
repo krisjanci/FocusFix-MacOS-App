@@ -81,12 +81,7 @@ enum SessionFiles {
     // Copy a session to a new export folder, adding a suffix instead of overwriting an existing export.
     static func export(_ session: SavedSession, to destination: URL, root: URL, active: URL?) throws -> URL {
         try validate(session.folder, in: root, active: active)
-        let target = destination.resolvingSymlinksInPath().standardizedFileURL
-        let storage = root.resolvingSymlinksInPath().standardizedFileURL
-        guard target != storage, !target.path.hasPrefix(storage.path + "/") else {
-            throw NSError(domain: "FocusFix", code: 2, userInfo: [NSLocalizedDescriptionKey:
-                "Choose an export location outside FocusFix's session storage."])
-        }
+        let target = try exportDestination(destination, root: root)
         let name = session.exportName()
         var copy = target.appendingPathComponent(name, isDirectory: true)
         var number = 2
@@ -97,5 +92,42 @@ enum SessionFiles {
         // copyItem fails rather than overwriting if another file appears here.
         try FileManager.default.copyItem(at: session.folder, to: copy)
         return copy
+    }
+
+    // Re-read storage and copy every inactive session into one new folder.
+    // Remove an incomplete batch if any copy fails, leaving originals untouched.
+    static func exportAll(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
+        let target = try exportDestination(destination, root: root)
+        let sessions = try list(in: root).filter { $0.folder.standardizedFileURL != active?.standardizedFileURL }
+        guard !sessions.isEmpty else {
+            throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
+                "There are no saved sessions to export. Stop and save the current recording first."])
+        }
+        var batch = target.appendingPathComponent("FocusFix Sessions", isDirectory: true)
+        var number = 2
+        while FileManager.default.fileExists(atPath: batch.path) {
+            batch = target.appendingPathComponent("FocusFix Sessions (\(number))", isDirectory: true)
+            number += 1
+        }
+        try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: false)
+        do {
+            for session in sessions {
+                _ = try export(session, to: batch, root: root, active: active)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: batch)
+            throw error
+        }
+        return (batch, sessions.count)
+    }
+
+    private static func exportDestination(_ destination: URL, root: URL) throws -> URL {
+        let target = destination.resolvingSymlinksInPath().standardizedFileURL
+        let storage = root.resolvingSymlinksInPath().standardizedFileURL
+        guard target != storage, !target.path.hasPrefix(storage.path + "/") else {
+            throw NSError(domain: "FocusFix", code: 2, userInfo: [NSLocalizedDescriptionKey:
+                "Choose an export location outside FocusFix's session storage."])
+        }
+        return target
     }
 }
