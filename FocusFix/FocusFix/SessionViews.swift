@@ -11,6 +11,8 @@ struct SessionLibraryView: View {
     @State private var confirmDeletion = false
     @State private var notice: String?
     @State private var exportingAll = false
+    @State private var tagging: SavedSession?
+    @State private var managingTags = false
 
     // Find the saved session matching the current list selection.
     private var selected: SavedSession? { tracker.sessions.first { $0.id == selection } }
@@ -25,6 +27,7 @@ struct SessionLibraryView: View {
                     Text("Saved automatically on this Mac").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button("Manage tags…") { managingTags = true }
                 Text("\(tracker.sessions.count)").font(.title2.monospacedDigit()).foregroundStyle(teal)
             }.padding(24)
             Divider()
@@ -45,6 +48,11 @@ struct SessionLibraryView: View {
                             Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
                                 ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
                                 .font(.caption).foregroundStyle(.secondary)
+                            if !session.tags.isEmpty {
+                                Label(session.tags.joined(separator: ", "), systemImage: "tag")
+                                    .font(.caption).foregroundStyle(teal).lineLimit(2)
+                                    .help(session.tags.joined(separator: ", "))
+                            }
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 5) {
@@ -55,6 +63,17 @@ struct SessionLibraryView: View {
                 }.listStyle(.inset)
             }
             Divider()
+            if let selected {
+                HStack {
+                    Text(selected.tags.isEmpty ? "No tags" : selected.tags.joined(separator: ", "))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Spacer()
+                    Button("Edit tags…") { tagging = selected }
+                        .disabled(exportingAll || tracker.isActive(selected))
+                        .help(tracker.isActive(selected) ? "Stop and save this recording before editing its tags." : "Edit tags for this session")
+                }.padding(.horizontal, 18).padding(.vertical, 10)
+                Divider()
+            }
             HStack {
                 Button { tracker.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }
                     .help("Refresh sessions").accessibilityLabel("Refresh sessions")
@@ -77,6 +96,10 @@ struct SessionLibraryView: View {
         .frame(minWidth: 650, minHeight: 400)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { tracker.refreshSessions() }
+        .sheet(item: $tagging) { session in
+            SessionTagEditor(tags: session.tags) { try tracker.updateTags($0, for: session) }
+        }
+        .sheet(isPresented: $managingTags) { ManageSessionTagsView() }
         .confirmationDialog("Move this session to Trash?", isPresented: $confirmDeletion, titleVisibility: .visible) {
             Button("Move to Trash", role: .destructive) {
                 guard let session = pendingDeletion else { return }
