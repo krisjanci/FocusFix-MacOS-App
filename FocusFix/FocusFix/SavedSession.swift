@@ -4,7 +4,8 @@
 import Foundation
 
 // Read existing sessions without changing their CSVs or requiring a migration.
-struct SavedSession: Identifiable, Hashable {
+// Immutable metadata can be read by background exports as well as the UI.
+nonisolated struct SavedSession: Identifiable, Hashable {
     let folder: URL
     let startedAt: Date
     let endedAt: Date?
@@ -44,7 +45,8 @@ struct SavedSession: Identifiable, Hashable {
     }
 }
 
-enum SessionFiles {
+// File operations have no UI state and must not inherit the app's MainActor default.
+nonisolated enum SessionFiles {
     // Locate the app's local Sessions directory in Application Support.
     static func root() throws -> URL {
         try FileManager.default.url(for: .applicationSupportDirectory,
