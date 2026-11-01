@@ -52,7 +52,9 @@ struct SessionCheckInView: View {
     init(tracker: ActivityTracker, tagLibrary: SessionTagLibrary? = nil) {
         self.tracker = tracker
         self.tagLibrary = tagLibrary ?? .shared
-        _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession))
+        _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession,
+            tags: tracker.sessionFolder == nil ? tracker.sessionTags : [],
+            tagColors: tracker.sessionFolder == nil ? tracker.sessionTagColors : [:]))
     }
 
     var body: some View {
