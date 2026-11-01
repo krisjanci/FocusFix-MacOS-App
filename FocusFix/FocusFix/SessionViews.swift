@@ -114,18 +114,10 @@ struct SessionLibraryView: View {
                 Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
                     ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
                     .font(.caption).foregroundStyle(.secondary)
-                Button { selection = session.id; tagging = session } label: {
-                    if session.tags.isEmpty {
-                        Label("Add tag", systemImage: "plus").font(.caption)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.06), in: Capsule())
-                    } else {
-                        SessionTagChips(tags: session.tags,
-                            colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors))
-                    }
-                }.buttonStyle(.plain).disabled(exportingAll)
-                    .help("Click to change this session's tags and colors")
-                    .accessibilityLabel(session.tags.isEmpty ? "Add session tags" : "Edit tags: \(session.tags.joined(separator: ", "))")
+                SessionTagButton(tags: session.tags,
+                    colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors)) {
+                        selection = session.id; tagging = session
+                    }.disabled(exportingAll)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
