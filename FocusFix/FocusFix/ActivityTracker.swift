@@ -812,7 +812,7 @@ final class ActivityTracker: ObservableObject {
     }
     // Check whether a library entry is the session currently being recorded.
     func isActive(_ session: SavedSession) -> Bool {
-        isRecording && session.folder == sessionFolder
+        isRecording && SessionFiles.sameFolder(session.folder, sessionFolder)
     }
     func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession) throws {
         let valid = try SessionTags.validated(tags)
@@ -824,7 +824,7 @@ final class ActivityTracker: ObservableObject {
             try SessionFiles.updateTags(valid, colors: validColors, for: session, root: SessionFiles.root(),
                                         active: isRecording ? sessionFolder : nil)
         }
-        if sessionFolder == session.folder {
+        if SessionFiles.sameFolder(session.folder, sessionFolder) {
             sessionTags = valid
             sessionTagColors = validColors
         }
@@ -839,7 +839,7 @@ final class ActivityTracker: ObservableObject {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
         try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
-        if sessionFolder == session.folder { sessionFolder = nil; sessionTags = []; sessionTagColors = [:] }
+        if SessionFiles.sameFolder(session.folder, sessionFolder) { sessionFolder = nil; sessionTags = []; sessionTagColors = [:] }
         refreshSessions()
     }
     // Keep destination access alive while the background copy runs.
