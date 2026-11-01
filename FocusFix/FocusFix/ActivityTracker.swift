@@ -209,7 +209,7 @@ final class ActivityTracker: ObservableObject {
             let root = try SessionFiles.root()
             startedAt = Date()
             researchConsent = ResearchSharingController.shared.capturedConsent
-            let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
+            let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
                 surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
             writer = newWriter
             sessionFolder = newWriter.folder
@@ -293,11 +293,20 @@ final class ActivityTracker: ObservableObject {
             }
             try record(type: "session_stop", at: end)
             try writer?.finish(startedAt: startedAt, duration: end, reason: reason)
+            // Progress was credited independently above; retaining data never adds time again.
+            if let folder = sessionFolder {
+                writer = nil
+                sessionFolder = try SessionFiles.retainRecording(folder, duration: end, root: SessionFiles.root())
+            }
             if let sessionFolder, reason != "recording_error", reason != "monitor_unavailable" {
                 ResearchSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: researchConsent)
             }
             researchConsent = nil
-            message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
+            if sessionFolder == nil {
+                message = "Time added to your daily goal. Sessions under 15 minutes aren't saved."
+            } else {
+                message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
+            }
             if let checkInSaveError {
                 hasError = true
                 message = "Session stopped, but the check-in could not be saved: \(checkInSaveError.localizedDescription)"
