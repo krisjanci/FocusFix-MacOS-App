@@ -14,6 +14,8 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var eventCount = 0
     @Published private(set) var movementRows = 0
     @Published private(set) var sessionFolder: URL?
+    @Published private(set) var sessionTags: [String] = []
+    @Published private(set) var sessionTagColors: [String: String] = [:]
     @Published private(set) var message = "Ready when you are."
     @Published private(set) var needsPermission = false
     @Published private(set) var hasError = false
@@ -191,10 +193,10 @@ final class ActivityTracker: ObservableObject {
         sessionCheckIn = nil
         sessionCheckInPresented = false
         start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
-              prompt: prompt, plan: selection.plan, tags: selection.tags)
+              prompt: prompt, plan: selection.plan, tags: selection.tags, tagColors: selection.tagColors)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String]) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String]) {
         guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
@@ -208,9 +210,11 @@ final class ActivityTracker: ObservableObject {
             startedAt = Date()
             researchConsent = ResearchSharingController.shared.capturedConsent
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
-                surveyOptions: sessionSurveyOptions, tags: tags)
+                surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
             writer = newWriter
             sessionFolder = newWriter.folder
+            sessionTags = tags
+            sessionTagColors = tagColors
             startInstant = clock.now
             if let prompt, sessionSurveyOptions.beforeSession {
                 let beforeStart = prompt.instant.duration(to: startInstant).components
@@ -810,17 +814,32 @@ final class ActivityTracker: ObservableObject {
     func isActive(_ session: SavedSession) -> Bool {
         isRecording && session.folder == sessionFolder
     }
-    func updateTags(_ tags: [String], for session: SavedSession) throws {
-        try SessionFiles.updateTags(tags, for: session, root: SessionFiles.root(),
-                                    active: isRecording ? sessionFolder : nil)
+    func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession) throws {
+        let valid = try SessionTags.validated(tags)
+        let validColors = try SessionTags.colors(colors, for: valid)
+        if isActive(session) {
+            guard let writer else { throw CocoaError(.fileWriteUnknown) }
+            try writer.updateTags(valid, colors: validColors)
+        } else {
+            try SessionFiles.updateTags(valid, colors: validColors, for: session, root: SessionFiles.root(),
+                                        active: isRecording ? sessionFolder : nil)
+        }
+        if sessionFolder == session.folder {
+            sessionTags = valid
+            sessionTagColors = validColors
+        }
         refreshSessions()
+    }
+    func updateCurrentTags(_ tags: [String], colors: [String: String]) throws {
+        guard let sessionFolder else { throw CocoaError(.fileNoSuchFile) }
+        try updateTags(tags, colors: colors, for: SavedSession(folder: sessionFolder))
     }
     // Move an inactive local session to Trash. Cloud research-data deletion is separate.
     func deleteSession(_ session: SavedSession) throws {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
         try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
-        if sessionFolder == session.folder { sessionFolder = nil }
+        if sessionFolder == session.folder { sessionFolder = nil; sessionTags = []; sessionTagColors = [:] }
         refreshSessions()
     }
     // Keep destination access alive while the background copy runs.
