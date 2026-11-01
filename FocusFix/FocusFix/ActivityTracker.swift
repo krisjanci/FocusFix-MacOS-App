@@ -191,10 +191,10 @@ final class ActivityTracker: ObservableObject {
         sessionCheckIn = nil
         sessionCheckInPresented = false
         start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
-              prompt: prompt, plan: selection.plan)
+              prompt: prompt, plan: selection.plan, tags: selection.tags)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String]) {
         guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
@@ -208,7 +208,7 @@ final class ActivityTracker: ObservableObject {
             startedAt = Date()
             researchConsent = ResearchSharingController.shared.capturedConsent
             let newWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: startedAt,
-                surveyOptions: sessionSurveyOptions)
+                surveyOptions: sessionSurveyOptions, tags: tags)
             writer = newWriter
             sessionFolder = newWriter.folder
             startInstant = clock.now
@@ -809,6 +809,11 @@ final class ActivityTracker: ObservableObject {
     // Check whether a library entry is the session currently being recorded.
     func isActive(_ session: SavedSession) -> Bool {
         isRecording && session.folder == sessionFolder
+    }
+    func updateTags(_ tags: [String], for session: SavedSession) throws {
+        try SessionFiles.updateTags(tags, for: session, root: SessionFiles.root(),
+                                    active: isRecording ? sessionFolder : nil)
+        refreshSessions()
     }
     // Move an inactive local session to Trash. Cloud research-data deletion is separate.
     func deleteSession(_ session: SavedSession) throws {
