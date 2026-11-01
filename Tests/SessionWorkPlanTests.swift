@@ -37,16 +37,19 @@ struct SessionWorkPlanTests {
         for asksForFatigue in [false, true] {
             var attempt = SessionStartDraft(asksForFatigue: asksForFatigue)
             attempt.tags = ["Creative work", "My custom tag"]
+            attempt.tagColors = ["Creative work": "#7963CF", "My custom tag": "#C64B66"]
             attempt.addPlan()
             if asksForFatigue { precondition(attempt.selection() == nil) }
             let skipped = attempt.selection(skippingFatigue: true)!
             precondition(skipped.fatigue == nil && skipped.plan.targetMinutes == 60)
             precondition(skipped.tags == attempt.tags)
+            precondition(skipped.tagColors == attempt.tagColors)
             attempt.fatigue = 7
             let answered = attempt.selection()!
             precondition(answered.fatigue == (asksForFatigue ? 7 : nil))
             precondition(answered.plan.targetMinutes == 60)
             precondition(answered.tags == attempt.tags)
+            precondition(answered.tagColors == attempt.tagColors)
             attempt.fatigue = 11
             if asksForFatigue { precondition(attempt.selection() == nil) }
         }
