@@ -37,43 +37,26 @@ struct SessionLibraryView: View {
                 ContentUnavailableView("No sessions yet", systemImage: "clock",
                     description: Text("Start a session in FocusFix. It will appear here automatically."))
             } else {
-                List(tracker.sessions, selection: $selection) { session in
-                    HStack(spacing: 14) {
-                        Image(systemName: tracker.isActive(session) ? "record.circle" : "doc.text")
-                            .font(.title2).foregroundStyle(teal)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(session.startedAt.formatted(date: .abbreviated, time: .standard))
-                                .font(.headline)
-                            Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
-                                ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
-                                .font(.caption).foregroundStyle(.secondary)
-                            Button { tagging = session } label: {
-                                if session.tags.isEmpty {
-                                    Label("Add tag", systemImage: "plus").font(.caption)
-                                        .padding(.horizontal, 8).padding(.vertical, 4)
-                                        .background(Color.primary.opacity(0.06), in: Capsule())
-                                } else {
-                                    SessionTagChips(tags: session.tags,
-                                        colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors))
-                                }
-                            }.buttonStyle(.plain).disabled(exportingAll)
-                                .help("Click to change this session's tags and colors")
-                                .accessibilityLabel(session.tags.isEmpty ? "Add session tags" : "Edit tags: \(session.tags.joined(separator: ", "))")
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 5) {
-                            Text(durationLabel(session)).monospacedDigit()
-                            Text(statusLabel(session)).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }.accessibilityElement(children: .contain)
-                        .padding(.vertical, 10).padding(.horizontal, 8)
-                        .background {
-                            if !session.tags.isEmpty {
-                                TagTintBackground(colors: session.tags.map { tagLibrary.color(for: $0, saved: session.tagColors) }, opacity: 0.18)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(tracker.sessions) { session in
+                                sessionRow(session)
                             }
-                        }.tag(session.id)
-                }.listStyle(.inset)
+                        }.padding(.horizontal, 18).padding(.vertical, 10)
+                    }
+                    .focusable()
+                    .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
+                    .onKeyPress(.downArrow) { moveSelection(1); return .handled }
+                    .onKeyPress(.return) {
+                        guard let selected, !exportingAll else { return .ignored }
+                        tagging = selected
+                        return .handled
+                    }
+                    .onChange(of: selection) { _, id in
+                        if let id { proxy.scrollTo(id, anchor: .center) }
+                    }
+                }
             }
             Divider()
             HStack {
@@ -121,6 +104,59 @@ struct SessionLibraryView: View {
             Button("OK") { notice = nil }
         } message: { Text(notice ?? "") }
     }
+    private func sessionRow(_ session: SavedSession) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: tracker.isActive(session) ? "record.circle" : "doc.text")
+                .font(.title2).foregroundStyle(teal)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(session.startedAt.formatted(date: .abbreviated, time: .standard))
+                    .font(.headline)
+                Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
+                    ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Button { selection = session.id; tagging = session } label: {
+                    if session.tags.isEmpty {
+                        Label("Add tag", systemImage: "plus").font(.caption)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                    } else {
+                        SessionTagChips(tags: session.tags,
+                            colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors))
+                    }
+                }.buttonStyle(.plain).disabled(exportingAll)
+                    .help("Click to change this session's tags and colors")
+                    .accessibilityLabel(session.tags.isEmpty ? "Add session tags" : "Edit tags: \(session.tags.joined(separator: ", "))")
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(durationLabel(session)).monospacedDigit()
+                Text(statusLabel(session)).font(.caption).foregroundStyle(.secondary)
+            }
+        }.accessibilityElement(children: .contain)
+            .padding(.vertical, 10).padding(.horizontal, 8)
+            .background {
+                if !session.tags.isEmpty {
+                    TagTintBackground(colors: session.tags.map { tagLibrary.color(for: $0, saved: session.tagColors) }, opacity: 0.18)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(selection == session.id ? teal : Color.clear, lineWidth: 1.5)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .onTapGesture { selection = session.id }
+            .id(session.id)
+    }
+
+    // Preserve arrow-key selection while tag chips remain independent controls.
+    private func moveSelection(_ step: Int) {
+        guard !tracker.sessions.isEmpty else { return }
+        let current = tracker.sessions.firstIndex { $0.id == selection }
+        let next = current.map { min(max($0 + step, 0), tracker.sessions.count - 1) } ?? 0
+        selection = tracker.sessions[next].id
+    }
+
     // Show live duration for the active session and saved duration for completed sessions.
     private func durationLabel(_ session: SavedSession) -> String {
         guard let seconds = tracker.isActive(session) ? tracker.elapsed : session.duration else { return "—" }
