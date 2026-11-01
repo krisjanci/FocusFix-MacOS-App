@@ -91,13 +91,19 @@ operation, and it doesn't start recording or change any session timers.
    folder at your chosen destination, without selecting each recording. Any current
    recording is skipped; stop and save it first to include it. Original files stay
    on this Mac, and repeated exports create separate folders without replacing copies.
-   **Tags…** in Before you start adds optional labels to that session. Combine labels
-   such as **Creative work** and **Focused work**, or add your own. In Sessions,
-   select a saved recording and choose **Edit tags…** to add, remove, or clear its
-   labels. Stop and save an active recording before editing its tags.
-   **Manage tags…** lets you rename/remove the reusable labels. Custom labels and
-   list edits are remembered on this Mac across launches. Changing the reusable
-   list does not rewrite past recordings; edit a session's tags to change its labels.
+   **Tags…**, beside **Plan session**, opens a compact colored tag list. The three
+   starter labels are **Focused work**, **Creative work**, and **Repetitive work**.
+   Click labels to select them, or use **New tag**. Each tag's options menu offers
+   **Edit name and color…**, with quick swatches and a custom color picker.
+   Choose **Done** to apply the selection. Custom labels and colors are remembered
+   on this Mac across launches; existing customized tag lists are preserved.
+   Change tags before starting, through **Tags…** on the running or stopped timer,
+   or by clicking the tag chips in Sessions, including the current recording.
+   Untagged rows offer an **Add tag** chip in the same spot. Changes
+   during recording are saved immediately and retained by Stop & save. The timer
+   and session rows show the tag colors; multiple colors have sharp diagonal splits.
+   Catalog color changes recolor matching labels in the app. Renaming/removing a
+   reusable tag does not rewrite past session labels; edit a session to change them.
 5. **Test tracking** opens a separate window with live individual-event and
    mouse-interval counts. It doesn't start a separate recording; testing during a
    session adds events to that session. Close it when you're done checking.
@@ -549,10 +555,14 @@ doesn't establish that the user saw or deliberately ignored it.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason.
-Schema 9 adds `tags`, a JSON array of up to 20 user-selected strings (each 1–40
+Schema 9 added `tags`, a JSON array of up to 20 user-selected strings (each 1–40
 characters), for example `"tags": ["Creative work", "Focused work"]`. Tags describe
 the session as a whole, not individual intervals or objective attention measurements.
-They are saved before recording begins and kept at Stop. Sessions without tags have
+Schema 10 also stores `tag_colors`, a name-to-`#RRGGBB` map captured when tags are
+applied to that session. Colors and labels are saved before recording begins,
+updated by live edits, and kept at Stop. Tags still describe the whole session;
+editing them during recording does not create interval-level labels.
+Sessions without tags have
 an empty array; older metadata without the field is displayed as untagged.
 Tag edits preserve the remaining metadata and every CSV. Individual exports,
 Export All, and research ZIPs include the labels in each session's `session.json`.
