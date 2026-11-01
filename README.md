@@ -97,9 +97,10 @@ operation, and it doesn't start recording or change any session timers.
    **Edit name and color…**, with quick swatches and a custom color picker.
    Choose **Done** to apply the selection. Custom labels and colors are remembered
    on this Mac across launches; existing customized tag lists are preserved.
-   Change tags before starting, through **Tags…** on the running or stopped timer,
-   or by clicking the tag chips in Sessions, including the current recording.
-   Untagged rows offer an **Add tag** chip in the same spot. Changes
+   Click the tag chips on the timer or in Sessions to edit them directly,
+   including during a recording. When there are no tags, a small **+ Add tags**
+   chip opens the same picker. On an idle timer with no saved session attached,
+   these choices carry into the next Before you start screen. Changes
    during recording are saved immediately and retained by Stop & save. The timer
    and session rows show the tag colors; multiple colors have sharp diagonal splits.
    Catalog color changes recolor matching labels in the app. Renaming/removing a
