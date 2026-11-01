@@ -96,6 +96,14 @@ struct SessionTagsTests {
         let untouched = try Data(contentsOf: folder.appendingPathComponent("events.csv"))
         precondition(untouched == csv)
         fails { try SessionFiles.updateTags(["New"], for: edited, root: storage, active: folder) }
+        let noDirectoryHint = URL(fileURLWithPath: folder.path, isDirectory: false)
+        precondition(SessionFiles.sameFolder(folder, noDirectoryHint))
+        let alias = root.appendingPathComponent("storage-alias")
+        try manager.createSymbolicLink(at: alias, withDestinationURL: storage)
+        let activeAlias = alias.appendingPathComponent(folder.lastPathComponent, isDirectory: false)
+        precondition(SessionFiles.sameFolder(folder, activeAlias))
+        fails { try SessionFiles.updateTags(["New"], for: edited, root: storage, active: activeAlias) }
+        fails { _ = try SessionFiles.exportAll(to: root, root: storage, active: activeAlias) }
         fails { try SessionFiles.updateTags([""], for: edited, root: storage, active: nil) }
 
         let exports = root.appendingPathComponent("Exports")
