@@ -51,6 +51,29 @@ nonisolated struct SavedSession: Identifiable, Hashable {
 
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
+    static let minimumDuration: Double = 15 * 60
+
+    static func qualifies(duration: Double) -> Bool {
+        duration.isFinite && duration >= minimumDuration
+    }
+
+    // In-progress data stays hidden from history and exports until Stop qualifies it.
+    static func pendingRoot(in root: URL) -> URL {
+        root.appendingPathComponent(".pending", isDirectory: true)
+    }
+
+    // Only the current recording is removed; existing saved sessions are never pruned.
+    static func retainRecording(_ folder: URL, duration: Double, root: URL) throws -> URL? {
+        try validate(folder, in: pendingRoot(in: root), active: nil)
+        guard qualifies(duration: duration) else {
+            try FileManager.default.removeItem(at: folder)
+            return nil
+        }
+        let saved = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+        try FileManager.default.moveItem(at: folder, to: saved)
+        return saved
+    }
+
     // Directory URLs may differ only by a trailing slash or a parent-directory alias.
     static func sameFolder(_ first: URL, _ second: URL?) -> Bool {
         guard let second else { return false }
