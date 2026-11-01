@@ -36,17 +36,21 @@ struct SessionWorkPlanTests {
         precondition(draft.selection()?.fatigue == nil)
         for asksForFatigue in [false, true] {
             var attempt = SessionStartDraft(asksForFatigue: asksForFatigue)
+            attempt.tags = ["Creative work", "My custom tag"]
             attempt.addPlan()
             if asksForFatigue { precondition(attempt.selection() == nil) }
             let skipped = attempt.selection(skippingFatigue: true)!
             precondition(skipped.fatigue == nil && skipped.plan.targetMinutes == 60)
+            precondition(skipped.tags == attempt.tags)
             attempt.fatigue = 7
             let answered = attempt.selection()!
             precondition(answered.fatigue == (asksForFatigue ? 7 : nil))
             precondition(answered.plan.targetMinutes == 60)
+            precondition(answered.tags == attempt.tags)
             attempt.fatigue = 11
             if asksForFatigue { precondition(attempt.selection() == nil) }
         }
+        precondition(SessionStartDraft(asksForFatigue: false).tags.isEmpty)
 
         for minutes in [1, 30, 60, 90, 480] {
             var boundary = SessionWorkPlan(targetMinutes: minutes)
