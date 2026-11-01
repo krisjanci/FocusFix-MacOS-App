@@ -45,7 +45,11 @@ struct RecordingDataTests {
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("focusfix-tests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0))
+        let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0),
+                                         tags: ["Focused work", "Creative work"])
+        let initialMetadata = try JSONSerialization.jsonObject(with: Data(contentsOf:
+            writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
+        precondition(initialMetadata["tags"] as? [String] == ["Focused work", "Creative work"])
         let initialRating = SurveyEntry(id: "synthetic-check-in", context: .sessionStart,
             status: .answered, breakID: "", shownAt: Date(timeIntervalSince1970: -2),
             answeredAt: Date(timeIntervalSince1970: 0), shownElapsed: -2, answeredElapsed: 0,
@@ -67,7 +71,8 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 8)
+        precondition(info["schema_version"] as? Int == 9)
+        precondition(info["tags"] as? [String] == ["Focused work", "Creative work"])
         precondition(info["participant_id"] == nil && info["sharing_consent_id"] == nil)
         precondition((info["sharing_policy"] as? String)?.contains("server-recorded, versioned consent") == true)
         precondition(info["token"] == nil && info["credential"] == nil)
@@ -87,6 +92,7 @@ struct RecordingDataTests {
 
         // Saved sessions survive reopening; exports are named and never replace earlier copies.
         let saved = try SavedSession(folder: writer.folder)
+        precondition(saved.tags == ["Focused work", "Creative work"])
         precondition(saved.exportName(timeZone: TimeZone(secondsFromGMT: 0)!) ==
             "FocusFix Session [1970-01-01 00-00-00-1970-01-01 00-00-01]")
         let initialSessions = try SessionFiles.list(in: root)
