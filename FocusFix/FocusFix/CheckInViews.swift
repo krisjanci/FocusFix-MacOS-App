@@ -47,9 +47,11 @@ struct SessionCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SessionStartDraft
     @State private var editingTags = false
+    @ObservedObject var tagLibrary: SessionTagLibrary
 
-    init(tracker: ActivityTracker) {
+    init(tracker: ActivityTracker, tagLibrary: SessionTagLibrary? = nil) {
         self.tracker = tracker
+        self.tagLibrary = tagLibrary ?? .shared
         _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession))
     }
 
@@ -57,18 +59,20 @@ struct SessionCheckInView: View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Before you start").font(.title2.weight(.semibold))
             if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
-            HStack(alignment: .top) {
+            HStack {
+                if draft.planning { Text("Plan session").font(.headline) }
+                else { Button("Plan session") { draft.addPlan() } }
                 Button { editingTags = true } label: { Label("Tags…", systemImage: "tag") }
-                Text(draft.tags.isEmpty ? "Optional · describe your work" : draft.tags.joined(separator: ", "))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true).help(draft.tags.joined(separator: ", "))
+                Spacer()
+                if draft.planning { Button("Remove plan") { draft.removePlan() } }
+            }
+            if !draft.tags.isEmpty {
+                SessionTagChips(tags: draft.tags, colors: tagLibrary.resolvedColors(for: draft.tags, saved: draft.tagColors))
+                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .background { TagTintBackground(colors: draft.tags.map { tagLibrary.color(for: $0, saved: draft.tagColors) })
+                        .clipShape(RoundedRectangle(cornerRadius: 8)) }
             }
             if draft.planning {
-                HStack {
-                    Text("Plan session").font(.headline)
-                    Spacer()
-                    Button("Remove plan") { draft.removePlan() }
-                }
                 Picker("Work target", selection: $draft.durationChoice) {
                     Text("30 min").tag(30)
                     Text("60 min").tag(60)
@@ -89,8 +93,6 @@ struct SessionCheckInView: View {
                 }
                 Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
                     .font(.caption).foregroundStyle(.secondary)
-            } else {
-                Button("Plan session") { draft.addPlan() }
             }
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -104,7 +106,9 @@ struct SessionCheckInView: View {
             }
         }.padding(28).frame(width: 440)
         .sheet(isPresented: $editingTags) {
-            SessionTagEditor(tags: draft.tags) { draft.tags = $0 }
+            SessionTagEditor(tags: draft.tags, colors: draft.tagColors, library: tagLibrary) { tags, colors in
+                draft.tags = tags; draft.tagColors = colors
+            }
         }
     }
 
