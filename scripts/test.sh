@@ -11,7 +11,7 @@ run_test() {
     shift
     echo "Testing $name"
     xcrun swiftc -module-cache-path "$test_build_dir/module-cache" \
-        "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
+        "$source_dir/SessionTags.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
     "$test_build_dir/$name"
 }
 
@@ -21,6 +21,7 @@ run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/So
 run_test GroupPresentationTests "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
 run_test QuickTourTests "$source_dir/QuickTour.swift" "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
 run_test SessionWorkPlanTests "$source_dir/SessionWorkPlan.swift" "$source_dir/SessionStartDraft.swift" "$source_dir/DailyProgress.swift"
+run_test SessionTagsTests "$source_dir/SavedSession.swift"
 run_test LaunchCoordinatorTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" \
     "$source_dir/AccountController.swift" "$source_dir/LaunchCoordinator.swift"
 run_test AccountTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
