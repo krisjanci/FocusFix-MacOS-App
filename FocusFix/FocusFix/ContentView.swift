@@ -135,15 +135,10 @@ struct ContentView: View {
                         }
                     }
                 }
-                if tracker.sessionFolder != nil {
-                    HStack {
-                        SessionTagChips(tags: tracker.sessionTags,
-                            colors: tagLibrary.resolvedColors(for: tracker.sessionTags, saved: tracker.sessionTagColors))
-                        Spacer(minLength: 4)
-                        Button { editingSessionTags = true } label: { Label("Tags…", systemImage: "tag") }
-                            .font(.caption).help("Change this session's tags and colors")
-                    }
-                }
+                SessionTagButton(tags: tracker.sessionTags,
+                    colors: tagLibrary.resolvedColors(for: tracker.sessionTags, saved: tracker.sessionTagColors)) {
+                        editingSessionTags = true
+                    }.frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity).padding(26)
             .background {
