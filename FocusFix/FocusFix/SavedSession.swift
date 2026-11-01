@@ -11,6 +11,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     let endedAt: Date?
     let duration: Double?
     let status: String
+    let tags: [String]
     // Use the unique session folder name as the library row's identity.
     var id: String { folder.lastPathComponent }
 
@@ -30,6 +31,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         endedAt = (metadata["ended_at_utc"] as? String).flatMap { formatter.date(from: $0) }
             ?? start.flatMap { date in validDuration.map { date.addingTimeInterval($0) } }
         status = metadata["status"] as? String ?? "metadata_unavailable"
+        tags = metadata["tags"] as? [String] ?? []
     }
 
     // Build the readable FocusFix Session name from local start and end dates.
@@ -47,6 +49,32 @@ nonisolated struct SavedSession: Identifiable, Hashable {
 
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
+    // Edit labels without recreating metadata or touching activity/survey files.
+    static func updateTags(_ tags: [String], for session: SavedSession, root: URL, active: URL?) throws {
+        try validate(session.folder, in: root, active: active)
+        let valid = try SessionTags.validated(tags)
+        let url = session.folder.appendingPathComponent("session.json")
+        var metadata: [String: Any]
+        if FileManager.default.fileExists(atPath: url.path) {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else {
+                throw SessionTags.TagError("This session's metadata is not a regular local file.")
+            }
+            guard let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
+                throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
+            }
+            metadata = existing
+        } else {
+            // Unfinished legacy folders may have no metadata yet.
+            metadata = ["session_id": session.id,
+                        "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
+                        "status": session.status]
+        }
+        metadata["tags"] = valid
+        try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
+            .write(to: url, options: .atomic)
+    }
+
     // Locate the app's local Sessions directory in Application Support.
     static func root() throws -> URL {
         try FileManager.default.url(for: .applicationSupportDirectory,
