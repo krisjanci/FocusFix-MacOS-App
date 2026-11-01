@@ -87,6 +87,10 @@ operation, and it doesn't start recording or change any session timers.
 4. Choose **Stop & save**. Sessions are saved automatically; you don't need to export
    after every recording. Open **Sessions** to browse previous recordings, select one,
    then choose **Export…**, **Show in Finder**, or **Delete…**.
+   Choose **Export All…** to copy every saved session into one **FocusFix Sessions**
+   folder at your chosen destination, without selecting each recording. Any current
+   recording is skipped; stop and save it first to include it. Original files stay
+   on this Mac, and repeated exports create separate folders without replacing copies.
 5. **Test tracking** opens a separate window with live individual-event and
    mouse-interval counts. It doesn't start a separate recording; testing during a
    session adds events to that session. Close it when you're done checking.
