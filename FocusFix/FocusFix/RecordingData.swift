@@ -105,12 +105,16 @@ final class RecordingWriter {
     private var mouseBuffer = ""
     private var breakBuffer = ""
     private let surveyOptions: SurveyOptions
-    private let tags: [String]
+    private var tags: [String]
+    private var tagColors: [String: String]
+    private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = []) throws {
+         surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
         self.surveyOptions = surveyOptions
         self.tags = try SessionTags.validated(tags)
+        self.tagColors = try SessionTags.colors(tagColors, for: self.tags)
+        self.startedAt = startedAt
         folder = root.appendingPathComponent(id, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else {
             throw CocoaError(.fileWriteFileExists)
@@ -196,11 +200,21 @@ final class RecordingWriter {
         try surveyPrompts.synchronize()
         try metadata(startedAt: startedAt, duration: duration, reason: reason)
     }
+    // Persist live tag edits before publishing them; Stop uses the same updated values.
+    func updateTags(_ tags: [String], colors: [String: String]) throws {
+        let valid = try SessionTags.validated(tags)
+        let validColors = try SessionTags.colors(colors, for: valid)
+        let previous = (self.tags, self.tagColors)
+        self.tags = valid; self.tagColors = validColors
+        do { try metadata(startedAt: startedAt, duration: nil, reason: "recording") }
+        catch { self.tags = previous.0; self.tagColors = previous.1; throw error }
+    }
+
     // Write session timing, schema, participant identity and consent information into session.json.
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 9, "session_id": folder.lastPathComponent,
-            "tags": tags,
+            "schema_version": 10, "session_id": folder.lastPathComponent,
+            "tags": tags, "tag_colors": tagColors,
             "survey_options": surveyOptions.metadata,
             "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
             "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
