@@ -14,6 +14,8 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @AppStorage("focusfix.research.invitationDeclined") private var invitationDeclined = false
     @State private var sharingPresented = false
+    @State private var editingSessionTags = false
+    @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
     @State private var peopleExpanded = false
     @State private var peopleSheet = false
@@ -133,9 +135,22 @@ struct ContentView: View {
                         }
                     }
                 }
+                if tracker.sessionFolder != nil {
+                    HStack {
+                        SessionTagChips(tags: tracker.sessionTags,
+                            colors: tagLibrary.resolvedColors(for: tracker.sessionTags, saved: tracker.sessionTagColors))
+                        Spacer(minLength: 4)
+                        Button { editingSessionTags = true } label: { Label("Tags…", systemImage: "tag") }
+                            .font(.caption).help("Change this session's tags and colors")
+                    }
+                }
             }
             .frame(maxWidth: .infinity).padding(26)
-            .background(teal.opacity(onBreak ? 0.10 : 0.04), in: RoundedRectangle(cornerRadius: 16))
+            .background {
+                TagTintBackground(colors: tracker.sessionTags.map { tagLibrary.color(for: $0, saved: tracker.sessionTagColors) },
+                                  opacity: onBreak ? 0.2 : 0.15)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
 
             DailyProgressCard(tracker: tracker)
             if !invitationDeclined, account.researchAvailable, account.session != nil,
@@ -236,6 +251,11 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
+        .sheet(isPresented: $editingSessionTags) {
+            SessionTagEditor(tags: tracker.sessionTags, colors: tracker.sessionTagColors, library: tagLibrary) { tags, colors in
+                try tracker.updateCurrentTags(tags, colors: colors)
+            }
+        }
         .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal).interactiveDismissDisabled() }
         .sheet(isPresented: $tracker.breakSetupPresented, onDismiss: { tracker.cancelBreakCheckIn() }) {
             BreakSetupView(tracker: tracker).tint(teal)
