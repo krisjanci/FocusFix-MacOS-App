@@ -46,10 +46,23 @@ struct RecordingDataTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("focusfix-tests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let writer = try RecordingWriter(root: root, id: "synthetic-session", startedAt: Date(timeIntervalSince1970: 0),
-                                         tags: ["Focused work", "Creative work"])
+                                         tags: ["Repetitive work"], tagColors: ["Repetitive work": "#D48326"])
         let initialMetadata = try JSONSerialization.jsonObject(with: Data(contentsOf:
             writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
-        precondition(initialMetadata["tags"] as? [String] == ["Focused work", "Creative work"])
+        precondition(initialMetadata["tags"] as? [String] == ["Repetitive work"])
+        precondition(initialMetadata["tag_colors"] as? [String: String] == ["Repetitive work": "#D48326"])
+        // Changing tags during recording is immediately durable and must survive Stop.
+        let liveColors = ["Focused work": "#168B80", "Creative work": "#7963CF"]
+        try writer.updateTags(["Focused work", "Creative work"], colors: liveColors)
+        let liveMetadata = try JSONSerialization.jsonObject(with: Data(contentsOf:
+            writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
+        precondition(liveMetadata["tags"] as? [String] == ["Focused work", "Creative work"])
+        precondition(liveMetadata["status"] as? String == "recording")
+        precondition(liveMetadata["tag_colors"] as? [String: String] == liveColors)
+        do {
+            try writer.updateTags(["Invalid change"], colors: ["Invalid change": "not-a-color"])
+            preconditionFailure("Invalid live colors must fail without changing the writer")
+        } catch { }
         let initialRating = SurveyEntry(id: "synthetic-check-in", context: .sessionStart,
             status: .answered, breakID: "", shownAt: Date(timeIntervalSince1970: -2),
             answeredAt: Date(timeIntervalSince1970: 0), shownElapsed: -2, answeredElapsed: 0,
@@ -71,8 +84,9 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 9)
+        precondition(info["schema_version"] as? Int == 10)
         precondition(info["tags"] as? [String] == ["Focused work", "Creative work"])
+        precondition(info["tag_colors"] as? [String: String] == liveColors)
         precondition(info["participant_id"] == nil && info["sharing_consent_id"] == nil)
         precondition((info["sharing_policy"] as? String)?.contains("server-recorded, versioned consent") == true)
         precondition(info["token"] == nil && info["credential"] == nil)
