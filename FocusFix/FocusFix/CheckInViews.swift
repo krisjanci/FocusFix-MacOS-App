@@ -46,6 +46,7 @@ struct SessionCheckInView: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SessionStartDraft
+    @State private var editingTags = false
 
     init(tracker: ActivityTracker) {
         self.tracker = tracker
@@ -56,6 +57,12 @@ struct SessionCheckInView: View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Before you start").font(.title2.weight(.semibold))
             if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
+            HStack(alignment: .top) {
+                Button { editingTags = true } label: { Label("Tags…", systemImage: "tag") }
+                Text(draft.tags.isEmpty ? "Optional · describe your work" : draft.tags.joined(separator: ", "))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true).help(draft.tags.joined(separator: ", "))
+            }
             if draft.planning {
                 HStack {
                     Text("Plan session").font(.headline)
@@ -96,6 +103,9 @@ struct SessionCheckInView: View {
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
+        .sheet(isPresented: $editingTags) {
+            SessionTagEditor(tags: draft.tags) { draft.tags = $0 }
+        }
     }
 
     private func start(skippingFatigue: Bool = false) {
