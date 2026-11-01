@@ -831,7 +831,14 @@ final class ActivityTracker: ObservableObject {
         refreshSessions()
     }
     func updateCurrentTags(_ tags: [String], colors: [String: String]) throws {
-        guard let sessionFolder else { throw CocoaError(.fileNoSuchFile) }
+        guard let sessionFolder else {
+            // An idle timer can label the upcoming session before its start sheet opens.
+            guard !isRecording else { throw CocoaError(.fileNoSuchFile) }
+            let valid = try SessionTags.validated(tags)
+            let validColors = try SessionTags.colors(colors, for: valid)
+            sessionTags = valid; sessionTagColors = validColors
+            return
+        }
         try updateTags(tags, colors: colors, for: SavedSession(folder: sessionFolder))
     }
     // Move an inactive local session to Trash. Cloud research-data deletion is separate.
