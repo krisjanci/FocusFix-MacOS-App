@@ -35,7 +35,8 @@ struct ResearchSharingTests {
         let folder = sessions.appendingPathComponent(first)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic fixture".utf8).write(to: folder.appendingPathComponent(name)) }
-        let tagMetadata = try JSONSerialization.data(withJSONObject: ["tags": ["Focused work", "My custom tag"]])
+        let tagMetadata = try JSONSerialization.data(withJSONObject: ["tags": ["Focused work", "My custom tag"],
+            "tag_colors": ["Focused work": "#168B80", "My custom tag": "#C64B66"]])
         try tagMetadata.write(to: folder.appendingPathComponent("session.json"))
         try Data("private name and photo".utf8).write(to: folder.appendingPathComponent("profile.json"))
         let records = [ResearchSession(id: first, consentID: consent.id, startedAt: now, endedAt: now)]
