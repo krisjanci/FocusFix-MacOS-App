@@ -91,6 +91,13 @@ operation, and it doesn't start recording or change any session timers.
    folder at your chosen destination, without selecting each recording. Any current
    recording is skipped; stop and save it first to include it. Original files stay
    on this Mac, and repeated exports create separate folders without replacing copies.
+   **Tags…** in Before you start adds optional labels to that session. Combine labels
+   such as **Creative work** and **Focused work**, or add your own. In Sessions,
+   select a saved recording and choose **Edit tags…** to add, remove, or clear its
+   labels. Stop and save an active recording before editing its tags.
+   **Manage tags…** lets you rename/remove the reusable labels. Custom labels and
+   list edits are remembered on this Mac across launches. Changing the reusable
+   list does not rewrite past recordings; edit a session's tags to change its labels.
 5. **Test tracking** opens a separate window with live individual-event and
    mouse-interval counts. It doesn't start a separate recording; testing during a
    session adds events to that session. Close it when you're done checking.
@@ -542,10 +549,19 @@ doesn't establish that the user saw or deliberately ignored it.
 
 **session.json** stores the random session ID, UTC start/end, schema version, time/unit
 definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason.
+Schema 9 adds `tags`, a JSON array of up to 20 user-selected strings (each 1–40
+characters), for example `"tags": ["Creative work", "Focused work"]`. Tags describe
+the session as a whole, not individual intervals or objective attention measurements.
+They are saved before recording begins and kept at Stop. Sessions without tags have
+an empty array; older metadata without the field is displayed as untagged.
+Tag edits preserve the remaining metadata and every CSV. Individual exports,
+Export All, and research ZIPs include the labels in each session's `session.json`.
+Already exported or delivered copies keep the labels they had at export time.
 New recordings omit the retired Cloudflare `participant_id` and `sharing_consent_id`.
 Existing recordings keep their original metadata and remain readable/exportable.
 Account-based consent and delivery state are managed separately by the Supabase
-research flow. Recording metadata contains no names, emails, credentials or survey scores.
+research flow. Recording metadata contains no profile names, emails, credentials or
+survey scores; user-authored tags contain the text the user enters.
 
 ### Background behavior and limitations
 
