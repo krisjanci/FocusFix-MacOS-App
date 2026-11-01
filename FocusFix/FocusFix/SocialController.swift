@@ -56,10 +56,13 @@ final class SocialController: ObservableObject {
             loaded: hasLoadedGroups, failed: syncFailed, notice: notice != nil)
     }
     func selectGroup(_ id: UUID) {
-        guard groups.contains(where: { $0.id == id }) else { return }
+        guard selection.groupID != id, groups.contains(where: { $0.id == id }) else { return }
         selection.groupID = id; saveSelection()
     }
-    func selectMetric(_ metric: LeaderboardMetric) { selection.metric = metric; saveSelection() }
+    func selectMetric(_ metric: LeaderboardMetric) {
+        guard selection.metric != metric else { return }
+        selection.metric = metric; saveSelection()
+    }
     private func selectionKey(_ identity: String) -> String { "focusfix.groups.selection." + identity }
     private func saveSelection() {
         guard let identity, let data = try? JSONEncoder().encode(selection) else { return }
