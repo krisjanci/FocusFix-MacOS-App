@@ -577,3 +577,22 @@ second revision. Invalid/stale edits leave the previous atomic snapshot intact.
 The generated label/edit tests check bounds, mixed context, original revisions,
 idempotence and unchanged raw event bytes. Real input/permission behavior remains
 a separate manual check, not something these fixtures establish.
+
+## November 2, 2026 — automatic recording, Step 5
+
+I kept the fixed reminder baseline and made eligibility explicit. Work reminders
+require declared work. An independent off-by-default screen-use switch permits
+reminders for unknown/non-work computer use, identified as screen-use reminders.
+
+The notification's Not working action labels from its action time onward; it does
+not stop capture or rewrite the preceding session. History is the separate route
+for earlier corrections. Requests carry logical recording/context/work-period IDs
+and a policy version. A later explicit label, pause or revocation invalidates them,
+and consumed actions are idempotent. The process-monotonic cooldown survives file
+rotation. I log scheduled/requested/action times; requests are not proof of delivery,
+viewing or a response, and silence isn't fatigue or break evidence.
+
+Synthetic gate tests passed for current/stale/duplicate/no-response requests,
+changed context, pause/revoke and midnight cooldown. Debug compiled. Full Swift
+regressions passed for the iteration. Notification denial/delivery and actual
+macOS action routing still require device qualification; no permissions changed.
