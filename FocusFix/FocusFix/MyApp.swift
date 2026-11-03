@@ -68,7 +68,7 @@ private struct RecordingMenu: View {
     @Environment(\.openWindow) private var openWindow
     // Expose session, break and survey controls while the main window is closed.
     var body: some View {
-        Text(tracker.isRecording ? "\(tracker.breakPhase == .work ? "Recording" : "On break") · \(tracker.formattedTime)" : "FocusFix · Idle")
+        Text(tracker.recordingStatus)
         ProgressMenuSummary(tracker: tracker)
         Button("Groups") { openWindow(id: "groups"); NSApp.activate(ignoringOtherApps: true) }
         if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
@@ -84,8 +84,8 @@ private struct RecordingMenu: View {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button(tracker.isRecording ? "Stop & save" : "Start session") {
-            if tracker.isRecording { tracker.stop() } else {
+        Button(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work") {
+            if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else {
                 launch.requestStart(start: { tracker.requestStart() }, showWindow: {
                     openWindow(id: "collector")
                     NSApp.activate(ignoringOtherApps: true)
@@ -98,11 +98,6 @@ private struct RecordingMenu: View {
         }
         if tracker.isRecording {
             Text("Context · \(tracker.userContext == .work ? "Work" : tracker.userContext == .nonWork ? "Not working" : "Unknown")")
-            if tracker.userContext == .work {
-                Button("End work") { tracker.endWork() }
-            } else {
-                Button("Start work") { tracker.requestStart() }
-            }
             Menu("Activity context") {
                 Button("Work") { tracker.setContext(.work) }
                 Button("Not working") { tracker.setContext(.nonWork) }
