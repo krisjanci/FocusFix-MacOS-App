@@ -219,3 +219,20 @@ Generated progress/outbox/account tests, full Swift regressions, unsigned Debug 
 the isolated PostgreSQL suite passed. PGlite 0.5.12 was restored into /tmp with
 package scripts disabled; the suite uses an in-memory database, not real groups.
 Next: Step 9 research archive/scope preparation, with new-format delivery disabled.
+
+## Automatic tracking Step 9 — November 2, 2026
+
+I prepared archive version 2, scope/provenance validation, account/consent segment
+boundaries and the expanded allowlist. Old consent has no automatic/non-work scope;
+withdrawal/account mismatch/pre-consent data fail closed. New-schema production
+queue/ZIP eligibility remains disabled. The new ZIP builder is compiled only for
+synthetic tests and requires generated-fixture metadata. Caps remain 180 minutes/
+study day, 100 MiB raw and 25 MiB compressed. Long segments are ineligible rather
+than bypassing the cap. Existing withdrawal/deletion/receipt protections remain.
+See research operations for downloaded-data/model inventory deletion requirements.
+
+Generated archive/scope/cap/path/retry/account tests and the existing withdrawal
+regressions are run. Local Debug compiled; real reviewed consent, disposable-service
+end-to-end/race checks and cumulative server compatibility remain absent. No
+migrations/functions deployed, settings enabled, billing changed or data accessed.
+Next: Step 10 a separate local clustering experiment on generated fixtures.
