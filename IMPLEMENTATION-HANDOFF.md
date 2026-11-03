@@ -190,3 +190,16 @@ dark at narrow width, including paused/idle/permission and long text. Evidence:
 full-window or spoken VoiceOver qualification. Source inspection confirms keyboard
 history controls and explicit labels; full keyboard navigation remains manual.
 Next: Step 7 ordinary use without surveys and separately gated study checks.
+
+## Automatic tracking Step 7 — November 2, 2026
+
+I made ordinary use survey-free without deleting old answers/options. An independent
+versioned study scope plus complete reviewed configuration is required for prompts;
+none is bundled. Only generated tests inject the synthetic schedule. Rate/quiet
+limits and frozen versions gate cross-context requests, and their immutable IDs
+join to precise preceding recall windows/context. Revocation cancels stale prompts.
+Old survey exports remain readable and are not relabeled as new measurements.
+The original supervised backend remains work-only and cannot consume schema 11.
+Debug compiled; generated preference/schedule/recall/withdrawal checks and the
+existing Swift runner are used. Real study configuration/approval remains absent.
+Next: Step 8 declared-work progress and fail-closed unsupported social corrections.
