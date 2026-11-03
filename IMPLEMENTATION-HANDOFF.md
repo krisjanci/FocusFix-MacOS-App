@@ -1,3 +1,32 @@
+# Current redesign handoff — November 2, 2026
+
+I implemented all twelve automatic-tracking steps locally and committed each changed
+file separately in each iteration. The current behavior/contract is in README,
+RECORDING-CONTRACT and CODE_MAP; the requirement/verification/release boundaries are
+in [REDESIGN-READINESS.md](REDESIGN-READINESS.md). Historical deployment entries below
+do not mean this redesign was deployed or qualified on a signed Mac.
+
+- Automatic mode requires a new explicit scope; manual remains available. Unknown,
+  declared work, intervention phase and capture state remain independent.
+- Lifecycle, atomic labels/revisions, coverage/history, contextual notifications and
+  survey-free ordinary use are implemented. Study configuration is absent/off.
+- New Work totals stay local: the old group RPC cannot reconcile decreases. Existing
+  groups/healthy-break rules stay intact. New research archive qualification is off;
+  old consent cannot authorize automatic/non-work delivery. No collection activated.
+- Backend clustering and independent validation are separate, synthetic by default,
+  with leakage checks and disabled preview fallback. Real fatigue benefit is unproven.
+- 32 Swift executables, 40 pinned Python tests, seven mocked Node tests and isolated
+  PostgreSQL checks passed. Universal unsigned builds/content checks and component
+  visual evidence are recorded in readiness. The missing public privacy URL still
+  blocks the submission gate; signing/live-device/service checks remain unperformed.
+
+Next action: qualify one stable signed build on a fresh Mac using
+[MANUAL-QUALIFICATION.md](MANUAL-QUALIFICATION.md), starting with actual Input
+Monitoring and idle/pause/sleep. Keep research and unsupported new Work sync off.
+Nothing pushed, deployed, published, submitted to Apple, or changed in live billing.
+
+---
+
 ## Expandable People panel — October 27, 2026
 
 The main Groups button now toggles a right-hand People panel, expanding from 490 to 850 points while retaining the timer width. Screens narrower than 850 points use the same panel in a sheet. The shared group selector and metric tabs persist by account, and account changes immediately clear displayed members. Rankings share rows with the Groups window and isolated 12-step tutorial, including positive-score podium markers and a pinned personal rank. Decorative animation respects Reduce Motion and inactive windows. Group progress has explicit signed-out, opt-in, loading, enabled and retry states; enabling is an in-app action, not a macOS permission prompt. Profile retains Test tracking and Quick tour.
