@@ -6,10 +6,10 @@ import SwiftUI
 struct PrivacyNoticeDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("While recording manually or automatically, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing and any survey answers you choose to give.")
-            Text("It does not save typed text, individual letter keys, app names, window titles, screenshots or cursor paths. Detailed activity timing can still be sensitive. Stop recording before doing anything you don't want included.")
+            Text("While recording manually or automatically, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing, user-declared work/non-work/unknown labels and any separately enabled optional study answers. Automatic recording can include non-work computer use.")
+            Text("It does not save typed text, individual letter keys, app names, window titles, URLs, screenshots or exact cursor paths. Detailed activity timing can still be sensitive. Pause recording before doing anything you don't want included.")
             Text("Sessions stay in FocusFix's private storage on this Mac until you delete them. Use Sessions → Show in Finder to locate them. They are not separately encrypted by FocusFix. Exports and Mac backups can contain copies. Deleting a session moves the local folder to Trash; empty Trash when you want to remove that copy.")
-            Text("Input Monitoring permission lets the app observe keyboard and mouse activity across apps without changing or blocking your input. You can stop with Stop & save or Quit, and revoke access in System Settings. macOS may withhold keyboard events during secure input, such as password entry. Such gaps are not proof of inactivity. During a planned break detailed logging pauses; it resumes when the break timer ends or you return early.")
+            Text("Input Monitoring permission lets the app observe keyboard and mouse activity across apps without changing or blocking your input. You can stop with Pause recording, disabling recording or Quit, and revoke access in System Settings. macOS may withhold keyboard events during secure input, such as password entry. Such gaps are not proof of inactivity. During a planned break detailed logging pauses; it resumes when the break timer ends or you return early.")
             Text(AccountConfiguration.bundled?.researchSharingEnabled == true
                 ? "This build supports optional per-session research sharing with the FocusFix researcher through private Supabase storage after manual researcher approval and separate, versioned consent. Signing in does not enable sharing. Received data can be associated with your account; ZIPs exclude profile names and photos. Review the full study consent in Settings → Privacy & Research before enabling sharing. Turning sharing off cancels pending deliveries but cannot recall copies already received."
                 : "This build cannot enroll in research or upload recordings. Exporting a session is a separate action you control.")
@@ -29,7 +29,7 @@ struct RecordingNoticeView: View {
         VStack(alignment: .leading, spacing: 20) {
             Label("Your activity, your choice", systemImage: "hand.raised").font(.title2.weight(.semibold))
             ScrollView { PrivacyNoticeDetails() }
-            Text("After closing this notice, press Start session when you're ready.")
+            Text("After closing this notice, Start work begins manual capture. Automatic recording needs a separate explicit choice in Privacy & Research.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Not now") { tracker.declineRecordingNotice(); dismiss() }.keyboardShortcut(.cancelAction)
