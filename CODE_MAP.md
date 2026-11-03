@@ -36,6 +36,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: UI` | `MyApp.swift`, `ContentView.swift` | App windows, main screen, menu bar and appearance |
 | `FF: STARTUP` | `LaunchScreen.swift` | Play/pause logo animation and skip/reduced-motion behavior |
 | Account services | `AccountAPI.swift`, `AccountController.swift`, `UserProfile.swift` | Supabase authentication, profile sync and account Keychain storage |
+| Prepared archive contract | `ResearchArchiveContract.swift` | Version-2 scope/capability/provenance checks, local eligibility snapshots and synthetic-only ZIP verification; real delivery remains off |
 | `FF: RESEARCH SHARING` | `ResearchSharing.swift`, `ResearchSharingController.swift`, `AccountViews.swift` | Consent snapshots, ZIP allowlisting, delivery queue, retries and withdrawal |
 | Research backend | `supabase/functions/`, `supabase/migrations/` (repository root) | Server consent, private Storage policies, approval and deletion |
 | Automatic preferences/login | `AutomaticRecordingPreferences.swift`, `LoginLaunch.swift` | Separate versioned automatic opt-in, persistent pause, stale-callback generation and explicit OS login registration |
