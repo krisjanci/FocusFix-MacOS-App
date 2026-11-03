@@ -1,3 +1,13 @@
+## Automatic-recording choice — November 2, 2026
+
+Settings → Privacy & Research now has a separate **Enable automatic recording**
+acknowledgement. Fresh and upgraded installations remain manual until explicitly
+accepted; existing recording consent, accounts, Input Monitoring and research
+sharing do not enable it. Turning all recording off also revokes automatic mode.
+Optional **Launch at login** reads macOS status and changes it only when toggled.
+It does not override consent or user pause. Closing the window leaves FocusFix
+running in the menu bar; Quit stops capture. Step 3 supplies the automatic lifecycle.
+
 ## Automatic-tracking foundation — November 2, 2026
 
 I added the [schema 11 recording contract](RECORDING-CONTRACT.md): manual Start
