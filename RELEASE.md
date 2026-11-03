@@ -1,3 +1,15 @@
+## Automatic-recording redesign gate — November 2, 2026
+
+The local redesign has universal unsigned build/content and synthetic regression
+evidence, not signed-device release qualification. Read
+[REDESIGN-READINESS.md](REDESIGN-READINESS.md) and complete
+[MANUAL-QUALIFICATION.md](MANUAL-QUALIFICATION.md) on the exact stable signed build.
+Research/new archives and experimental policy remain disabled. New declared-work
+sync requires a correction-compatible server; do not release held totals through
+the increment-only RPC. Public policy/support URLs, signing/provisioning/notarization
+or Store export, final materials and rights review remain separate gates. No
+publication, deployment, Apple submission or push was performed in this redesign.
+
 ## October 26 research/privacy implementation
 
 Use [STORE-SUBMISSION.md](STORE-SUBMISSION.md) and
