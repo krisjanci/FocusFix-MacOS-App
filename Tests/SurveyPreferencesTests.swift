@@ -11,7 +11,9 @@ struct SurveyPreferencesTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let preferences = SurveyPreferences(defaults: defaults)
+        let preferences = SurveyPreferences(defaults: defaults, configuration: .synthetic, allowSynthetic: true)
+        precondition(preferences.snapshot == SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false))
+        preferences.setStudyCheckInsEnabled(true)
         precondition(preferences.snapshot == SurveyOptions())
 
         for mask in 0..<8 {
@@ -19,7 +21,7 @@ struct SurveyPreferencesTests {
             preferences.beforeBreak = mask & 2 != 0
             preferences.duringWork = mask & 4 != 0
             let snapshot = preferences.snapshot
-            precondition(SurveyPreferences(defaults: defaults).snapshot == snapshot)
+            precondition(SurveyPreferences(defaults: defaults, configuration: .synthetic, allowSynthetic: true).snapshot == snapshot)
             precondition(snapshot.isEnabled(for: .sessionStart) == preferences.beforeSession)
             precondition(snapshot.isEnabled(for: .beforeBreak) == preferences.beforeBreak)
             precondition(snapshot.isEnabled(for: .duringWork) == preferences.duringWork)
