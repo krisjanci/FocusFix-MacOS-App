@@ -75,6 +75,7 @@ final class ActivityTracker: ObservableObject {
     private var activityPhase: String { checkInOpen ? "check_in" : breakPolicy.activityPhase }
     var openMainWindow: (() -> Void)?
     private var breakPolicy = BreakPolicy()
+    let breakPolicyProvider: any BreakPolicyProvider = FixedTimerPolicyProvider()
     private let breakNotifications = BreakNotifications()
     private let notificationAccess = NotificationAccess(client: SystemNotificationPermissionClient())
     private var returnPoint: CGPoint = .zero
