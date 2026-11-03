@@ -30,6 +30,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: SURVEYS` | `SurveyPreferences.swift`, `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | Saved survey switches, session snapshots, 10-minute opportunities, rating validation, CSV answers and sliders |
 | Reminder eligibility | `ReminderEligibility.swift` | Context/work-period tokens, policy version, duplicate/stale actions and rotation-safe cooldown |
 | `FF: NOTIFICATIONS` | `NotificationAccess.swift`, `BreakNotifications.swift` | Asking for permission, banners and notification buttons |
+| Coverage/status | `RecordingCoverage.swift`, `RecordingPresentation.swift`, `RecordingStatusPanel.swift` | Observed coverage versus missing time, context/phase duration partitions and shared main/menu status |
 | `FF: SESSIONS` | `SessionViews.swift` | Session library and Test tracking window |
 | `FF: UI` | `MyApp.swift`, `ContentView.swift` | App windows, main screen, menu bar and appearance |
 | `FF: STARTUP` | `LaunchScreen.swift` | Play/pause logo animation and skip/reduced-motion behavior |
