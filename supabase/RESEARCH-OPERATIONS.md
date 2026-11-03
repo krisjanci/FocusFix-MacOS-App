@@ -178,3 +178,39 @@ file or paste credentials into chat. Run the script once; it deletes both fixtur
 accounts in cleanup and retains the monotonic cohort count and minimal deletion
 requests as designed. Recreating fixtures consumes additional test cohort slots.
 This runner does not test real email delivery or fresh-Mac recording permissions.
+
+## Automatic-format preparation (not enabled) — November 2, 2026
+
+Schema 11 is still rejected by live queueing and legacy ZIP creation. The prepared
+archive contract is version 2, with `context_intervals.json`, `reminders.jsonl` and
+`study_check_ins.jsonl` added to the existing six files. A generated archive manifest
+names the recording/capability/scope versions and consent reference. Credentials,
+profiles and the private local `research_eligibility.json` are excluded. The only
+new ZIP builder is compiled under the synthetic-test flag and refuses unmarked
+fixtures; shipping builds cannot invoke it. Production qualification stays false.
+
+Old consent snapshots have no new scope and cannot authorize automatic/non-work
+archives. New reviewed scope must explicitly cover automatic/non-work data,
+context/revisions, optional checks, retention, downloaded-data deletion and training
+uses (including whether future training is permitted). Required fields are
+configuration checks, not institutional approval. No such scope is configured here.
+
+Capture segments snapshot consent/account identity. Input/timer boundaries close
+prior scope and begin a new segment; signing in or granting consent cannot make
+pre-consent files eligible. Withdrawal/current-account mismatch rejects preparation,
+while existing durable withdrawal, revoke-before-delete and receipt paths remain.
+Qualification must additionally exercise actual app callbacks and service races in
+a disposable environment before any new-format gate can change.
+
+Limits deliberately remain 100 MiB raw / 25 MiB ZIP and 180 captured minutes per
+study day. Whole segments exceeding the remaining daily cap are ineligible, not
+silently truncated or split to bypass it. A daily local recording can therefore be
+too long to share. The real server must enforce the same cap cumulatively across
+accepted new/legacy archives before release; local validation alone is insufficient.
+
+The researcher inventory must map archive ID → consent ID → recording/segment IDs →
+downloads, datasets/features, fitted preprocessors, training runs and model versions.
+Process deletion against that inventory, including copied/revised labels and derived
+window assignments. Hosted deletion remains distinct from downloaded-copy cleanup;
+source removal does not establish model unlearning. No migration/function was
+replayed or deployed, no recruitment/collection enabled and no billing changed.
