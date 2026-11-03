@@ -117,11 +117,11 @@ struct ProgressMenuSummary: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let calendar = social.enabled ? social.calendar : DailyProgress.calendar()
-            let progress = social.ledger?.progress ?? tracker.dailyProgress
+            let calendar = DailyProgress.calendar()
+            let progress = tracker.dailyProgress
             let day = progress.day(at: context.date, calendar: calendar)
             let streak = progress.streak(at: context.date, calendar: calendar)
-            Text("Today: \(Int(day.workSeconds / 60))/60 min · \(streak)-day weekday streak")
+            Text("Declared work: \(Int(day.workSeconds / 60))/60 min · \(streak)-day weekday streak")
             Text("Breaks taken today: \(day.completedBreakIDs.count)")
         }
     }
