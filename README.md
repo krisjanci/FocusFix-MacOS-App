@@ -1,832 +1,180 @@
-## Experimental policies remain off — November 2, 2026
-
-The shipped fixed timer/idle policy stays selected. A disabled synthetic preview
-provider checks the separate seven-rate feature contract and falls back for missing
-coverage, incompatible/stale models, unknown clusters, pause or ineligible context.
-It returns descriptive cluster IDs, never fatigue scores. Independent backend
-validation is separate from cluster stability and intervention benefit; neither
-fatigue improvement nor benefit has been established for real users. No model or
-randomization is activated.
-
-## Prepared research format remains disabled — November 2, 2026
-
-New-schema recordings remain local. The prepared version-2 archive includes context,
-label provenance, reminder logs and optional study checks, but old consent cannot
-authorize it. Production eligibility stays disabled pending reviewed scope and
-configuration plus disposable-service qualification. Long automatic recordings do
-not bypass the existing 180-minute study cap or ZIP limits. Account/consent changes
-create scope boundaries; sign-in/consent never backfills old recordings. Private local
-eligibility snapshots contain pseudonymous IDs, not credentials; explicit folder
-exports may include them. See [research operations](supabase/RESEARCH-OPERATIONS.md).
-
-## Declared-work scoring compatibility — November 2, 2026
-
-Goals use declared work with observed coverage, excluding unknown/non-work, missing
-coverage, check-ins and explicit breaks. Context corrections replace new local
-contributions without rescoring legacy earned credit. These minutes are not
-objective productivity. Existing group Work scores stay unchanged by new-format
-work because the old server cannot safely reconcile correction decreases. New work
-summaries remain in an account-scoped local queue; a compatible server update and
-disposable-service qualification are required before sync. Explicit healthy-break
-rules and private-group thresholds/freezes remain unchanged. See
-[the sync dependency](supabase/DECLARED-WORK-SYNC.md).
-
-## Ordinary use without surveys — November 2, 2026
-
-Manual/automatic capture and breaks do not require surveys. Optional study check-ins
-are off by default, including upgrades with old survey preferences. They require
-separate explicit opt-in and a complete reviewed study configuration; none is bundled.
-Research sharing does not activate prompts. Old answers/exports are preserved, with
-missing ratings kept blank. Generated tests cover a synthetic cross-context schedule;
-this is not an approved study schedule. The original supervised backend cannot
-consume these new context/recall measurements without adaptation.
-
-## Recording status and history — November 2, 2026
-
-The main window and menu share Working, Not working, automatic Unknown, Paused,
-Idle and Permission needed states. Start/End work and Pause/Resume have different
-effects. Recorded elapsed time includes unknown/non-work use; declared-work time
-is shown separately. History lists recording segments and observed work/non-work/
-unknown/break/unavailable coverage. Missing observations are unavailable, not zero
-activity. Quick tour includes isolated automatic-recording/label/pause practice.
-Component previews are in `verification/recording-status-previews.png`; full
-keyboard, VoiceOver and real-device qualification remain manual.
-
-## Contextual reminders — November 2, 2026
-
-The fixed timer/idle policy suggests work breaks during declared work. Settings has
-a separate, off-by-default choice for screen-use break reminders during Unknown or
-Not working activity. **I’m not working** labels from the notification action time
-onward and keeps recording; correct an earlier interval in Sessions. Older requests
-cannot overwrite a later context choice. Notification requests are logged separately
-from actions and do not prove delivery, viewing or fatigue. In-app controls remain
-available without notification permission.
-
-## Optional work labels and corrections — November 2, 2026
-
-**Start work** in the menu labels activity from now, including during automatic
-capture. **End work** returns automatic activity to Unknown; manual-only capture
-ends and saves. Work is user declared, not objectively verified productivity.
-The menu also offers Not working and Unknown. Sessions → **Edit context…** changes
-a selected bounded interval and preserves a revision history. Earlier unknown
-activity stays unknown unless explicitly corrected. Raw activity files stay intact.
-
-## Automatic lifecycle — November 2, 2026
-
-After explicit automatic opt-in, capture can begin while FocusFix runs if Input
-Monitoring is already granted. It starts Unknown. Pause/Resume is in the menu bar;
-a user pause survives relaunch. Sleep/lock or five continuous idle minutes stop
-capture; eligible lifecycle resumes start Unknown. Quit stops capture; closing a
-window keeps the menu-bar app running. Errors stop capture until deliberate retry.
-Files rotate by local day with stable logical recording/context IDs. Checkpoints
-bound crash recovery and missing coverage is never filled. Short automatic
-recordings are retained; unknown activity does not count as work. See the
-[recording contract](RECORDING-CONTRACT.md) for elapsed origins across segments.
-Actual capture, sleep/wake, permissions and long-run operation need device tests.
-
-## Automatic-recording choice — November 2, 2026
-
-Settings → Privacy & Research now has a separate **Enable automatic recording**
-acknowledgement. Fresh and upgraded installations remain manual until explicitly
-accepted; existing recording consent, accounts, Input Monitoring and research
-sharing do not enable it. Turning all recording off also revokes automatic mode.
-Optional **Launch at login** reads macOS status and changes it only when toggled.
-It does not override consent or user pause. Closing the window leaves FocusFix
-running in the menu bar; Quit stops capture. Step 3 supplies the automatic lifecycle.
-
-## Automatic-tracking foundation — November 2, 2026
-
-I added the [schema 11 recording contract](RECORDING-CONTRACT.md): manual Start
-records a user-declared work label separately from the old intervention phase.
-Legacy sessions remain readable with unknown context. Context snapshots save
-atomically without rewriting activity CSVs. New-schema recordings stay local
-and are rejected by research queueing and archive construction. Automatic capture
-and its opt-in are subsequent steps; nothing starts automatically in this step.
-
-## Private groups and automatic streak freezes
-
-Groups now supports private invite codes, creator controls, and separate all-time Work and Healthy habits leaderboards. A 60-minute work day earns one work point; a day with a completed one-minute break earns one healthy-habit point. Scores start at joining, and weekends can earn points. The existing weekday streak receives three automatic monthly freezes, without rollover or consecutive calendar-day use. Frozen days add no points or streak days.
-
-Choose **Groups** on the main screen to expand the People panel. Sign in from Profile, then choose **Enable group progress** inside the panel to sync account-scoped summaries. This is an explicit in-app choice, with no macOS permission prompt. Guest history stays local and research participation is separate.
-
-People keeps the timer at its original width and shows the selected private group, its member count out of 50, Work / Healthy habits tabs, and a pinned personal rank. **Manage groups** opens invitations and membership controls. Group and metric selection are shared between these views and saved separately for each account; the panel starts collapsed each launch. Narrow screens use a sheet. Positive top-three ranks have gold crown, silver medal and bronze laurel markers, with restrained animation that pauses in inactive windows and respects Reduce Motion. The isolated 12-step Quick tour explains expanding People, switching groups and metrics, podium symbols, scoring and freezes using practice data. The group backend is deployed to the configured FocusFix project. See [Social setup](supabase/SOCIAL-SETUP.md) for verification results and migration instructions for other projects. **Test tracking** and **Quick tour** are available directly in Profile.
-
-## Research/privacy update — October 26, 2026
-
-Profile now contains identity/account actions. **Settings → Privacy & Research**
-contains the recording preference, optional surveys, complete study consent,
-manual participant approval status and per-session delivery controls. First launch
-offers Enable recording or Not now. Neither choice grants Input Monitoring or
-starts recording. Switching recording off stops the session and blocks all Start paths.
-
-The legacy Cloudflare uploader and its service code have been removed. Saved
-development state and received data are preserved; see [removal notes](CLOUDFLARE-REMOVAL.md). The account-based path requires
-server-recorded, versioned consent as well as approval. The lifetime cohort cap is
-50 even after account deletion. Offline withdrawal is durable and blocks subsequent
-uploads until synchronized. Research-data deletion is separate from local deletion
-and leaves a private researcher task for downloaded copies/model datasets.
-
-Accounts are configured; the privacy manifest declares account collection. Research
-remains disabled until the actual institution determination, consent, retention and
-public study URL are configured. There is no fabricated approval or retention period.
-
-Current implementation and operating instructions: [Research operations](supabase/RESEARCH-OPERATIONS.md).
-Current App Store copy, privacy categories and remaining requirements:
-[Submission package](STORE-SUBMISSION.md). The historical notes below describe earlier
-implementation stages; these current documents supersede their enrollment and
-local-only Release descriptions.
-
-![FocusFix logo](Assets/FocusFixLong.png)
-
-# FocusFix-MacOS-App
-Evaluating Personalized Microbreaks to Reduce Mental Fatigue While Maintaining Productivity
-
-## Current app: activity collector and rule-based breaks
-
-This version collects local behavior data and recommends breaks using a timing/idle
-rule. It collects brief fatigue/self-reported productivity check-ins. It does not predict fatigue with
-ML. Optional research uploads require manual researcher approval and explicit versioned consent. The
-account-based Supabase path handles optional per-session ZIP delivery; see
-[research operations](supabase/RESEARCH-OPERATIONS.md). Research remains disabled
-until the study requirements are configured and verified. Both Debug and Release
-use the same Supabase path; neither contains a Cloudflare upload receiver.
-The reminder rule is a prototype to evaluate, not evidence that fatigue is reduced.
-
-**Not ready for a public app download yet.** See [my release checklist](RELEASE.md)
-for signing, notarization, clean-Mac testing and the separate study approval steps.
-
-For finding/editing a feature, I use [my code map](CODE_MAP.md). It lists the searchable
-`FF:` comments, which files do what, and Xcode/VS Code shortcuts. For cloud setup,
-use [research operations](supabase/RESEARCH-OPERATIONS.md).
-
-### Run it
-
-On launch, the muted play logo holds for 0.9 seconds before a pronounced press,
-bounce and clockwise quarter-turn into the full-color pause logo. The pause symbol
-presses again and shrinks away while the four ring pieces grow, spread outward and
-fade to reveal the app underneath. The full sequence takes about 3.7 seconds and
-plays once per app launch. Click to skip; Reduce Motion skips it automatically.
-Reopening the main window doesn't replay it. This is visual only, not a loading
-operation, and it doesn't start recording or change any session timers.
-
-1. Open `FocusFix/FocusFix.xcodeproj` in Xcode. Select FocusFix → My Mac.
-   Debug supports enrolled research tests; do not distribute it. Research setup stays
-   locked at launch until explicitly unlocked in the profile.
-   Use an unconfigured Release for local recording checks. Both configurations target macOS 14 or later;
-   runtime compatibility still needs testing on each supported system.
-2. Press **Start session**. On first use, review the recording/privacy notice and
-   choose **I understand**, then press Start again. **Not now** records nothing.
-   The notice is also available in the profile. Start requests **Input Monitoring** if needed.
-   Enable FocusFix in System Settings → Privacy & Security → Input Monitoring.
-   **Enable Input Monitoring** is the single setup button: it requests the app entry
-   and opens the right Settings page. Turn on FocusFix there, then quit and reopen
-   it if macOS asks. FocusFix cannot grant itself permission. Debug, Release and older
-   copies can have different entries; older builds used Accessibility.
-
-   For a development build that still fails to appear, add the exact built app using
-   **+** in Input Monitoring settings. Repeated local builds are not a substitute
-   for testing a stable, developer-signed release.
-3. If the starting survey is enabled, rate how mentally tired you feel or choose **Skip & start**.
-   Then work normally. Close the window if you like: recording continues, with controls
-   in the menu bar. Nothing starts automatically on launch.
-4. Choose **Stop & save**. All session work time counts toward the daily 60-minute
-   goal. Sessions lasting at least 15 minutes (including exactly 15 minutes) are
-   saved in history and eligible for optional research delivery to Supabase.
-   Shorter recordings are discarded while their earned daily progress is kept.
-   Existing saved sessions are preserved. You don't need to export after every recording. Open **Sessions** to browse previous recordings, select one,
-   then choose **Export…**, **Show in Finder**, or **Delete…**.
-   Choose **Export All…** to copy every saved session into one **FocusFix Sessions**
-   folder at your chosen destination, without selecting each recording. Any current
-   recording is skipped; stop and save it first to include it. Original files stay
-   on this Mac, and repeated exports create separate folders without replacing copies.
-   **Tags…**, beside **Plan session**, opens a compact colored tag list. The three
-   starter labels are **Focused work**, **Creative work**, and **Repetitive work**.
-   Click labels to select them, or use **New tag**. Each tag's options menu offers
-   **Edit name and color…**, with quick swatches and a custom color picker.
-   Choose **Done** to apply the selection. Custom labels and colors are remembered
-   on this Mac across launches; existing customized tag lists are preserved.
-   Click the tag chips on the timer or in Sessions to edit them directly,
-   including during a recording. When there are no tags, a small **+ Add tags**
-   chip opens the same picker. On an idle timer with no saved session attached,
-   these choices carry into the next Before you start screen. Changes
-   during recording are saved immediately and retained by Stop & save. The timer
-   and session rows show the tag colors; multiple colors have sharp diagonal splits.
-   Catalog color changes recolor matching labels in the app. Renaming/removing a
-   reusable tag does not rewrite past session labels; edit a session to change them.
-5. **Test tracking** opens a separate window with live individual-event and
-   mouse-interval counts. It doesn't start a separate recording; testing during a
-   session adds events to that session. Close it when you're done checking.
-6. Use the appearance menu in the main window to choose **System**, **Light**, or
-   **Dark**. The choice is remembered and applies to all FocusFix windows.
-7. Choose **Enable notifications** on the main window's reminder card, then Allow
-   in the macOS dialog. If notifications or banners are off, the card offers
-   **Open notification settings** instead. Enable FocusFix and choose Banners or Alerts.
-   The card refreshes when you return to the app and disappears when banners are enabled.
-   Recording is still allowed without notifications; the same break actions remain
-   in the app and menu bar. Focus / Do Not Disturb and
-   macOS notification settings may hide or delay banners; the app doesn't override them.
-
-Sessions are automatically saved inside the app sandbox, normally under
-`~/Library/Containers/io.github.krisjanci.FocusFix/Data/Library/Application Support/FocusFix/Sessions/<session-id>/`.
-Use **Sessions → Show in Finder** to locate the actual folder. Debug builds use
-`io.github.krisjanci.FocusFix.debug` and a separate container. Old unsandboxed
-recordings are not moved or deleted; export them from the old build before changing
-installations. No existing participant identity is automatically migrated.
-Each new session has five CSVs and `session.json`. A new session never replaces an old
-one. Old sessions appear in the Sessions window after relaunching the app.
-Keep recordings out of the repository and personal cloud storage if your study
-or dataset agreement prohibits it. Git ignore rules cover these output filenames,
-but renamed data could still be staged accidentally.
-
-### Quick tour
-
-Choose **Quick tour** from Welcome, Profile, Help, or the menu bar. A short practice
-tour appears inside the current main-window bounds, without resizing the window.
-A spotlight reveals one control at a time; click it to try a safe example. Seven
-short stops cover starting, planning, work time, breaks, daily progress, saved
-sessions, and your profile. Captions have at most eight words.
-
-**Practice · nothing saved** identifies the demo. Only the highlighted control,
-Back, Close, and occasional Next/Done actions are available. Return activates the
-current action; choose a duration with the keyboard or mouse. Command-[ goes back,
-and Escape closes. Each replay starts fresh; Back returns to the previous stop's
-starting state. Editing the example name never changes your profile.
-
-The demo uses in-memory values and shared presentation components, with no recording,
-storage, credentials, permission requests, file pickers, or network services. Existing
-recordings continue underneath, and real menu-bar Stop & save stays available. Pending
-recording/check-in sheets finish before a requested tour appears. On exit, your actual
-onboarding, account and recording state is restored unchanged.
-
-Spotlights pulse briefly, scenes fade smoothly, and saved/finished actions show
-animated feedback. Reduce Motion displays immediate/static results. Captions use
-measured text sizes and move into a separate instruction panel when needed. The
-practice area scrolls to keep the current target reachable as the window resizes;
-the tour never resizes the window. The detailed recording, permissions, research, progress,
-and export instructions remain in the sections below.
-
-### Welcome and guest access
-
-After the intro animation, the first launch offers **Create account**, **Log in**,
-and **Use as guest**. Guest mode is remembered: later launches open the main app
-directly, and account options remain in Profile. Guest mode includes local profiles,
-recording, surveys, saved sessions and progress. It never opts into research sharing.
-The checked-in build has no account service configured, so account buttons explain
-that online access is unavailable and Guest remains usable.
-
-**Keep me signed in** is checked by default in account forms. After a successful
-sign-in with that choice, future launches restore the account from Keychain after
-the intro; macOS may ask for Keychain access. Failed restoration offers retry,
-login or Guest. Choosing Guest cancels pending authentication and ignores late
-responses. Leaving the choice off keeps the new session in memory only, without
-saving its tokens for automatic restoration. Signing out disables automatic restore
-and leaves local recording available as a guest.
-
-Newly created accounts offer optional name/avatar setup after email confirmation;
-**Skip for now** enters the app. Nothing starts recording or requests Input Monitoring
-before a recording action. A menu-bar Start action during onboarding shows the
-welcome window first.
-
-### Personal profile
-
-Open the profile button at the top left, then click your name or **Add your name**
-to edit it in place (1–40 characters). Import a PNG, JPEG, HEIC or TIFF photo under
-10 MB by clicking the avatar circle's camera-plus badge. Click the same circle to
-replace a photo; **Remove photo** restores the placeholder or an existing saved icon.
-Photos are cropped to a 256×256 PNG and re-encoded without source photo metadata.
-**Save profile** applies your changes; **Cancel** discards them. Name and photo choices
-persist after relaunch. Icon and color selectors are no longer shown.
-
-Without an account, the editor saves only on this Mac in `FocusFix/profile.json`.
-Configured builds also offer email/password accounts, confirmation/recovery codes,
-private account profile sync, sign-out and account deletion. The checked-in build
-has blank public service settings, so online controls explain that it isn't connected.
-Local and account profiles stay separate; signing in never silently uploads an old
-local name/photo. Explicit Save syncs an account profile. Session tokens use Keychain;
-passwords are not persisted. Automatic restoration only follows a successful sign-in
-with Keep me signed in selected. Continue with saved account is also available
-as an explicit action in the account form. Names and photos are excluded from research ZIPs and recording metadata.
-
-Optional per-session research delivery uses a separate opt-in for new sessions. It sends
-one ZIP per completed session to private Supabase storage while signed in and running.
-Sharing requires researcher approval (50 selected participants by default) and an
-explicit participant opt-in; interest requests alone share no recordings. Failed deliveries
-stay local and can be exported. The integration does not enable billing or use email to transport recordings.
-Removing the old Cloudflare source does not shut down deployed Cloudflare resources. Deployment, free-tier
-limits, privacy review and end-to-end verification are in [supabase/SETUP.md](supabase/SETUP.md).
-
-### Per-session planning and welcome preview
-
-Starting a session opens **Before you start**, whether you use the main window or
-the menu bar. The fatigue question appears only when the pre-session survey is on.
-**Plan session** adds an optional work target: 30, 60 or 90 minutes, or a custom
-whole number from 1–480. It opens at 60 minutes; **Remove plan** clears it. Each
-start attempt begins untargeted, and cancelling discards all choices. Old global
-work-target preferences are ignored. Skipping fatigue keeps your selected plan.
-
-Work uses the daily progress clock, including quiet reading and excluding breaks,
-surveys, sleep and screen lock. The timer and menu show **Planned session** separately
-from the fixed daily goal. At the target, **Plan complete** offers **Stop & save**
-(the normal save flow) or **Keep going**. Recording continues until stopped. Keep
-going acknowledges this session's reminder without changing its work target.
-
-Click your displayed profile name (or **Add your name**) to edit it in place, then
-choose **Save profile** or **Cancel**. The photo circle opens the image picker;
-**Remove photo** is available during editing. Existing icon/color appearances are
-preserved, but new editing offers photos only. Account name/photo changes upload
-only on Save; cancelling keeps the saved profile.
-
-Use **Profile → Advanced → Preview welcome screen** while stopped to explore the
-welcome, Create account and Log in screens. Sample fields are editable, but account
-submission, recovery and saved-account restoration are disabled. The preview has no
-account API, Keychain provider or persistent preferences. **Use as guest**, Escape,
-or **Close preview** returns to Profile without changing real sign-in, local data or
-sharing choices. No history deletion is needed. Real account creation still requires
-Supabase configuration.
-
-Manual checks passed for survey-enabled and survey-disabled start windows, the
-60-minute default, invalid custom targets disabling both start actions, Remove plan,
-cancel/reopen reset, inline name focus and cancellation, unsaved photo selection,
-picker cancellation and removal, and light/dark layouts. Advanced retains the safe
-welcome preview without global work-target controls. Synthetic tests also verify
-skipping fatigue preserves the plan and disabled surveys produce no answer.
-
-The isolated unsigned test build lacks Input Monitoring permission: live recording
-through completion, Keep going and Stop & save still needs a check on a permitted
-build. Synthetic tests cover the shared work clock, boundaries, snapshots and
-one-time completion. These additions use no animation and respect Reduce Motion.
-
-### Daily progress and breaks
-
-The main window shows today's progress toward **60 minutes of work**, a weekday
-streak, and the number of completed breaks. Work adds up across sessions, including
-quiet reading. Breaks, break setup/check-in screens, sleep, screen lock, and time
-outside a recording do not count. The session timer still shows total session time.
-
-Monday–Friday require the goal to continue a streak. Saturdays and Sundays show
-optional progress and neither increase nor break it. Today's unfinished goal keeps
-the previous streak visible until a weekday is missed. Days use the Mac's local
-calendar and time zone; work crossing midnight is split between days.
-
-A break earns one count when you return after at least **one minute**, using
-**I'm back** or the existing automatic return detection. Returning before or after
-the planned timer is fine. Stopping a session during a break earns no count.
-Completing the daily goal and returning from a qualifying break show brief inline
-encouragement without opening a dialog or sending a notification.
-
-Progress starts with this feature; old recordings aren't backfilled. It lives in
-`FocusFix/progress.json` under the app's Application Support directory, separately
-from session files, exports, and research uploads. Deleting a recording doesn't
-remove earned progress. Progress saves atomically every 15 seconds while recording
-and at phase changes, Stop, and normal quit. Unexpected termination can lose up to
-15 seconds since the last successful save. Save failures show a notice and retry;
-an unreadable file is backed up before starting fresh progress. No recording files
-are changed during recovery.
-
-Manual reward check: record work in two sessions and confirm their daily totals add
-up; open/cancel a check-in and confirm that time does not count. Return from a
-one-minute break both early relative to a longer plan and after its timer expires;
-check one count and the recharge message. Stop during another break and check no
-count is added. Check the menu-bar totals, relaunch persistence, light/dark layouts,
-and VoiceOver's daily-goal description. Use synthetic tests for the one-hour,
-weekday, midnight and daylight-saving boundaries rather than altering the Mac clock.
-
-### Survey choices
-
-The account icon opens **Surveys**, with separate switches for:
-
-- Before a session: mental fatigue.
-- Before a break: mental fatigue and self-reported productivity.
-- The 10-minute check-in: both ratings after starting or actually returning from a break.
-
-All three start on. The choices are remembered locally and apply to the **next session**,
-even if I change them while recording. They don't require enrollment or sharing.
-Turning off pre-break ratings keeps the duration/activity picker and break timer.
-Turning off the 10-minute check-in removes that survey's schedule and notification,
-not the normal break reminders. Saved answers aren't deleted.
-
-Each new session records its choices under `survey_options` in `session.json`.
-Disabled surveys produce no answer/prompt rows, rather than fake skipped responses.
-The CSV files are still included, even if they only contain headers. I need to account
-for these choices when comparing sessions; opting out can change which labels I receive.
-
-### Optional research sharing
-
-Open **Settings → Privacy & Research** to review a configured study, confirm
-eligibility and request to join. A researcher manually approves up to 50 total
-participants. Signing in or receiving approval never turns sharing on. Approved
-participants must review the full versioned consent and choose **Share new sessions**.
-There is no enrollment key to paste.
-
-Each new completed session begun under the current consent is sent separately to
-private, account-linked Supabase storage while signed in and running. The server
-requires current approval and consent even for direct Storage calls. Receipts and
-stable archive IDs prevent duplicate deliveries. Quota/offline failures keep the
-original recording local; the app can export the next queued ZIP explicitly.
-
-Turning sharing off cancels local pending deliveries and records a durable server
-withdrawal. It cannot recall data already received. Use **Request deletion of
-research data** for hosted copies and researcher review of downloaded datasets.
-Deleting local recordings, deleting an account and handling trained models have
-different effects; read the current study terms. The app does not claim anonymous
-recordings or automatic model unlearning.
-
-Research is disabled in the checked-in configuration until the institution's actual
-determination and study terms are supplied. See [research operations](supabase/RESEARCH-OPERATIONS.md)
-for deployment, manual approval, the lifetime cap, retention/deletion and verification.
-
-### Session library and exports
-
-- The library shows start/end dates, duration and status, newest first. Use Refresh
-  after changing files outside the app. An unfinished session is shown as incomplete
-  rather than silently treated as a complete recording.
-- Export copies all session CSV files and metadata together into a folder named like
-  `FocusFix Session [2026-10-17 09-00-00-2026-10-17 10-30-00]`.
-  Times use the Mac's current local time zone; hyphens replace colons in filenames.
-  The metadata keeps UTC times. Old sessions without an end date use start + duration.
-  Incomplete sessions use `unfinished` rather than an invented end time.
-- Exporting again adds `(2)`, `(3)`, etc. if needed. Original recordings and existing
-  exports are not overwritten. Exports cannot be placed inside session storage.
-- Delete asks for confirmation and moves the selected local session to the Mac's
-  Trash, not permanent deletion. Restore it to its original location and refresh the
-  library to recover it. Exported copies are unaffected.
-- A session currently recording cannot be exported or deleted. Stop it first.
-
-### Break workflow
-
-1. After **25 minutes**, look for **two separate idle stretches of at least 5 seconds
-   each within the last 60 seconds**. Only prompt while currently idle for at least
-   5 seconds. A continuous 10-second pause counts once, not twice. Without a qualifying
-   moment, keep waiting; 25 minutes is a minimum, not a guaranteed prompt time.
-2. **Take a break** opens a setup sheet with fatigue and productivity sliders. Rate both,
-   or choose **Skip ratings & start break**. Choose **5 minutes** (default), **10**, **15**,
-   or a custom duration from **1–120 minutes**. Choose Stretch, Walk, Water / snack,
-   Rest my eyes, Breathing or Other (custom text). **Start break** begins the timer.
-   Cancelling setup doesn't start a break or count as Skip. A manual Take a break
-   button is also available before a reminder is due.
-3. **Skip** waits 25 more minutes from the decision; **Snooze** waits 10 more minutes.
-   Both then wait for a fresh qualifying idle pattern. Neither resets the factual
-   time since the last completed break. An unanswered prompt isn't repeatedly sent.
-4. During the planned break, detailed keyboard, click, scroll, app-switch and mouse
-   logging pauses. A minimal in-memory input check remains to detect return. The
-   main screen uses a softer teal/mint theme and an **I'm back** button.
-5. **I'm back** ends a break immediately. Outside FocusFix, a non-repeated key press,
-   click, non-momentum scroll or at least **20 screen points of mouse travel within
-   one second** also ends it early. Key releases, tiny movements, auto-repeat and app
-   activation alone don't end it. Interacting with FocusFix's own windows doesn't
-   count as automatic return. This is a heuristic, not proof of productive work.
-6. At timer expiry, detailed logging resumes with `activity_phase=awaiting_return`.
-   The break remains open until qualifying return activity or **I'm back**; that
-   extra time is included in its actual duration. The first return event is logged
-   as `work`. Never count the awaiting-return interval as both work and break time.
-7. After returning, **Confirm activity** / **Edit activity** lets you report what you
-   actually did, even if different from the plan. This is optional and doesn't force
-   a popup. It edits the most recent break in the current session, before Stop.
-   Unconfirmed actual activity stays blank rather than being assumed from the plan.
-
-The session timer includes breaks. Before the first break, “since last break” uses
-session start as the reference. Work reminders restart 25 minutes after actual
-return, not after the planned timer deadline. User-state labels are still undecided.
-
-During a planned break, screen/system sleep and inactive login suspend sampling but
-preserve break state. The continuous monotonic clock includes this time; wake does
-not itself end a break. No mouse rows are invented for suspended time. If the timer
-expired while asleep, expiry is recognized and sampling resumes on wake. Sleep
-outside a break still stops the session. Quit, Stop and lost permission close an
-active break with a `session_*` reason: treat it as **truncated**, not an observed
-return. A crash leaves the last recorded break state unfinished; no auto-restart.
-
-### What each file does
-
-| Source | Purpose |
-| --- | --- |
-| `ContentView.swift` | Minimal timer, status, Start/Stop and export interface. |
-| `ActivityTracker.swift` | Permission checks, input monitors, clock, session lifecycle and library actions. |
-| `RecordingData.swift` | Mouse aggregation, private in-memory key timing and buffered CSV writing. |
-| `SavedSession.swift` | Reads saved-session metadata, validates file targets and names exports safely. |
-| `SessionViews.swift` | Saved-session browser and separate Test tracking window. |
-| `MyApp.swift` | App windows, shared appearance setting and menu-bar controls. |
-| `BreakPolicy.swift` | Clock-driven reminder rules, break state and CSV lifecycle entries. |
-| `BreakNotifications.swift` | Native banners, Take/Skip/Snooze actions and stale-action checks. |
-| `BreakViews.swift` | Duration/activity setup, reminder controls and activity correction. |
-| `Tests/RecordingDataTests.swift` | Synthetic recording, session reload and export-safety checks. |
-| `Tests/BreakPolicyTests.swift` | Simulated timing, idle-gap rules, early/late return and break CSV checks. |
-
-### Data dictionary
-
-All CSVs use seconds relative to the same session start. Activity timestamps are callback
-receipt times from a continuous monotonic clock including sleep, not hardware event timestamps. Callbacks can
-be delayed; six decimal places do not imply microsecond measurement accuracy.
-
-**events.csv — one row for each observed discrete event**
-
-| Column | Meaning |
-| --- | --- |
-| `elapsed_seconds` | Seconds since Start. |
-| `event_type` | `key_down`, `key_up`, `delete_down`, `delete_up`, `modifier_change`, `left_click_down/up`, `right_click_down/up`, `other_click_down/up`, `scroll`, `app_switch`, `session_start`, or `session_stop`. |
-| `is_repeat` | 1 for auto-repeated key-down events, 0 for an initial down; blank for other events. |
-| `key_hold_seconds` | Down-to-up duration, only on key release when its initial press was observed. |
-| `scroll_delta_x` | Amount of sideways scrolling in this event. The sign distinguishes opposite directions. |
-| `scroll_delta_y` | Amount of vertical scrolling in this event. The sign distinguishes opposite directions. |
-| `scroll_precise` | 1 for fine-grained scrolling deltas, often from a trackpad; 0 for coarse scrolling deltas; blank on other events. Not a measure of the user's accuracy. |
-| `activity_phase` | `work`, `check_in` (break setup), or `awaiting_return`. Detailed events are not recorded during the planned break. |
-| `seconds_since_last_break` | Elapsed time since the last actual return (or session start before the first break); blank while awaiting return. |
-
-Scrolling is already recorded as individual `scroll` rows, including delivered
-momentum events. Scroll amounts are native deltas, not a count of pages read, and
-should not be compared across devices without validation. Scrolling alongside
-pauses and low typing activity could be a clue to reading, not proof of it.
-
-Delete events replace, rather than duplicate, generic key events. Total key-downs
-include `key_down` plus `delete_down`; exclude repeat rows if you want physical
-presses. Click counts use down rows, not both down and up. Modifier changes do not
-identify which modifier was used. No typed characters, persistent key identifiers,
-app identities, window names or clipboard contents are saved. Key codes are used
-only in memory for delete detection and matching releases. App switches compare
-process identities in memory; switching windows within one app is not counted.
-
-**mouse_movement.csv — one row per observed one-second interval, plus partial boundary intervals**
-
-| Column | Meaning |
-| --- | --- |
-| `start_seconds`, `end_seconds` | Interval boundaries; intervals are `[start, end)`. |
-| `distance_screen_points` | Sum of distances between consecutive observed cursor positions, including dragging. |
-| `movement_events` | Number of observed move/drag callbacks in the interval. |
-| `seconds_since_last_movement` | Time since the last observed nonzero movement, measured at interval end. Blank if none since tracking started/resumed. |
-| `activity_phase` | `work`, `check_in` (break setup), or `awaiting_return`; no rows during planned breaks or suspended sampling. |
-| `seconds_since_last_break` | Measured at interval end; blank while awaiting return. |
-
-Cursor positions are discarded after updating totals. Returning to the starting
-position does not cancel accumulated distance. Idle intervals have zero movement
-counts and distance. Position and idle timing survive interval boundaries. A segment
-crossing a boundary is assigned to the interval containing its ending callback.
-Distance is screen-coordinate points, not physical mouse travel. Display geometry,
-pointer speed, device type and cursor warps affect interpretation. Exact trajectories,
-movement efficiency, or exact within-second idle time cannot be recovered later.
-
-There is no separate mouse duration column: subtract `start_seconds` from
-`end_seconds` if needed. The final partial interval can be excluded when analysing
-full seconds. Break boundaries can also create partial intervals. Position and key
-hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. Current sessions use **schema version 11** (see the recording contract); schema 8 introduced these timing fields.; older files are left
-unchanged and remain available in the library.
-
-**breaks.csv — append-only decisions and break lifecycle**
-
-| Column | Meaning |
-| --- | --- |
-| `elapsed_seconds`, `action` | When and what happened: `prompt`, `skip`, `snooze`, `break_start`, `timer_elapsed`, `break_end`, `activity_updated`, `prompt_cancelled_session_end`, or `suspended_*` / `resumed_*`. Timer expiry uses its planned deadline even if processed later. |
-| `prompt_id`, `break_id` | IDs linking decisions and updates. Manual breaks have no prompt ID. |
-| `planned_seconds` | Chosen timer duration, not measured break length. |
-| `start_seconds`, `end_seconds` | Actual start and detected/explicit end; end stays blank until known. |
-| `actual_seconds` | End minus start, including time away after the timer; blank until known. |
-| `extra_idle_seconds` | `max(0, end - planned deadline)`; an inferred away-time extension, not confirmed rest. |
-| `planned_activity`, `actual_activity` | Original plan and optional later report; custom labels are CSV-escaped and protected against spreadsheet formulas. |
-| `end_reason` | `explicit_return`, `outside_app_input`, or a `session_*` interruption. |
-| `next_eligible_seconds` | Session-relative reminder eligibility time where applicable, not a promised delivery time. |
-| `seconds_since_last_break` | Time since the prior completed break (or session start) when the entry is made. |
-
-Multiple rows share a break ID. Use one `break_end` row per break for duration, plus
-the latest `activity_updated` row for the corrected activity. Don't sum durations
-across lifecycle snapshots. A start without an end is unfinished, not a zero-length
-break. Custom activity text is intentional user-provided data, not captured typing.
-`prompt` records the app's reminder decision, not proof that macOS displayed a
-banner. Permission settings and Focus can prevent delivery; an unanswered prompt
-doesn't establish that the user saw or deliberately ignored it.
-
-**surveys.csv — short check-ins**
-
-- Before a session I show only **Mental fatigue** above the slider.
-  The scale is 0 (Not tired) to 10 (Extremely tired).
-- Before each break I show that again, plus **Productivity**. The scale is
-  0 (Not productive) to 10 (Extremely productive). The extra explanations and slider
-  instructions are removed. There is no explicit recall period in these short labels.
-  Productivity is the person's own rating, not an objective measure of output or workload.
-- Both ratings are also requested once **10 minutes after starting a session** and
-  once **10 minutes after each actual return from a break**. It doesn't repeat every
-  ten minutes or wait for inactivity/predicted fatigue. An early or late return shifts
-  the next check-in accordingly; break timer expiry alone doesn't start the wait.
-- A quiet notification offers **Answer** and **Skip**. Clicking Answer or the banner
-  opens the two sliders in a small in-app sheet, not inside the system notification.
-  This build doesn't add a custom notification-content extension. **Check-in available**
-  in the main window and **Answer check-in** in the menu bar work if banners are hidden.
-- I don't send these during breaks. If another check-in is open at the due time, I
-  wait until it closes. Opening break setup dismisses a pending work check-in rather
-  than stacking surveys. Starting a break cancels the old work-period schedule.
-  Skip/Snooze of a break reminder does not reset or remove the work check-in.
-- Answering, skipping or closing the sheet uses that period's one opportunity.
-  Dismissing a banner alone leaves it available in the app without repeated notifications.
-  Stop/Quit cancels it. Nothing is carried into another session or work period.
-- Move a slider, tap an endpoint, or press **Select 5 / 10** to deliberately select
-  the midpoint. The initial thumb position is not an answer. Every check-in starts fresh.
-- Skip saves blank ratings with `status=skipped`, not zero. Cancelling break setup
-  saves `cancelled`, discards any draft answers and doesn't start a break. Cancelling
-  the initial check-in doesn't create a session or recording.
-- Rows contain `session_id`, `check_in_id`, `question_version`, `context`, `status`,
-  `break_id`, UTC shown/answered times, session-relative shown/answered seconds,
-  `fatigue_0_10` and `productivity_0_10`. `context` is `session_start`, `before_break`
-  or `during_work`. The break ID joins to `breaks.csv` for pre-break responses; it is
-  blank for cancelled setup, session start and during-work responses.
-  For skipped/cancelled rows, the answered time is the decision time, not a rating.
-- The initial check-in happens before recording, so its shown elapsed time is negative
-  and its completion is zero. Break setup and opened work check-ins stay in total
-  session time, not break duration. Their activity is marked `check_in` with
-  `check_in_start`/`check_in_end` events. Waiting to answer a banner is still work.
-  Exclude that interval from work predictors, even if someone uses another app while
-  the sheet is open. Use behavior before the check-in, not clicks made answering it.
-- Responses are saved immediately and export with the session. They are included in
-  optional research uploads only after enrollment and explicit opt-in.
-  Old recordings without this file still work. An interrupted session may have an
-  unmatched `check_in_start`; don't invent an answer or a completion time for it.
-- These are custom ratings, not a validated NASA-TLX score, diagnosis or objective
-  productivity measurement. Timed check-ins add observations outside break-taking,
-  but don't guarantee low fatigue or an unbiased sample. A late answer isn't a rating
-  from exactly minute 10. I still need to finalize the research protocol/IRB plan and
-  use consistent assessment schedules across study conditions.
-- New check-ins use `focusfix_check_in_v2`. Older v1 sessions keep their original
-  `workload_0_10` column and wording. I shouldn't rename or combine those scores with
-  productivity ratings; they measure different things.
-
-**survey_prompts.csv — timed check-in history**
-
-- Records `scheduled`, `requested`, `opened`, `answered`, `skipped`, `cancelled`,
-  `break_setup`, `break_started` and `session_stopped` actions.
-- Each row has session/check-in IDs, action time, due time, notification-request time
-  and sheet-opening time (blank until known), in session-relative seconds.
-  `reference_break_id` identifies the preceding break, not a new break.
-- Join responses by `check_in_id`. This is append-only history, not a separate survey
-  per row. An unopened check-in has no response in surveys.csv; a skip from a banner
-  is recorded here without inventing a time when the slider sheet was shown.
-- `requested` isn't proof macOS delivered the banner or the person read it. Focus and
-  notification settings may hide or delay it. `opened` records opening the slider sheet.
-- Saved immediately and included in exports. Old sessions are unchanged. A crash can
-  leave an unfinished item; missing answers are never zero ratings.
-
-**session.json** stores the random session ID, UTC start/end, schema version, time/unit
-definitions, reminder-policy description, check-in wording/scale/version, and final duration/stop reason.
-Schema 9 added `tags`, a JSON array of up to 20 user-selected strings (each 1–40
-characters), for example `"tags": ["Creative work", "Focused work"]`. Tags describe
-the session as a whole, not individual intervals or objective attention measurements.
-Schema 10 also stores `tag_colors`, a name-to-`#RRGGBB` map captured when tags are
-applied to that session. Colors and labels are saved before recording begins,
-updated by live edits, and kept at Stop. Tags still describe the whole session;
-editing them during recording does not create interval-level labels.
-Sessions without tags have
-an empty array; older metadata without the field is displayed as untagged.
-Tag edits preserve the remaining metadata and every CSV. Individual exports,
-Export All, and research ZIPs include the labels in each session's `session.json`.
-Already exported or delivered copies keep the labels they had at export time.
-New recordings omit the retired Cloudflare `participant_id` and `sharing_consent_id`.
-Existing recordings keep their original metadata and remain readable/exportable.
-Account-based consent and delivery state are managed separately by the Supabase
-research flow. Recording metadata contains no profile names, emails, credentials or
-survey scores; user-authored tags contain the text the user enters.
-
-### Background behavior and limitations
-
-- One passive Core Graphics event tap observes input across apps, including FocusFix,
-  using Input Monitoring permission. No input is modified, blocked or synthesized.
-  A disabled tap ends the session visibly; queued events from an old session are discarded.
-- App Nap is discouraged, but system sleep is allowed. Outside breaks, sleep/screen
-  sleep and inactive login stop collection. During breaks, they suspend sampling
-  while keeping break timing. Lost Input Monitoring permission, Stop and Quit end the session.
-- Standard macOS Secure Input can suppress keyboard events. Absence of events is
-  not proof of inactivity. Mouse events may be coalesced by macOS: this is not a
-  hardware-level trace. Input Monitoring permission alone does not guarantee completeness.
-- Break and check-in notifications have no sound and don't force the app to the
-  foreground. The timed banner is automatic; slider sheets and permission/setup/export
-  dialogs follow explicit actions.
-  Errors appear in the window; a recording error stops
-  collection rather than silently continuing. The menu-bar indicator returns to idle.
-- Files are buffered and flushed approximately every second (earlier for a large
-  event buffer), and synchronized on Stop. A crash can lose buffered data; metadata
-  left with `status: recording` should be treated as an unfinished session.
-- Both production distribution paths use App Sandbox. Release grants user-selected
-  read/write access for exports and outgoing HTTPS for optional accounts. The
-  checked-in account service settings are blank and research sharing is off.
-  A compiled build is not proof of App Store approval or live input-monitoring coverage.
-  Fresh-Mac permission and feature checks remain required; see [RELEASE.md](RELEASE.md).
-- Event timing is sensitive even without text. Obtain the required institutional
-  approval/consent before recording participants. Sharing is off by default; once
-  enrolled and opted in, eligible new sessions upload automatically after Stop.
-
-### Verification
-
-Build from the repository root:
-
-```sh
-xcodebuild -project FocusFix/FocusFix.xcodeproj -scheme FocusFix \
-  -destination 'platform=macOS' -derivedDataPath /tmp/focusfix-event-build \
-  CODE_SIGNING_ALLOWED=NO build
-```
-
-Run all synthetic tests from the repository root (macOS with Xcode command-line tools):
+# FocusFix for macOS
+
+I am building a local activity recorder with optional work labels, rule-based break
+reminders and private groups. Recorded computer use, declared work and objective
+productivity are different things. This app is not a validated fatigue/health or
+productivity detector. No model, real randomization or new-format research delivery
+is active. See [readiness](REDESIGN-READINESS.md) for verification and release gaps.
+
+## Recording and work labels
+
+1. Choose **Enable recording** or **Not now**. Recording acknowledgement is separate
+   from macOS Input Monitoring, automatic mode, login launch, group sync and research.
+2. **Start work** starts manual work capture after consent/permission checks. The
+   planning sheet can optionally set a target and tags; ordinary use asks no survey.
+   Use **Enable Input Monitoring** explicitly to request setup. Opening Settings or
+   accepting automatic scope does not grant/request OS access. Relaunch if macOS asks.
+3. Optionally enable **automatic recording** in Settings → Privacy & Research and
+   accept its separate scope. Existing installations remain manual until they opt in.
+   With existing OS access, automatic capture starts while FocusFix runs, including
+   non-work computer use. It begins **Unknown**. Start work is optional and labels
+   from now in the existing recording, without a second input tap or writer.
+4. **End work** returns automatic activity to Unknown; manual-only capture saves and
+   stops. Work/Not working/Unknown are explicit context choices. They do not establish
+   productivity or fatigue. **Pause recording** stops capture and persists until Resume.
+   Resume after lifecycle/user pause does not inherit an old automatic work label.
+5. Five continuous idle minutes, sleep/lock/display loss or permission loss stop
+   capture. Eligible lifecycle resumes start Unknown; permission restoration cannot
+   override user pause. Errors require deliberate retry. Missing coverage is not zero
+   activity. **Quit** stops capture; closing a window leaves the menu-bar app running.
+6. Optional **Launch at login** uses the public main-app service API and shows actual
+   approval/status. It changes only on explicit action and cannot bypass consent/pause.
+
+The main window and menu share recording state. The timer is recorded elapsed time;
+declared-work time is separate. Local day/timezone rotation retains logical recording
+and context IDs without resetting the break cooldown. Elapsed durations use a
+continuous monotonic clock. A sampling gap over five seconds is not backfilled.
+Crash recovery finalizes only durably checkpointed data, never downtime.
+
+## Breaks and notifications
+
+The shipped fixed baseline waits 25 minutes and two distinct five-second idle gaps
+in the preceding minute. Skip waits 25 minutes; snooze waits 10. Reminders default
+to declared work. A separate off-by-default preference permits **screen-use break
+reminders** during Unknown/Not working activity without calling that work.
+
+**I’m not working** on a notification labels from its action time forward and keeps
+recording. Use history for earlier corrections. Stable recording/work-period/context
+and policy IDs reject stale/duplicate actions. Requests are not proof of delivery or
+viewing; no response is missing response data, not work/fatigue/rest confirmation.
+Notifications are optional; equivalent controls remain in the app/menu when denied.
+
+Explicit breaks have their own intervention phase, separate from context and idle.
+Detailed capture pauses during planned breaks, then resumes awaiting return until
+explicit return or the existing outside-app-input heuristic. This is not proof of
+rest. Break duration/activity and healthy-habit credit keep their existing rules.
+
+## History, goals, private groups and exports
+
+History lists recording **segments/files**, distinct from user-declared work periods.
+It shows declared work, non-work, unknown, explicit break, check-in/awaiting-return
+and unavailable durations using observed coverage. Stationary observed mouse bins
+count as coverage; absent bins do not. Secure Input can still suppress keyboard
+observations, so mouse coverage does not establish complete keyboard capture.
+
+Automatic intervals are retained even when short. Manual-only recordings keep the
+existing 15-minute history threshold; earned observed work remains local progress.
+Schemas 1–10 load unchanged as legacy/unknown context, not work inferred from the
+old phase or whole-session tags. Unsupported/corrupt metadata stays on disk with a
+visible history notice; compatible history remains usable and Export All fails
+closed rather than claiming an incomplete export is complete.
+
+**Edit context…** corrects a bounded interval in segment-relative seconds. Atomic
+snapshots retain original labels, provenance and ordered revisions; stale/invalid
+edits do not replace them. Raw CSV files stay intact. Tags/colors still describe
+whole sessions, not individual work intervals. Existing planning, profiles, themes,
+People panel and account/private-group controls remain.
+
+Goals use durably observed declared work in normal phase, excluding other contexts,
+breaks, check-ins, return waiting and unavailable time. Corrections replace new local
+contributions idempotently; historical earned credit is a protected baseline. Daily
+thresholds stay 60 work minutes and one explicitly completed one-minute break.
+Three monthly weekday streak freezes retain their existing limits.
+
+The old group RPC cannot reconcile decreased work totals. New-format work summaries
+therefore stay in an account/service-scoped local replacement queue; group Work
+scores do not yet reflect them. Existing groups, historical scores and explicit
+healthy-break sync are preserved. A verified correction-compatible server capability
+is required before releasing held work. See [sync dependency](supabase/DECLARED-WORK-SYNC.md).
+
+Use **Export…** or **Export All…** for byte-preserving copies outside storage;
+repeated exports do not overwrite earlier copies. Local deletion moves a recording
+to Trash; exports/backups and research-cloud deletion are separate. Private sandbox
+storage is normally `~/Library/Containers/io.github.krisjanci.FocusFix/Data/Library/Application Support/FocusFix/Sessions`;
+Debug uses a separate `.debug` identity/container. No automatic legacy migration.
+
+## Privacy and optional study checks
+
+The passive Input Monitoring tap records generic keyboard/delete/repeat/hold timing,
+clicks, scrolls, app-switch counts and one-second mouse distance/count summaries.
+It never saves typed text, individual letter identities, app names, window titles,
+URLs, screenshots or exact cursor paths. Temporary key/process/position values are
+used in memory only. Custom tags/break labels intentionally save text entered by
+the user; avoid sensitive details. Timing data can still be sensitive.
+
+Ordinary manual/automatic use is survey-free. **Optional study check-ins** is a new,
+off-by-default choice; old preferences or research sharing cannot activate it. A
+complete separately reviewed configuration must also exist. None is bundled.
+Synthetic schedules are test injections only. A frozen reviewed version would
+control spacing, quiet hours, prompt cap, context at request and preceding recall
+window. Turning checks off cancels pending prompts. Old responses/exports stay
+readable; missing/skipped values are never zero or estimated ratings.
+
+Accounts, group sync and research are independent choices. Accounts send the chosen
+profile/authentication information to the configured service. Research collection
+remains disabled in checked-in configuration. New schema 11 is rejected by live
+queueing and the legacy ZIP path. The prepared archive-v2 contract requires new
+reviewed automatic/non-work scope, matching account/consent, no pre-consent history,
+server cap compatibility and disposable-service qualification. Limits remain 180
+minutes/study day, 100 MiB raw and 25 MiB ZIP; long local segments may be ineligible.
+The only new ZIP builder is test-flag-only and requires marked generated fixtures.
+
+Private `research_eligibility.json` snapshots contain pseudonymous consent/account
+references, no credentials, and are excluded from research ZIPs. Explicit whole-
+folder exports may include them. Withdrawal, hosted deletion, downloaded-copy/model
+inventory cleanup and local deletion retain distinct meanings. Source deletion does
+not establish model unlearning. See [research operations](supabase/RESEARCH-OPERATIONS.md).
+
+## File and analysis contracts
+
+[RECORDING-CONTRACT.md](RECORDING-CONTRACT.md) defines schema 11, stable IDs,
+capabilities, elapsed origins, half-open labels, atomic revisions, recovery,
+coverage and archive boundaries. [CODE_MAP.md](CODE_MAP.md) maps implementation files.
+
+- `events.csv`: nine existing generic event/timing/phase columns. The legacy
+  `activity_phase=work` means normal intervention phase, **not a work-context label**.
+- `mouse_movement.csv`: seven existing interval/distance/count/phase columns,
+  `[start,end)` bins including observed stationary bins. No exact positions stored.
+- `breaks.csv`: existing append-only decision/lifecycle rows; one break ID can have
+  many snapshots. Use the completed end once, not a sum of lifecycle durations.
+- `surveys.csv` and `survey_prompts.csv`: original response/prompt meanings and blank
+  skipped/cancelled ratings remain. Workload-v1 answers are not renamed productivity.
+- `session.json`: version/capabilities, IDs, UTC anchors, duration, tags/colors and
+  frozen options. Segment duration subtracts `elapsed_origin_seconds` from logical
+  elapsed time; UTC clock changes do not determine duration.
+- `context_intervals.json`: independent context, source/effective/recorded times,
+  logical IDs and revision history. Numeric Unix UTC dates are current; earlier
+  local ISO dates/origin-zero snapshots remain readable without rewriting them.
+- `reminders.jsonl`, `study_check_ins.jsonl`: request/action provenance and independent
+  context/recall metadata. Requests are not assumed delivered or viewed.
+
+The old Python supervised fatigue/productivity pipeline remains separate and accepts
+its original work-only schemas 5–8. The new backend clustering pipeline uses schema
+11, full-coverage five-minute input-rate windows and development-only fitting. Labels
+and ratings are evaluation metadata, not clustering inputs. Descriptive clusters do
+not measure fatigue. Independent validation reports sample/missingness/uncertainty;
+small generated demos report insufficient evidence. Intervention benefit is untested.
+The app selects its fixed timer provider; an alternate synthetic preview is disabled
+and safely falls back for unsupported versions, missing coverage or stale models.
+
+## Quick tour and verification
+
+Quick tour uses an isolated in-memory practice model: automatic Unknown capture,
+optional work, forward notification labels, pause/resume, breaks, history and groups.
+Its actions never call the tracker, change consent/OS settings or upload. Reduce
+Motion and named icon controls are preserved. **Test tracking** is different: during
+real recording it observes real events in that recording; it does not open a second tap.
 
 ```sh
 bash scripts/test.sh
+cd supabase && npm test && npm run test:database
 ```
 
-The script compiles and runs small Swift test programs (the release-configuration
-test runs twice, once with Debug enabled and once without it). A failed assertion
-stops the run with a nonzero exit code. It uses generated temporary data, cleans up
-its own files, and never reads participant sessions or changes system permissions.
-
-- `QuickTourTests`: practice actions, stale/duplicate callbacks, replay, isolated values,
-  caption word limits, and spotlight/caption geometry.
-- `SessionWorkPlanTests`: target limits, fresh start/cancel reset, survey choices, plan snapshots, shared work
-  credit across work/excluded intervals, completion boundaries and acknowledgement.
-- `LaunchCoordinatorTests`: offline preview isolation plus first launch, remembered guest mode, automatic restoration,
-  failed restoration, registration/profile setup, menu-bar gating and cancelled responses.
-- `AccountTests`: fake signup/confirmation/sign-in, private profile sync, recovery,
-  Keychain boundaries, cross-service restore rejection and deletion requests.
-- `ResearchSharingTests` and `ResearchDeliveryTests`: consent snapshots, safe ZIPs,
-  delivery timing, free-limit failures, stable retry paths, export and in-flight opt-out.
-- `UserProfileTests`: name/avatar validation, local persistence, failed writes,
-  invalid saved data, and bounded square photo import using generated images.
-- `DailyProgressTests`: work accounting, weekday streaks, midnight/DST boundaries,
-  break credit/deduplication, persistence, failed writes and unreadable-file recovery.
-- `RecordingDataTests`: timing, CSV schemas, saving/reloading, export names and guards.
-- `BreakPolicyTests`: separate idle gaps, Skip/Snooze, early/late return and break records.
-- `SurveyDataTests`: rating validation, skipped/cancelled answers, timestamps,
-  immediate saving, question metadata and the check-in activity phase.
-- `TimedCheckInTests`: ten-minute boundaries, one opportunity per work period,
-  deferral, stale/duplicate actions, early/late return, cancellation and linked CSVs.
-- `SurveyPreferencesTests`: all eight switch combinations, persistence, per-session
-  snapshots, enabled/disabled scheduling and matching metadata/CSV output.
-- `RecordingNoticeTests`: first-use acknowledgement, cancellation/no automatic acceptance
-  and asking again when the notice version changes.
-- `NotificationAccessTests`: fake permission responses, denial, banners disabled,
-  returning from Settings, repeated clicks, errors and retry. No real OS dialog is opened.
-- `ResearchSharingTests` and `ResearchDeliveryTests`: consent snapshots, ZIP allowlisting,
-  account isolation, approval checks, durable retries and in-flight opt-out using synthetic data.
-
-Supabase server tests use fake authentication/storage:
-
-```sh
-node --test supabase/tests/*.test.mjs
-```
-
-Database checks use isolated in-memory PostgreSQL:
-
-```sh
-npm install --prefix supabase --ignore-scripts --no-package-lock
-npm --prefix supabase run test:database
-```
-
-The same command is configured in `.github/workflows/tests.yml` for pushes and pull
-requests using [GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
-Check the Actions tab for the remote result. This workflow tests logic and file
-handling, not the full Xcode app or UI. Build the app locally using the command above.
-
-Manual check after granting Input Monitoring permission: start a short session and complete the
-fatigue check-in first. Also try Cancel (no session starts), Skip
-(blank score), selecting 0 and 10, and starting from the menu bar with the main window
-closed. Take two manual breaks and check that both ratings start unselected each time.
-Try cancelling setup, skipping ratings, and exporting the session to inspect surveys.csv.
-Check that answered break rows join to the correct break ID and setup activity is
-marked `check_in`. These UI checks aren't covered by the synthetic test programs.
-
-In the profile, turn all three surveys off, stop any current session and start a new
-one. It should start directly, allow breaks without ratings and have no timed survey.
-Change a switch during recording: it should only affect the next session. Relaunch
-to check the choices persist, then turn surveys back on and check the original flow.
-
-For the timed check-in, leave a session running for ten minutes with the main window
-closed. Check Answer/Skip in the notification, the menu-bar fallback, and that answering
-doesn't end the session. Try a manual break before minute ten (old reminder cancelled),
-then return and wait ten more minutes. Verify actual banner delivery, Focus/notifications
-off, stale banners after Stop, and the request/open/answer times in the exported files.
-
-For activity tracking, type five keys
-and Delete in another app, click and scroll, switch apps, move the pointer out and
-back, close the collector window, then stop from the menu bar. Inspect the activity CSVs.
-Confirm capture continues with the window closed and repeated Start/Stop creates
-distinct sessions. Test sleep and permission revocation before a participant study.
-
-For the session library, restart the app and check that saved sessions still appear.
-Export the same session twice and confirm both copies exist. Check that active-session
-export/delete controls are disabled. Test deletion only on a disposable session and
-confirm it is recoverable in Trash. Switch appearance and check each app window.
-
-Build and synthetic checks have passed. Use the manual checks above to verify
-real-input recording before a participant study.
-
-For breaks, test a manual 1-minute custom break: check counts pause, end early from
-another app, repeat and stay away past expiry, then correct the activity. Inspect
-`breaks.csv` and phase tags. Test screen sleep/wake, closing the window, Stop during
-a break, notification permission denied, and Take/Skip/Snooze from actual macOS
-banners. The synthetic tests simulate 25/10-minute timings without waiting; they
-don't prove notification delivery or every sleep/permission behavior on a real Mac.
-
-Native notification integration follows [Apple's notification delegate documentation](https://developer.apple.com/documentation/usernotifications/unusernotificationcenterdelegate).
-
-For notification setup, check the main-window card before recording. Press Enable,
-try Allow and Don't Allow on separate test installations/accounts, and verify that
-declining doesn't block a session. When denied, use the settings shortcut, enable
-notifications and banners, and return to FocusFix: the card should disappear.
-Disable banners again and return: it should reappear. Finally test actual break
-banners with Focus mode off. An automated permission test cannot prove macOS will
-display a banner. Do not reset permissions or delete real sessions just to test this.
+Open `FocusFix/FocusFix.xcodeproj` to build. Debug/Release target macOS 14+; source
+builds do not qualify that OS/hardware range. See [REDESIGN-READINESS.md](REDESIGN-READINESS.md),
+[MANUAL-QUALIFICATION.md](MANUAL-QUALIFICATION.md), [RELEASE.md](RELEASE.md) and
+[STORE-SUBMISSION.md](STORE-SUBMISSION.md). No deployment, website publication, Apple
+submission or push is part of this work.
 
 ## License
 
@@ -842,19 +190,3 @@ warranties of merchantability or fitness for a particular purpose. See the
 license for details. Third-party components retain their own licenses and
 notices; this grant applies only to material whose rights are held by
 Kristian Janci.
-
-## Future ML workflow (not implemented in this collector)
-
-1. External Data is used to train the machine learning model in python.
-
-2. Convert the trained model to Core ML to run in swift.
-
-3. Derive features from event logs and mouse summaries. Test different time windows in Python, then match those definitions in the app for live inference.
-
-4. THe model will give a fatigue, stress or workload prediction.
-
-5. A seperate decision rule will use the prediction and things like time since last break to decide if it should recommend a break.
-
-6. Later the new data can be used for retraining the model.
-
-
