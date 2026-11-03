@@ -22,7 +22,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 
 | Search | Files | What I can find there |
 | --- | --- | --- |
-| Automatic lifecycle | `RecordingLifecycle.swift`, `ActivityTracker.swift` | Consent/permission/pause/idle/sleep/quit decisions, daily segments and checkpoint-only recovery |
+| Automatic lifecycle | `RecordingLifecycle.swift`, `SystemIdleTime.swift`, `ActivityTracker.swift` | Consent/permission/pause/idle/sleep/quit decisions, daily segments and checkpoint-only recovery |
 | `FF: TRACKING` | `ActivityTracker.swift`, `InputMonitor.swift` | Passive Input Monitoring tap, start/stop, input events, session clock and coordination with breaks/surveys |
 | `FF: RECORDING CONTRACT` | `RecordingContract.swift`, `RECORDING-CONTRACT.md` | Schema 11, independent mode/capture/context/phase, validated atomic label snapshot and local-only research boundary |
 | `FF: STORAGE` | `RecordingData.swift`, `SavedSession.swift` | CSV writing, one-second mouse summaries, key hold timing, saved sessions and exports |
@@ -32,7 +32,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: SURVEYS` | `SurveyPreferences.swift`, `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | Saved survey switches, session snapshots, 10-minute opportunities, rating validation, CSV answers and sliders |
 | Reminder eligibility | `ReminderEligibility.swift` | Context/work-period tokens, policy version, duplicate/stale actions and rotation-safe cooldown |
 | `FF: NOTIFICATIONS` | `NotificationAccess.swift`, `BreakNotifications.swift` | Asking for permission, banners and notification buttons |
-| Coverage/status | `RecordingCoverage.swift`, `RecordingPresentation.swift`, `RecordingStatusPanel.swift` | Observed coverage versus missing time, context/phase duration partitions and shared main/menu status |
+| Coverage/status | `RecordingCoverage.swift`, `RecordingPresentation.swift`, `RecordingStatusPanel.swift`, `RecordingHistorySummary.swift` | Observed coverage versus missing time, context/phase duration partitions and shared main/menu status |
 | `FF: SESSIONS` | `SessionViews.swift` | Session library and Test tracking window |
 | `FF: UI` | `MyApp.swift`, `ContentView.swift` | App windows, main screen, menu bar and appearance |
 | `FF: STARTUP` | `LaunchScreen.swift` | Play/pause logo animation and skip/reduced-motion behavior |
@@ -60,3 +60,8 @@ user-facing explanation together. A matching number in just one file isn't enoug
 
 For cloud setup, use [research operations](supabase/RESEARCH-OPERATIONS.md).
 For the retired uploader, see [Cloudflare removal notes](CLOUDFLARE-REMOVAL.md).
+
+
+Current verification/release boundaries: [REDESIGN-READINESS.md](REDESIGN-READINESS.md)
+and [MANUAL-QUALIFICATION.md](MANUAL-QUALIFICATION.md). Older deployment entries are
+historical; the redesign has not deployed or enabled new scoring/research contracts.
