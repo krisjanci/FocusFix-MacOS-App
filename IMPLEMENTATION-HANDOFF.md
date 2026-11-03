@@ -136,3 +136,18 @@ reads actual OS status and registers only on the explicit toggle. Failed setup
 stays visible. Login launch is separate from capture/pause consent. Fake-client
 preference/login tests passed; actual registration and login remain manual checks.
 The lifecycle in Step 3 is next; this step does not start automatic capture.
+
+## Automatic tracking Step 3 — November 2, 2026
+
+I connected silent launch/activation, sleep/display/login, permission loss, idle,
+user pause, preference revocation and Quit to a single lifecycle decision point.
+Automatic capture requires both explicit scope consent and existing OS access.
+Idle defaults to five minutes, pause persists, and resumed automatic capture starts
+unknown. Daily/timezone rotation preserves logical IDs and cooldown while changing
+segments. Synchronized checkpoints bound crash recovery; sampling gaps are not
+backfilled. Short automatic intervals are retained. New data remain local only.
+
+Pure lifecycle/recovery/rotation tests passed and Debug compiled. Release and the
+full Swift runner passed for this iteration. Real sleep/lock, permission,
+long-running memory/disk behavior and signed-device operation remain manual.
+Next: Step 4 work/non-work/unknown actions and bounded history revisions.
