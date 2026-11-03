@@ -193,6 +193,13 @@ final class RecordingWriter {
         try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
         try surveyPrompts.synchronize()
     }
+    func changeContext(_ context: ActivityContext, at time: Double, effectiveAt: Date, source: ContextSource) throws {
+        try checkpoint(at: time)
+        var snapshot = contract
+        try snapshot.changeContext(context, at: time, effectiveAt: effectiveAt, recordedAt: Date(), source: source)
+        try snapshot.save(to: folder)
+        contract = snapshot
+    }
     // Checkpoint only after raw bytes are durable; crash recovery stops at this bound.
     func checkpoint(at time: Double) throws {
         try flush()
