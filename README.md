@@ -1,3 +1,15 @@
+## Declared-work scoring compatibility — November 2, 2026
+
+Goals use declared work with observed coverage, excluding unknown/non-work, missing
+coverage, check-ins and explicit breaks. Context corrections replace new local
+contributions without rescoring legacy earned credit. These minutes are not
+objective productivity. Existing group Work scores stay unchanged by new-format
+work because the old server cannot safely reconcile correction decreases. New work
+summaries remain in an account-scoped local queue; a compatible server update and
+disposable-service qualification are required before sync. Explicit healthy-break
+rules and private-group thresholds/freezes remain unchanged. See
+[the sync dependency](supabase/DECLARED-WORK-SYNC.md).
+
 ## Ordinary use without surveys — November 2, 2026
 
 Manual/automatic capture and breaks do not require surveys. Optional study check-ins
