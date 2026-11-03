@@ -38,6 +38,9 @@ struct SharingView: View {
 struct PrivacyResearchSettings: View {
     @ObservedObject private var tracker = ActivityTracker.shared
     @ObservedObject private var surveys = SurveyPreferences.shared
+    @ObservedObject private var automatic = AutomaticRecordingPreferences.shared
+    @StateObject private var login = LoginLaunch()
+    @State private var automaticConsentPresented = false
     @State private var recordingEnabled = RecordingNotice().enabled
     @State private var recordingConsentPresented = false
 
@@ -49,9 +52,17 @@ struct PrivacyResearchSettings: View {
                     if value { recordingConsentPresented = true }
                     else { tracker.disableRecording(); recordingEnabled = false }
                 }))
-                Text("Recording starts only when you press Start session. Turning this off stops the current session and keeps your saved recordings.")
+                Text("Manual recording starts with Start work. Automatic recording is a separate choice below. Turning all recording off stops both modes and keeps saved recordings.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Manage Input Monitoring") { tracker.requestPermission() }.disabled(!recordingEnabled)
+                Toggle("Enable automatic recording", isOn: Binding(get: { automatic.enabled }, set: { value in
+                    if value { automaticConsentPresented = true } else { automatic.disable() }
+                })).disabled(!recordingEnabled)
+                Text("Includes unknown and non-work computer use while FocusFix is running. Work labels are optional. Pause recording or Quit to stop capture.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Launch at login", isOn: Binding(get: { login.enabled }, set: { login.setEnabled($0) }))
+                Text(login.explanation).font(.caption).foregroundStyle(.secondary)
+                if let error = login.error { Text(error).font(.caption).foregroundStyle(.red) }
                 DisclosureGroup("What is recorded and where it is stored") { PrivacyNoticeDetails().padding(.top, 8) }
                 Divider()
                 ResearchSharingControls()
@@ -73,6 +84,10 @@ struct PrivacyResearchSettings: View {
         .sheet(isPresented: $recordingConsentPresented, onDismiss: { recordingEnabled = RecordingNotice().enabled }) {
             RecordingNoticeView(tracker: tracker).interactiveDismissDisabled()
         }
-        .onAppear { recordingEnabled = RecordingNotice().enabled }
+        .sheet(isPresented: $automaticConsentPresented) {
+            AutomaticRecordingNoticeView(onEnable: { automatic.enable() })
+        }
+        .onAppear { recordingEnabled = RecordingNotice().enabled; login.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in login.refresh() }
     }
 }
