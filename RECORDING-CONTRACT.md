@@ -98,3 +98,20 @@ context forward from the action and leaves capture running; history edits are
 separate. Context/pause/revoke changes invalidate pending requests. Consumed
 requests cannot be applied twice. Logical IDs and a process-monotonic cooldown
 survive file rotation, avoiding stacked requests.
+
+## Step 6: coverage in history
+
+Recording files/segments are distinct from logical user work periods. History
+calculates declared work, non-work and unknown only where mouse-summary coverage
+was observed in normal intervention phase. Zero-movement observed bins count as
+coverage; absent bins do not. Explicit break intervals come from break lifecycle
+records, including continued breaks across segments. Check-in/awaiting-return
+coverage is shown separately, and remaining duration is unavailable. No keyboard
+capture completeness is implied by mouse coverage; Secure Input limitations remain.
+Overlapping/malformed coverage fails closed instead of inflating durations.
+
+Selected history coverage is computed off the main actor with a per-file read
+limit. Legacy recordings retain unknown context. Local deletion, exports and
+research deletion keep their separate meanings. The main status and menu use one
+pure presentation function. The tour's automatic/label/pause controls modify only
+its in-memory practice model, never the real tracker, consent, permissions or cloud.
