@@ -173,6 +173,15 @@ final class ActivityTracker: ObservableObject {
     }
     // Open planning, with an optional fatigue check-in, before every session.
     func requestStart() {
+        if isRecording { setContext(.work); return }
+        if AutomaticRecordingPreferences.shared.enabled, lifecycle.blockers.isEmpty {
+            AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
+            lifecycle.failed = false
+            sessionSurveyOptions = SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false)
+            start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
+            if isRecording { setContext(.work) }
+            return
+        }
         guard !isRecording, !sessionCheckInPresented, !recordingNoticePresented else { return }
         guard !RecordingNotice().needsAcknowledgement else {
             recordingNoticePresented = true
@@ -183,6 +192,31 @@ final class ActivityTracker: ObservableObject {
         sessionSurveyOptions = SurveyPreferences.shared.snapshot
         sessionCheckIn = sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: 0) : nil
         sessionCheckInPresented = true
+    }
+    func endWork() {
+        guard isRecording, userContext == .work else { return }
+        if recordingMode == .automatic { setContext(.unknown) }
+        else { stop(reason: "end_work") }
+    }
+    func setContext(_ context: ActivityContext, source: ContextSource = .userAction) {
+        guard isRecording, let writer else { return }
+        let time = now
+        guard time - lastSamplingTick <= 5 else { stop(reason: "capture_gap", observedEnd: lastObservedTime); return }
+        do {
+            updateProgress(at: time)
+            if breakPolicy.phase != .resting { append(mouse.stop(at: time)) }
+            try writer.changeContext(context, at: time, effectiveAt: Date(), source: source)
+            userContext = writer.contract.currentContext
+            lastObservedTime = max(lastObservedTime, time)
+            resetMouse(at: time, phase: activityPhase)
+            updateProgress(at: time, persist: true)
+        } catch { fail(error) }
+    }
+    func correctContext(_ context: ActivityContext, start: Double, end: Double, session: SavedSession) throws {
+        try SessionFiles.correctContext(context, start: start, end: end, for: session,
+            root: SessionFiles.root(), active: isRecording ? sessionFolder : nil,
+            expectedRevision: session.recordingContract?.revisions.count ?? 0)
+        refreshSessions()
     }
     // Close the starting check-in without recording a session or an answer.
     func cancelSessionCheckIn() { sessionCheckIn = nil }
