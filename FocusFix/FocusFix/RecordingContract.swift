@@ -47,26 +47,33 @@ nonisolated struct RecordingContract: Codable, Hashable {
     let recordingID: UUID
     let segmentID: UUID
     let mode: RecordingMode
+    let elapsedOrigin: Double
     var observedThrough: Double
     var finalized: Bool
     var intervals: [ContextInterval]
     var revisions: [ContextRevision]
 
     init(recordingID: UUID = UUID(), segmentID: UUID = UUID(), mode: RecordingMode,
-         startedAt: Date, initialContext: ActivityContext? = nil, logicalID: UUID = UUID()) {
+         startedAt: Date, initialContext: ActivityContext? = nil, logicalID: UUID = UUID(),
+         elapsedOrigin: Double = 0, continuing: ContextInterval? = nil) {
         format = Self.format
         self.recordingID = recordingID; self.segmentID = segmentID; self.mode = mode
-        observedThrough = 0; finalized = false; revisions = []
-        intervals = [ContextInterval(id: UUID(), logicalID: logicalID, start: 0, end: nil,
+        self.elapsedOrigin = elapsedOrigin
+        observedThrough = elapsedOrigin; finalized = false; revisions = []
+        intervals = [ContextInterval(id: UUID(), logicalID: logicalID, start: elapsedOrigin, end: nil,
             context: initialContext ?? (mode == .manual ? .work : .unknown),
             source: mode == .manual ? .manualStart : .automaticDefault,
             effectiveAtUTC: startedAt, recordedAtUTC: startedAt)]
+        if let continuing {
+            intervals = [ContextInterval(id: UUID(), logicalID: continuing.logicalID, start: elapsedOrigin, end: nil,
+                context: continuing.context, source: continuing.source, effectiveAtUTC: continuing.effectiveAtUTC, recordedAtUTC: continuing.recordedAtUTC)]
+        }
     }
     enum Invalid: Error { case contract, bounds, overlap, revision, finalized }
 
     func validate() throws {
-        guard format == Self.format, observedThrough.isFinite, observedThrough >= 0 else { throw Invalid.contract }
-        var previousEnd = 0.0
+        guard format == Self.format, observedThrough.isFinite, elapsedOrigin.isFinite, elapsedOrigin >= 0, observedThrough >= elapsedOrigin else { throw Invalid.contract }
+        var previousEnd = elapsedOrigin
         var ids = Set<UUID>()
         for (index, item) in intervals.enumerated() {
             guard ids.insert(item.id).inserted, item.start.isFinite, item.start >= previousEnd,
