@@ -2,6 +2,12 @@ import Foundation
 
 @main struct RecordingLifecycleTests {
     static func main() throws {
+        precondition(RecordingLifecycle.observedEnd(now: 10000, lastSamplingTick: 10, lastObserved: 11) == 11)
+        precondition(RecordingLifecycle.observedEnd(now: 11, lastSamplingTick: 10, lastObserved: 10) == 11)
+        precondition(SystemIdleTime.anyInputEventType.rawValue == UInt32.max)
+        precondition(SystemIdleTime.anyInputEventType != .null)
+        var invalidIdle = RecordingLifecycle()
+        precondition(invalidIdle.reconcile(recording: true, mode: .automatic, idle: .nan) == .stop("idle_status_unavailable"))
         var lifecycle = RecordingLifecycle()
         precondition(lifecycle.reconcile(recording: false, mode: .automatic, idle: 0) == .none)
         lifecycle.recordingAllowed = true; lifecycle.automaticEnabled = true
