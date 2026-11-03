@@ -561,3 +561,19 @@ Generated lifecycle/recovery/rotation tests passed. Local Debug compilation pass
 Release and the full Swift suite also passed. These do not establish actual
 Input Monitoring, sleep/wake, signed login launch or long-run resource coverage.
 I did not change system permissions, enable research or access participant data.
+
+## November 2, 2026 — automatic recording, Step 4
+
+I connected work intent to the new context model. Start work labels the current
+automatic recording from now; it never labels earlier unknown time or opens a
+second tap. End work keeps automatic capture running as unknown and stops manual
+capture. Work context survives ordinary switching and daily rotation, while a
+new lifecycle recording starts unknown. Explicit breaks keep intent separately.
+
+The minimal menu offers Work/Not working/Unknown, and history accepts bounded
+corrections in segment-relative seconds. Each correction retains the original
+labels and provenance, checks revision ordering and can be retried without a
+second revision. Invalid/stale edits leave the previous atomic snapshot intact.
+The generated label/edit tests check bounds, mixed context, original revisions,
+idempotence and unchanged raw event bytes. Real input/permission behavior remains
+a separate manual check, not something these fixtures establish.
