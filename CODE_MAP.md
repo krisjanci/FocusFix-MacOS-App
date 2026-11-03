@@ -28,6 +28,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | `FF: STORAGE` | `RecordingData.swift`, `SavedSession.swift` | CSV writing, one-second mouse summaries, key hold timing, saved sessions and exports |
 | `FF: BREAKS` | `BreakPolicy.swift`, `BreakViews.swift` | 25-minute/idle reminder rules, snooze, actual break duration and break controls |
 | `FF: SURVEYS` | `SurveyPreferences.swift`, `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | Saved survey switches, session snapshots, 10-minute opportunities, rating validation, CSV answers and sliders |
+| Reminder eligibility | `ReminderEligibility.swift` | Context/work-period tokens, policy version, duplicate/stale actions and rotation-safe cooldown |
 | `FF: NOTIFICATIONS` | `NotificationAccess.swift`, `BreakNotifications.swift` | Asking for permission, banners and notification buttons |
 | `FF: SESSIONS` | `SessionViews.swift` | Session library and Test tracking window |
 | `FF: UI` | `MyApp.swift`, `ContentView.swift` | App windows, main screen, menu bar and appearance |
