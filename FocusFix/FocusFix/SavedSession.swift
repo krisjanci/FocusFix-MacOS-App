@@ -153,6 +153,17 @@ nonisolated enum SessionFiles {
             .write(to: url, options: .atomic)
     }
 
+    static func correctContext(_ context: ActivityContext, start: Double, end: Double,
+                               for session: SavedSession, root: URL, active: URL?,
+                               actionID: UUID = UUID(), expectedRevision: Int) throws {
+        try validate(session.folder, in: root, active: active)
+        var contract = try RecordingContract.load(from: session.folder)
+        try contract.correctContext(context, start: start, end: end,
+            effectiveAt: session.startedAt.addingTimeInterval(start - contract.elapsedOrigin),
+            recordedAt: Date(), actionID: actionID, expectedRevision: expectedRevision)
+        try contract.save(to: session.folder)
+    }
+
     // Locate the app's local Sessions directory in Application Support.
     static func root() throws -> URL {
         try FileManager.default.url(for: .applicationSupportDirectory,
