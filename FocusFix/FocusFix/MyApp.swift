@@ -121,6 +121,11 @@ private struct RecordingMenu: View {
                 }
             }
         }
+        if tracker.isRecording {
+            Button("Pause recording") { tracker.pauseRecording() }
+        } else if tracker.captureState == .userPaused || AutomaticRecordingPreferences.shared.enabled {
+            Button("Resume recording") { tracker.resumeRecording() }
+        }
         Button("Sessions") {
             openWindow(id: "sessions")
             NSApp.activate(ignoringOtherApps: true)
@@ -132,7 +137,7 @@ private struct RecordingMenu: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         Button("Quit FocusFix") {
-            tracker.stop(reason: "app_quit")
+            tracker.prepareToQuit()
             NSApp.terminate(nil)
         }.keyboardShortcut("q")
     }
