@@ -99,11 +99,19 @@ struct ContentView: View {
                         .tracking(2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label(onBreak ? "On break" : tracker.isRecording ? "Recording" : "Idle", systemImage: onBreak ? "leaf.fill" : "circle.fill")
+                Label(tracker.isRecording ? "Recording" : "FocusFix", systemImage: onBreak ? "leaf.fill" : "circle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(tracker.isRecording ? teal : Color.secondary)
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(teal.opacity(0.08), in: Capsule())
+            }
+            HStack(alignment: .top) {
+                RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
+                Menu("Context") {
+                    Button("Work") { tracker.setContext(.work) }
+                    Button("Not working") { tracker.setContext(.nonWork) }
+                    Button("Unknown") { tracker.setContext(.unknown) }
+                }.disabled(!tracker.isRecording).accessibilityLabel("Change activity context")
             }
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
@@ -119,6 +127,10 @@ struct ContentView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     SessionClockFace(time: tracker.formattedTime)
+                    Text("Recorded elapsed time · includes unknown and non-work")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("Declared work · \(RecordingCoverage.time(tracker.declaredWorkSeconds))")
+                        .font(.callout).monospacedDigit()
                 }
                 if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
                     Text(tracker.sessionWorkPlan.summary)
@@ -129,7 +141,7 @@ struct ContentView: View {
                                 .font(.callout.weight(.medium)).foregroundStyle(teal)
                             if tracker.sessionWorkPlan.reminderPending {
                                 Spacer()
-                                Button("Stop & save") { tracker.stop() }
+                                Button("End work") { tracker.endWork() }
                                 Button("Keep going") { tracker.keepGoingAfterPlan() }
                             }
                         }
@@ -217,14 +229,19 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
                 }
                 Button {
-                    if tracker.isRecording { tracker.stop() } else { tracker.requestStart() }
+                    if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else { tracker.requestStart() }
                 } label: {
-                    Label(tracker.isRecording ? "Stop & save" : "Start session",
-                          systemImage: tracker.isRecording ? "stop.fill" : "record.circle")
+                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work",
+                          systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
                         .frame(minWidth: 124)
                 }.buttonStyle(.bordered).tint(teal).controlSize(.large)
+                if tracker.isRecording {
+                    Button("Pause") { tracker.pauseRecording() }.accessibilityLabel("Pause recording")
+                } else if tracker.captureState == .userPaused || tracker.captureState == .idlePaused {
+                    Button("Resume") { tracker.resumeRecording() }.accessibilityLabel("Resume recording")
+                }
                 Button { openWindow(id: "sessions") } label: {
-                    Label("Sessions", systemImage: "folder")
+                    Image(systemName: "folder").accessibilityLabel("Sessions")
                 }.controlSize(.large)
                 Spacer()
             }
