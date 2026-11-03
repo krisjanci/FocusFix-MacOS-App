@@ -65,7 +65,7 @@ struct PrivacyResearchSettings: View {
                     .onChange(of: screenUseReminders) { _, _ in tracker.reminderPreferenceChanged() }
                 Text("Off by default. These are screen-use reminders during Unknown or Not working activity, without inferring work. ‘I’m not working’ labels from now and keeps recording; edit earlier labels in Sessions.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Launch at login", isOn: Binding(get: { login.enabled }, set: { login.setEnabled($0) }))
+                Toggle("Launch at login", isOn: Binding(get: { login.requested }, set: { login.setEnabled($0) }))
                 Text(login.explanation).font(.caption).foregroundStyle(.secondary)
                 if let error = login.error { Text(error).font(.caption).foregroundStyle(.red) }
                 DisclosureGroup("What is recorded and where it is stored") { PrivacyNoticeDetails().padding(.top, 8) }
