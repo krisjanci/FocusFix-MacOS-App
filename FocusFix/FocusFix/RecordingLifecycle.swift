@@ -15,8 +15,17 @@ nonisolated struct RecordingLifecycle {
     private(set) var state: CaptureState = .disabled
     private(set) var reason: String?
 
+    static func observedEnd(now: Double, lastSamplingTick: Double, lastObserved: Double) -> Double {
+        guard now.isFinite, lastSamplingTick.isFinite, lastObserved.isFinite,
+              now >= 0, lastSamplingTick >= 0, lastObserved >= 0 else { return max(0, lastObserved.isFinite ? lastObserved : 0) }
+        return now - lastSamplingTick > 5 ? lastObserved : max(now, lastObserved)
+    }
+
     mutating func reconcile(recording: Bool, mode: RecordingMode, idle: Double) -> Effect {
-        guard idle.isFinite, idle >= 0 else { return .none }
+        guard idle.isFinite, idle >= 0 else {
+            state = .ready; reason = "idle_status_unavailable"
+            return recording && mode == .automatic ? .stop("idle_status_unavailable") : .none
+        }
         let shouldStop: String?
         if quitting { shouldStop = "app_quit"; state = .disabled }
         else if !recordingAllowed { shouldStop = "recording_disabled"; state = .disabled }
