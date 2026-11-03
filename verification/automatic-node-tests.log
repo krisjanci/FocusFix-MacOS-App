@@ -1,0 +1,19 @@
+
+> test
+> node --test tests/*.test.mjs
+
+✔ requires authentication before any admin call (21.092917ms)
+✔ rejects an invalid user without touching storage or admin APIs (1.024292ms)
+✔ uses verified user ID; ignores a foreign user ID supplied in the request (2.060416ms)
+✔ storage failure prevents deleting the account and hides server error contents (1.134333ms)
+✔ research deletion revokes before storage cleanup and keeps the account (23.761083ms)
+✔ cleanup failure leaves the previously recorded request pending for retry (0.543459ms)
+✔ rejects unsafe storage paths and does not mark cleanup completed (0.414458ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123.095
