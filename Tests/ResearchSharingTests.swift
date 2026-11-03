@@ -35,9 +35,17 @@ struct ResearchSharingTests {
         let folder = sessions.appendingPathComponent(first)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic fixture".utf8).write(to: folder.appendingPathComponent(name)) }
-        let tagMetadata = try JSONSerialization.data(withJSONObject: ["tags": ["Focused work", "My custom tag"],
+        let tagMetadata = try JSONSerialization.data(withJSONObject: ["schema_version": 10, "tags": ["Focused work", "My custom tag"],
             "tag_colors": ["Focused work": "#168B80", "My custom tag": "#C64B66"]])
         try tagMetadata.write(to: folder.appendingPathComponent("session.json"))
+        // New context-bearing schemas cannot use the legacy research allowlist.
+        let metadataURL = folder.appendingPathComponent("session.json")
+        try JSONSerialization.data(withJSONObject: ["schema_version": 11]).write(to: metadataURL)
+        do {
+            _ = try ResearchArchive.prepare(ids: [first], root: sessions, destination: root.appendingPathComponent("rejected.zip"))
+            preconditionFailure("New schema must remain local only")
+        } catch { }
+        try tagMetadata.write(to: metadataURL)
         try Data("private name and photo".utf8).write(to: folder.appendingPathComponent("profile.json"))
         let records = [ResearchSession(id: first, consentID: consent.id, startedAt: now, endedAt: now)]
         let ids = try ResearchArchive.select(records, root: sessions)
