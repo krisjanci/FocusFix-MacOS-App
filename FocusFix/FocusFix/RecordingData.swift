@@ -114,7 +114,7 @@ final class RecordingWriter {
     private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, studyConfiguration: StudyCheckInConfiguration? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, researchIdentity: ResearchCaptureIdentity? = nil, studyConfiguration: StudyCheckInConfiguration? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
         contract = continuingContract ?? RecordingContract(mode: mode, startedAt: startedAt)
         self.studyConfiguration = studyConfiguration
         self.surveyOptions = surveyOptions
@@ -153,6 +153,7 @@ final class RecordingWriter {
         try breaks.seekToEnd()
         try surveys.seekToEnd()
         try surveyPrompts.seekToEnd()
+        try ResearchCaptureManifest(recordingID: contract.recordingID, segmentID: contract.segmentID, capturedAtUTC: startedAt, identity: researchIdentity).save(to: folder)
         try contract.save(to: folder)
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
     }
