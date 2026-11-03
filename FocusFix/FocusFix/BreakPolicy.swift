@@ -107,6 +107,11 @@ struct BreakPolicy {
         resetInput(at: time)
         return result
     }
+    mutating func contextChanged(at time: Double, beginsWork: Bool) {
+        promptID = nil
+        if beginsWork { nextEligible = max(nextEligible, time + workDelay) }
+        resetInput(at: time)
+    }
     // Start a valid planned break and remember its chosen activity and duration.
     mutating func begin(at time: Double, seconds: Double, activity: String) -> BreakLogEntry? {
         guard phase == .work, seconds.isFinite, (60...7200).contains(seconds), !activity.isEmpty else { return nil }
