@@ -1,3 +1,12 @@
+## Optional work labels and corrections — November 2, 2026
+
+**Start work** in the menu labels activity from now, including during automatic
+capture. **End work** returns automatic activity to Unknown; manual-only capture
+ends and saves. Work is user declared, not objectively verified productivity.
+The menu also offers Not working and Unknown. Sessions → **Edit context…** changes
+a selected bounded interval and preserves a revision history. Earlier unknown
+activity stays unknown unless explicitly corrected. Raw activity files stay intact.
+
 ## Automatic lifecycle — November 2, 2026
 
 After explicit automatic opt-in, capture can begin while FocusFix runs if Input
