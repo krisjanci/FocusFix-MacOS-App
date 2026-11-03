@@ -71,6 +71,23 @@ nonisolated struct RecordingContract: Codable, Hashable {
                 context: continuing.context, source: continuing.source, effectiveAtUTC: continuing.effectiveAtUTC, recordedAtUTC: continuing.recordedAtUTC)]
         }
     }
+    private enum CodingKeys: String, CodingKey {
+        case format, recordingID, segmentID, scoringTimeZone, mode, elapsedOrigin, observedThrough, finalized, intervals, revisions
+    }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        format = try values.decode(String.self, forKey: .format)
+        recordingID = try values.decode(UUID.self, forKey: .recordingID)
+        segmentID = try values.decode(UUID.self, forKey: .segmentID)
+        mode = try values.decode(RecordingMode.self, forKey: .mode)
+        // Earlier local iterations of the additive v11 format had origin zero and no scoring-zone field.
+        elapsedOrigin = try values.decodeIfPresent(Double.self, forKey: .elapsedOrigin) ?? 0
+        scoringTimeZone = try values.decodeIfPresent(String.self, forKey: .scoringTimeZone) ?? "UTC"
+        observedThrough = try values.decode(Double.self, forKey: .observedThrough)
+        finalized = try values.decode(Bool.self, forKey: .finalized)
+        intervals = try values.decode([ContextInterval].self, forKey: .intervals)
+        revisions = try values.decodeIfPresent([ContextRevision].self, forKey: .revisions) ?? []
+    }
     enum Invalid: Error { case contract, bounds, overlap, revision, finalized }
 
     func validate() throws {
@@ -176,7 +193,18 @@ nonisolated struct RecordingContract: Codable, Hashable {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true,
               (values.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw Invalid.contract }
-        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .secondsSince1970
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let value = try decoder.singleValueContainer()
+            if let seconds = try? value.decode(Double.self), seconds.isFinite { return Date(timeIntervalSince1970: seconds) }
+            let string = try value.decode(String.self)
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: string) { return date }
+            formatter.formatOptions = [.withInternetDateTime]
+            guard let date = formatter.date(from: string) else { throw Invalid.contract }
+            return date
+        }
         let result = try decoder.decode(Self.self, from: Data(contentsOf: url))
         try result.validate()
         return result
