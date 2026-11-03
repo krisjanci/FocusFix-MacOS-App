@@ -82,3 +82,19 @@ source/effective/action-recorded times (numeric Unix UTC seconds, preserving sub
 stale edits leave the snapshot and raw files untouched. The snapshot is capped at
 16 MiB; a size failure retains the previous readable labels. Legacy labels/files
 are unchanged and cannot be assigned invented historical context by this path.
+
+## Step 5: honest reminder requests
+
+`reminders.jsonl` is append-only scheduled/requested/action history, including the
+logical recording, context/work-period IDs, policy version, context, elapsed
+schedule/action and UTC request/action-recorded times. Requested does not mean
+delivered/viewed. An unanswered notification adds no rating, context confirmation
+or break-completion evidence. This file must be reviewed in Step 9's allowlist.
+
+The shipped policy remains the 25-minute/two-idle-gap baseline, eligible only for
+declared work by default. A separate screen-use reminder preference includes
+unknown/non-work without treating it as work. Notification Not working changes
+context forward from the action and leaves capture running; history edits are
+separate. Context/pause/revoke changes invalidate pending requests. Consumed
+requests cannot be applied twice. Logical IDs and a process-monotonic cooldown
+survive file rotation, avoiding stacked requests.
