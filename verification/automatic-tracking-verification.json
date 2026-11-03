@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-02",
+  "scope": "local twelve-step automatic tracking implementation; generated data only",
+  "swift_executables": {
+    "passed": 32,
+    "command": "bash scripts/test.sh"
+  },
+  "backend": {
+    "passed": 40,
+    "python": "3.13.15",
+    "sklearn": "1.5.2",
+    "environment": "/tmp/focusfix-backend-env",
+    "command": "/tmp/focusfix-backend-env/bin/python -m pytest -q",
+    "native_coreml": "conversion/runtime parity only, outside sandbox compiler temporary restriction"
+  },
+  "node": {
+    "passed": 7,
+    "command": "npm test",
+    "scope": "mocked deletion functions"
+  },
+  "database": {
+    "passed": true,
+    "command": "FOCUSFIX_PGLITE_MODULE=/tmp/focusfix-auto-deps/node_modules/@electric-sql/pglite/dist/index.js node tests/run-database.mjs",
+    "scope": "isolated PGlite, actual migrations/RLS/social/consent/deletion; no live service"
+  },
+  "builds": {
+    "Debug": [
+      "arm64",
+      "x86_64"
+    ],
+    "Release": [
+      "arm64",
+      "x86_64"
+    ],
+    "signed": false,
+    "app_launched": false
+  },
+  "release_content": "passed",
+  "submission_gate": "expected rejection: missing published privacy URL",
+  "gates": {
+    "research_flag": false,
+    "new_schema_research_delivery": false,
+    "reviewed_study_configuration_bundled": false,
+    "real_model_bundled": false,
+    "synthetic_zip_builder_in_shipping_binary": false,
+    "new_work_sync": "held owner/service-scoped; not sent to increment-only RPC",
+    "shipped_policy": "fixed timer/idle"
+  },
+  "visual": "actual shared status/empty/legacy history components rendered and inspected; narrow light/dark and long text; no full-window/keyboard/spoken VoiceOver qualification",
+  "parity_fixture_sha256": "e769c29a8bce249f7e4daaaa40008f39ec1986f7c4038fc5c8a03c0e6ff2b063",
+  "manual_qualification": "unperformed; see MANUAL-QUALIFICATION.md",
+  "deployment_publication_push": false,
+  "source_note": "engineering builds on the final audited working tree before final per-file commits; signed exact-release qualification is separate"
+}
