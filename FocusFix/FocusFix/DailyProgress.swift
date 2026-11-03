@@ -7,15 +7,20 @@ struct ProgressDay: Codable, Equatable {
     var completedBreakIDs: Set<String> = []
 }
 
+struct DeclaredWorkOwner: Codable, Equatable { let ownerID: UUID; let origin: String }
+
 struct DailyProgress: Codable, Equatable {
     static let goalSeconds: Double = 3600
     var version = 1
+    private(set) var declaredSegments: [String: [String: Double]] = [:]
+    private(set) var declaredRevisions: [String: Int] = [:]
+    private(set) var declaredOwners: [String: DeclaredWorkOwner] = [:]
     private(set) var days: [String: ProgressDay] = [:]
     var protectionStart: String?
     var reconciledThrough: String?
     var frozenDays: Set<String> = []
 
-    enum CodingKeys: String, CodingKey { case version, days, protectionStart, reconciledThrough, frozenDays }
+    enum CodingKeys: String, CodingKey { case version, days, protectionStart, reconciledThrough, frozenDays, declaredSegments, declaredRevisions, declaredOwners }
     init() {}
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -23,6 +28,9 @@ struct DailyProgress: Codable, Equatable {
         days = try values.decode([String: ProgressDay].self, forKey: .days)
         protectionStart = try values.decodeIfPresent(String.self, forKey: .protectionStart)
         reconciledThrough = try values.decodeIfPresent(String.self, forKey: .reconciledThrough)
+        declaredRevisions = try values.decodeIfPresent([String: Int].self, forKey: .declaredRevisions) ?? [:]
+        declaredOwners = try values.decodeIfPresent([String: DeclaredWorkOwner].self, forKey: .declaredOwners) ?? [:]
+        declaredSegments = try values.decodeIfPresent([String: [String: Double]].self, forKey: .declaredSegments) ?? [:]
         frozenDays = try values.decodeIfPresent(Set<String>.self, forKey: .frozenDays) ?? []
     }
 
@@ -95,6 +103,31 @@ struct DailyProgress: Codable, Equatable {
         }
     }
 
+    // Replace only new-schema contributions; historic earned work remains a protected baseline.
+    mutating func replaceDeclaredWork(segmentID: String, days replacement: [String: Double], revision: Int = 0, owner: DeclaredWorkOwner? = nil) throws {
+        guard replacement.allSatisfy({ $0.value.isFinite && $0.value >= 0 && $0.key.count == 10 }) else {
+            throw NSError(domain: "FocusFix.Progress", code: 2)
+        }
+        let previous = declaredSegments[segmentID] ?? [:]
+        declaredRevisions[segmentID] = revision
+        if let owner, declaredOwners[segmentID] == nil { declaredOwners[segmentID] = owner }
+        declaredSegments[segmentID] = replacement
+        version = 2
+        guard previous != replacement else { return }
+        for (day, seconds) in previous { days[day, default: ProgressDay()].workSeconds = max(0, days[day, default: ProgressDay()].workSeconds - seconds) }
+        for (day, seconds) in replacement { days[day, default: ProgressDay()].workSeconds += seconds }
+        declaredSegments[segmentID] = replacement
+        version = 2
+    }
+    static func declaredAllocation(slices: [CoverageSlice], startedAt: Date, origin: Double, calendar: Calendar) -> [String: Double] {
+        var temporary = DailyProgress()
+        for slice in slices {
+            temporary.addWork(seconds: slice.end - slice.start,
+                endingAt: startedAt.addingTimeInterval(slice.end - origin), calendar: calendar)
+        }
+        return temporary.days.mapValues(\.workSeconds)
+    }
+
     @discardableResult
     mutating func completeBreak(id: String, seconds: Double, reason: String,
                                 at date: Date, calendar: Calendar) -> Bool {
@@ -122,7 +155,8 @@ struct DailyProgress: Codable, Equatable {
     }
 
     var isValid: Bool {
-        version == 1 && days.values.allSatisfy { $0.workSeconds.isFinite && $0.workSeconds >= 0 }
+        (version == 1 || version == 2) && days.values.allSatisfy { $0.workSeconds.isFinite && $0.workSeconds >= 0 }
+            && declaredSegments.values.allSatisfy { $0.values.allSatisfy { $0.isFinite && $0 >= 0 } }
     }
 }
 
