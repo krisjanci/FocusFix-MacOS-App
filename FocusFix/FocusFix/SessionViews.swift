@@ -12,6 +12,8 @@ struct SessionLibraryView: View {
     @State private var notice: String?
     @State private var exportingAll = false
     @State private var tagging: SavedSession?
+    @State private var coverage: RecordingCoverage?
+    @State private var coverageError: String?
     @State private var editingContext: SavedSession?
     @ObservedObject var tagLibrary = SessionTagLibrary.shared
 
@@ -24,8 +26,8 @@ struct SessionLibraryView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Your sessions").font(.title2.weight(.semibold))
-                    Text("All time counts toward your daily goal. Sessions of 15+ minutes are saved in your history.").font(.callout).foregroundStyle(.secondary)
+                    Text("Your recordings").font(.title2.weight(.semibold))
+                    Text("Files are recording segments, not work periods. Automatic intervals are retained, including short ones. Only declared work with observed coverage counts toward work progress.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text("\(tracker.sessions.count)").font(.title2.monospacedDigit()).foregroundStyle(teal)
@@ -36,7 +38,7 @@ struct SessionLibraryView: View {
                     description: Text(error))
             } else if tracker.sessions.isEmpty {
                 ContentUnavailableView("No sessions yet", systemImage: "clock",
-                    description: Text("Complete a session of 15 minutes or longer to see it here."))
+                    description: Text("Record automatically after opting in, or start a manual work session. Legacy history stays available."))
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -58,6 +60,14 @@ struct SessionLibraryView: View {
                         if let id { proxy.scrollTo(id, anchor: .center) }
                     }
                 }
+            }
+            if let selected {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(selected.recordingContract.map { "Recording \($0.recordingID.uuidString.prefix(8)) · segment \($0.segmentID.uuidString.prefix(8))" } ?? "Legacy recording · context unknown")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let coverage { Text(coverage.summary).font(.caption).fixedSize(horizontal: false, vertical: true) }
+                    else { Text(coverageError ?? "Loading observed coverage…").font(.caption).foregroundStyle(.secondary) }
+                }.padding(.horizontal, 20).padding(.vertical, 8)
             }
             Divider()
             HStack {
@@ -84,6 +94,15 @@ struct SessionLibraryView: View {
         .frame(minWidth: 650, minHeight: 400)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { tracker.refreshSessions() }
+        .task(id: selected) {
+            coverage = nil; coverageError = nil
+            guard let selected else { return }
+            do {
+                let result = try await Task.detached { try RecordingCoverage.load(session: selected) }.value
+                guard !Task.isCancelled else { return }
+                coverage = result
+            } catch { coverageError = "Coverage unavailable; missing observations are not zero activity." }
+        }
         .sheet(item: $editingContext) { session in
             ContextCorrectionView(session: session) { context, start, end in
                 try tracker.correctContext(context, start: start, end: end, session: session)
