@@ -48,6 +48,15 @@ final class ActivityTracker: ObservableObject {
     private var progressStore: ProgressStore?
     @Published private(set) var sessionWorkPlan = SessionWorkPlan()
     private var progressClock = ProgressClock()
+    private var pendingWorkSlices: [CoverageSlice] = []
+    private var segmentWorkDays: [String: Double] = [:]
+    private var segmentWorkOwner: DeclaredWorkOwner?
+    private var captureAccountKey: String?
+    private var activeAccountKey: String? {
+        guard let session = AccountController.shared.session else { return nil }
+        return "\(AccountController.shared.api?.configuration.origin.absoluteString ?? "")|\(session.user.id)"
+    }
+    private var progressReconciliation: Task<Void, Never>?
     private var lastProgressSave: Double = 0
     private var progressDirty = false
     private var sessionCheckIn: CheckInPrompt?
@@ -362,6 +371,9 @@ final class ActivityTracker: ObservableObject {
         do {
             let root = try SessionFiles.root()
             startedAt = Date()
+            pendingWorkSlices = []; segmentWorkDays = [:]
+            captureAccountKey = activeAccountKey
+            segmentWorkOwner = SocialController.shared.declaredWorkScope.map { DeclaredWorkOwner(ownerID: $0.owner, origin: $0.origin) }
             sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
             studyPrompt = nil
             researchConsent = ResearchSharingController.shared.capturedConsent
@@ -460,6 +472,7 @@ final class ActivityTracker: ObservableObject {
             }
             try record(type: "session_stop", at: end)
             try writer?.finish(startedAt: startedAt, duration: end, reason: reason)
+            try applyObservedWork()
             // Progress was credited independently above; retaining data never adds time again.
             if let folder = sessionFolder {
                 writer = nil
@@ -511,7 +524,8 @@ final class ActivityTracker: ObservableObject {
             }
             lastSamplingTick = elapsed
             lastObservedTime = max(lastObservedTime, elapsed)
-            if recordingMode == .automatic, RecordingDay.key(at: Date()) != recordingDay { try rotateRecording(at: elapsed) }
+            if activeAccountKey != captureAccountKey { try rotateRecording(at: elapsed, reason: "account_boundary") }
+            else if recordingMode == .automatic, RecordingDay.key(at: Date()) != recordingDay { try rotateRecording(at: elapsed) }
             updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
@@ -537,6 +551,8 @@ final class ActivityTracker: ObservableObject {
                 if breakPolicy.phase != .resting { append(mouse.advance(to: elapsed)) }
             }
             try writer?.checkpoint(at: elapsed)
+            try applyObservedWork()
+            updateProgress(at: elapsed)
             eventCount = eventsRecorded
             movementRows = rowsRecorded
             updateBreakUI(at: elapsed)
@@ -569,20 +585,24 @@ final class ActivityTracker: ObservableObject {
                 }
             })
     }
-    private func rotateRecording(at time: Double) throws {
+    private func rotateRecording(at time: Double, reason: String = "local_day_rotation") throws {
         guard let previous = writer, let context = previous.contract.intervals.last else { return }
         if breakPolicy.phase != .resting { append(mouse.stop(at: time)) }
-        try previous.finish(startedAt: startedAt, duration: time, reason: "local_day_rotation")
+        try previous.finish(startedAt: startedAt, duration: time, reason: reason)
+        try applyObservedWork()
         let root = try SessionFiles.root()
         writer = nil
         _ = try SessionFiles.retainRecording(previous.folder, duration: time - previous.contract.elapsedOrigin, root: root)
         let nextStart = Date()
         let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
-            startedAt: nextStart, elapsedOrigin: time, continuing: context)
+            startedAt: nextStart, elapsedOrigin: time, continuing: context, scoringTimeZone: previous.contract.scoringTimeZone)
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
             startedAt: nextStart, mode: recordingMode, continuingContract: next, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
         writer = replacement; sessionFolder = replacement.folder
+        segmentWorkDays = [:]; pendingWorkSlices = []
+        captureAccountKey = activeAccountKey
+        segmentWorkOwner = SocialController.shared.declaredWorkScope.map { DeclaredWorkOwner(ownerID: $0.owner, origin: $0.origin) }
         if let activeBreak = breakPolicy.activeBreak {
             try replacement.logBreak(breakPolicy.entry(at: time, action: "segment_continued", record: activeBreak))
         }
@@ -652,6 +672,14 @@ final class ActivityTracker: ObservableObject {
     // Pass completed mouse summaries to the file writer and update the test counter.
     private func append(_ rows: [MouseSummary]) {
         writer?.append(rows)
+        if let contract = writer?.contract {
+            for row in rows where row.activityPhase == "work" {
+                for label in contract.intervals where label.context == .work {
+                    let lower = max(row.start, label.start), upper = min(row.end, label.end ?? row.end)
+                    if upper > lower { pendingWorkSlices.append(CoverageSlice(start: lower, end: upper, phase: .normal)) }
+                }
+            }
+        }
         rowsRecorded += rows.count
     }
     // Show a recording error and stop safely instead of pretending data is still being saved.
@@ -1050,15 +1078,48 @@ final class ActivityTracker: ObservableObject {
 
     func keepGoingAfterPlan() { sessionWorkPlan.keepGoing() }
 
+    private func applyObservedWork() throws {
+        guard let contract = writer?.contract else { return }
+        let slices = pendingWorkSlices
+        pendingWorkSlices = []
+        let calendar = DailyProgress.calendar(timeZone: TimeZone(identifier: contract.scoringTimeZone) ?? .current)
+        let allocation = DailyProgress.declaredAllocation(slices: slices, startedAt: startedAt, origin: contract.elapsedOrigin, calendar: calendar)
+        for (day, seconds) in allocation { segmentWorkDays[day, default: 0] += seconds }
+        try dailyProgress.replaceDeclaredWork(segmentID: contract.segmentID.uuidString, days: segmentWorkDays,
+            owner: segmentWorkOwner)
+        let seconds = slices.reduce(0) { $0 + $1.end - $1.start }
+        declaredWorkSeconds += seconds; sessionWorkPlan.credit(seconds)
+        progressDirty = true
+        SocialController.shared.stageDeclaredWork(segmentID: contract.segmentID, days: segmentWorkDays,
+            capturedOwner: segmentWorkOwner?.ownerID, capturedOrigin: segmentWorkOwner?.origin)
+    }
+    private func reconcileSavedProgress() {
+        progressReconciliation?.cancel()
+        let candidates = sessions.filter { session in
+            guard let contract = session.recordingContract, contract.finalized else { return false }
+            return dailyProgress.declaredSegments[contract.segmentID.uuidString] == nil
+                || dailyProgress.declaredRevisions[contract.segmentID.uuidString] != contract.revisions.count
+        }
+        progressReconciliation = Task { [weak self] in
+            for session in candidates {
+                guard !Task.isCancelled, let self, let contract = session.recordingContract else { return }
+                do {
+                    let coverage = try await Task.detached { try RecordingCoverage.load(session: session) }.value
+                    guard !Task.isCancelled else { return }
+                    let allocation = DailyProgress.declaredAllocation(slices: coverage.workSlices, startedAt: session.startedAt,
+                        origin: contract.elapsedOrigin, calendar: DailyProgress.calendar(timeZone: TimeZone(identifier: contract.scoringTimeZone) ?? .current))
+                    try self.dailyProgress.replaceDeclaredWork(segmentID: contract.segmentID.uuidString, days: allocation, revision: contract.revisions.count)
+                    let owner = self.dailyProgress.declaredOwners[contract.segmentID.uuidString]
+                    SocialController.shared.stageDeclaredWork(segmentID: contract.segmentID, days: allocation,
+                        capturedOwner: owner?.ownerID, capturedOrigin: owner?.origin)
+                    self.progressDirty = true; self.reconcileProgress()
+                } catch { self.progressNotice = "Declared-work coverage could not be reconciled. Existing progress was kept; refresh to retry." }
+            }
+        }
+    }
     private func updateProgress(at time: Double, persist: Bool = false) {
         let previous = dailyProgress
-        let credited = progressClock.update(&dailyProgress, elapsed: time, date: Date(),
-            working: isRecording && userContext == .work && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
-            calendar: DailyProgress.calendar())
-        if credited > 0 { SocialController.shared.record(kind: "work", seconds: credited) }
         dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
-        declaredWorkSeconds += credited
-        sessionWorkPlan.credit(credited)
         progressDirty = progressDirty || previous != dailyProgress
         guard persist || time - lastProgressSave >= 15 else { return }
         lastProgressSave = time
@@ -1077,6 +1138,7 @@ final class ActivityTracker: ObservableObject {
         do {
             sessions = try SessionFiles.list(in: SessionFiles.root())
             libraryError = nil
+            reconcileSavedProgress()
         } catch { libraryError = error.localizedDescription }
     }
     // Check whether a library entry is the session currently being recorded.
