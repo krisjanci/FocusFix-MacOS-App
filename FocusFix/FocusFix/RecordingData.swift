@@ -96,6 +96,7 @@ struct KeyTiming {
 // and on Stop; never keep the entire session in memory.
 final class RecordingWriter {
     let folder: URL
+    private(set) var contract: RecordingContract
     private let events: FileHandle
     private let mouse: FileHandle
     private let breaks: FileHandle
@@ -110,7 +111,8 @@ final class RecordingWriter {
     private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+         mode: RecordingMode = .manual, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+        contract = RecordingContract(mode: mode, startedAt: startedAt)
         self.surveyOptions = surveyOptions
         self.tags = try SessionTags.validated(tags)
         self.tagColors = try SessionTags.colors(tagColors, for: self.tags)
@@ -141,6 +143,7 @@ final class RecordingWriter {
         try breaks.seekToEnd()
         try surveys.seekToEnd()
         try surveyPrompts.seekToEnd()
+        try contract.save(to: folder)
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
     }
     // Buffer a generic keyboard, click, scroll or app-switch event with timing and phase information.
@@ -198,6 +201,10 @@ final class RecordingWriter {
         try breaks.synchronize()
         try surveys.synchronize()
         try surveyPrompts.synchronize()
+        var finalContract = contract
+        try finalContract.finish(at: duration)
+        try finalContract.save(to: folder)
+        contract = finalContract
         try metadata(startedAt: startedAt, duration: duration, reason: reason)
     }
     // Persist live tag edits before publishing them; Stop uses the same updated values.
@@ -213,7 +220,13 @@ final class RecordingWriter {
     // Write session timing, schema, participant identity and consent information into session.json.
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
-            "schema_version": 10, "session_id": folder.lastPathComponent,
+            "schema_version": RecordingContract.schemaVersion, "session_id": folder.lastPathComponent,
+            "recording_format": RecordingContract.format,
+            "required_capabilities": RecordingContract.requiredCapabilities,
+            "recording_id": contract.recordingID.uuidString, "segment_id": contract.segmentID.uuidString,
+            "recording_mode": contract.mode.rawValue,
+            "context_file": "context_intervals.json",
+            "legacy_phase_semantics": "activity_phase=work means normal intervention phase, not a user-declared work label",
             "tags": tags, "tag_colors": tagColors,
             "survey_options": surveyOptions.metadata,
             "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
