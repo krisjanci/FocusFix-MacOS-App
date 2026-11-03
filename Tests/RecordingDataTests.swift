@@ -84,7 +84,7 @@ struct RecordingDataTests {
         precondition(events.contains("0.700000,scroll,,,-1.000000,2.000000,1"))
         let info = try JSONSerialization.jsonObject(with: Data(contentsOf: writer.folder.appendingPathComponent("session.json"))) as! [String: Any]
         precondition(info["status"] as? String == "user_stop")
-        precondition(info["schema_version"] as? Int == 10)
+        precondition(info["schema_version"] as? Int == 11)
         precondition(info["tags"] as? [String] == ["Focused work", "Creative work"])
         precondition(info["tag_colors"] as? [String: String] == liveColors)
         precondition(info["participant_id"] == nil && info["sharing_consent_id"] == nil)
@@ -149,6 +149,19 @@ struct RecordingDataTests {
         let old = try SavedSession(folder: oldFolder)
         precondition(old.exportName(timeZone: TimeZone(secondsFromGMT: 0)!) ==
             "FocusFix Session [2026-10-17 23-59-30-2026-10-18 00-01-00]")
+        // Representative historic schemas retain unknown context, including phase=work.
+        for version in 1...10 {
+            var oldMetadata = legacy
+            oldMetadata["schema_version"] = version
+            try JSONSerialization.data(withJSONObject: oldMetadata).write(to: oldFolder.appendingPathComponent("session.json"))
+            let history = try SavedSession(folder: oldFolder)
+            precondition(history.recordingContract == nil && history.legacyContext == .unknown)
+        }
+        var future = legacy
+        future["schema_version"] = 12
+        try JSONSerialization.data(withJSONObject: future).write(to: oldFolder.appendingPathComponent("session.json"))
+        do { _ = try SavedSession(folder: oldFolder); preconditionFailure("Future schema cannot masquerade as legacy") } catch { }
+        try JSONSerialization.data(withJSONObject: legacy).write(to: oldFolder.appendingPathComponent("session.json"))
         let unfinishedFolder = root.appendingPathComponent("unfinished")
         try FileManager.default.createDirectory(at: unfinishedFolder, withIntermediateDirectories: true)
         let unfinished = try SavedSession(folder: unfinishedFolder)
