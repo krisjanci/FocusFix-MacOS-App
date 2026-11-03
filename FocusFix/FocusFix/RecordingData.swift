@@ -102,6 +102,7 @@ final class RecordingWriter {
     private let breaks: FileHandle
     private let surveys: FileHandle
     private let surveyPrompts: FileHandle
+    private let reminderLog: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
@@ -128,6 +129,8 @@ final class RecordingWriter {
         let breakURL = folder.appendingPathComponent("breaks.csv")
         let surveyURL = folder.appendingPathComponent("surveys.csv")
         let promptURL = folder.appendingPathComponent("survey_prompts.csv")
+        let reminderURL = folder.appendingPathComponent("reminders.jsonl")
+        try Data().write(to: reminderURL)
         try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
         try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
         try Data(BreakLogEntry.header.utf8).write(to: breakURL)
@@ -138,6 +141,7 @@ final class RecordingWriter {
         breaks = try FileHandle(forWritingTo: breakURL)
         surveys = try FileHandle(forWritingTo: surveyURL)
         surveyPrompts = try FileHandle(forWritingTo: promptURL)
+        reminderLog = try FileHandle(forWritingTo: reminderURL)
         try events.seekToEnd()
         try mouse.seekToEnd()
         try breaks.seekToEnd()
@@ -192,6 +196,11 @@ final class RecordingWriter {
         guard surveyOptions.duringWork else { return }
         try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
         try surveyPrompts.synchronize()
+    }
+    func logReminder(_ entry: ReminderLogEntry) throws {
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970
+        var data = try encoder.encode(entry); data.append(10)
+        try reminderLog.write(contentsOf: data); try reminderLog.synchronize()
     }
     func changeContext(_ context: ActivityContext, at time: Double, effectiveAt: Date, source: ContextSource) throws {
         try checkpoint(at: time)
@@ -275,5 +284,5 @@ final class RecordingWriter {
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
     // Close all recording file handles when this writer is released.
-    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close(); try? surveyPrompts.close() }
+    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close(); try? surveyPrompts.close(); try? reminderLog.close() }
 }
