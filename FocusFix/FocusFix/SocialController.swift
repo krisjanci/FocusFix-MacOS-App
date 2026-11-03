@@ -34,6 +34,7 @@ final class SocialController: ObservableObject {
     private var started = false
 
     var enabled: Bool { ledger != nil }
+    var declaredWorkSyncHeld: Bool { ledger?.declaredWorkPending?.isEmpty == false }
     var calendar: Calendar { DailyProgress.calendar(timeZone: TimeZone(identifier: ledger?.timezone ?? "") ?? .current) }
     var userID: UUID? { account.session?.user.id }
 
@@ -128,6 +129,19 @@ final class SocialController: ObservableObject {
         } catch { notice = "Progress could not be saved on this Mac. Keep FocusFix open and retry." }
     }
 
+    var declaredWorkScope: (owner: UUID, origin: String)? {
+        guard ledger != nil, let owner = userID, let origin = account.api?.configuration.origin.absoluteString else { return nil }
+        return (owner, origin)
+    }
+    func stageDeclaredWork(segmentID: UUID, days: [String: Double], capturedOwner: UUID?, capturedOrigin: String?) {
+        alignAccount()
+        guard let scope = declaredWorkScope, let capturedOwner, let capturedOrigin, var value = ledger,
+              value.stageDeclaredWork(DeclaredWorkPending(ownerID: capturedOwner, origin: capturedOrigin,
+                segmentID: segmentID, contractVersion: 2, days: days), owner: scope.owner, origin: scope.origin) else { return }
+        ledger = value
+        persist()
+        notice = "New declared-work totals stay on this Mac until correction-compatible group sync is verified. Existing group scores are preserved."
+    }
     func record(kind: String, seconds: Double, at date: Date = Date(), id: UUID = UUID()) {
         alignAccount()
         guard var value = ledger, seconds.isFinite, seconds > 0 else { return }
