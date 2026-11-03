@@ -12,7 +12,7 @@ required capabilities, recording/segment UUIDs, recording mode and the context f
 A compatible reader must check all capabilities and reject unsupported versions.
 The separate atomic `context_intervals.json` is the authoritative label snapshot.
 Each interval has a unique ID, a logical continuity ID, context, source, UTC
-effective/action-recorded times and `[start,end)` elapsed seconds. Only the final
+effective/action-recorded times (numeric Unix UTC seconds, preserving subsecond action timing) and `[start,end)` elapsed seconds. Only the final
 interval of an unfinished recording can have a null end. Bounds must be finite,
 nonnegative, within observed coverage and nonoverlapping. Empty completed recordings
 have no intervals. `observedThrough` bounds the snapshot; final metadata duration
@@ -65,3 +65,20 @@ Idle cutoff defaults to 300 continuous seconds; idle resume reads the public OS
 idle counter and does not install a second logger. Lifecycle resume creates a new
 unknown recording. Failures require deliberate Resume/Start to retry. Actual
 sleep/wake/lock, permission delivery and long-run resource use remain manual checks.
+
+## Step 4: context actions and corrections
+
+Start work on an existing automatic recording changes context from that action
+forward, with one tap/writer. End work returns automatic activity to unknown;
+manual-only End work saves/stops capture. Work, Not working and Unknown are
+available in the menu. Repeated Start work preserves the existing logical work ID.
+Labels survive rotation and ordinary app switching; idle, lifecycle/user pause and
+End work clear active intent. Break phase remains independent of work intention.
+
+The history editor accepts a bounded interval in segment-relative seconds, then
+converts it to the logical elapsed origin. It checks the latest revision before
+saving. The atomic snapshot contains ordered revisions with original intervals,
+source/effective/action-recorded times (numeric Unix UTC seconds, preserving subsecond action timing) and idempotent correction IDs. Invalid or
+stale edits leave the snapshot and raw files untouched. The snapshot is capped at
+16 MiB; a size failure retains the previous readable labels. Legacy labels/files
+are unchanged and cannot be assigned invented historical context by this path.
