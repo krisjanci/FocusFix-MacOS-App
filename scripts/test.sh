@@ -11,10 +11,11 @@ run_test() {
     shift
     echo "Testing $name"
     xcrun swiftc -module-cache-path "$test_build_dir/module-cache" \
-        "$source_dir/SessionTags.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
+        "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
     "$test_build_dir/$name"
 }
 
+run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
     "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
