@@ -125,3 +125,14 @@ unknown without destructive migration. New formats fail closed for research at
 queueing and ZIP construction. See `RECORDING-CONTRACT.md` for the exact contract.
 Automatic capture is not enabled by this foundation. Next: Step 2 explicit
 versioned automatic-recording consent and optional login launch.
+
+## Automatic tracking Step 2 — November 2, 2026
+
+I added a separate versioned automatic-recording acknowledgement, disabled by
+default for fresh and existing installations. Global recording revocation disables
+it; stale automatic callbacks can use the invalidated generation. The settings
+choice does not request OS permissions. Optional login launch uses SMAppService,
+reads actual OS status and registers only on the explicit toggle. Failed setup
+stays visible. Login launch is separate from capture/pause consent. Fake-client
+preference/login tests passed; actual registration and login remain manual checks.
+The lifecycle in Step 3 is next; this step does not start automatic capture.
