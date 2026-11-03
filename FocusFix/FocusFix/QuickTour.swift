@@ -26,16 +26,16 @@ enum QuickTourPhase: String, CaseIterable {
     }
     var caption: String {
         switch self {
-        case .start: return "Click Start session to begin."
+        case .start: return "Try automatic recording; Start work is optional."
         case .plan: return "Click Plan session to choose a goal."
         case .duration: return "Choose 30, 60, or 90 minutes."
-        case .confirmStart: return "Click Start session when ready."
-        case .work: return "Your work time grows here."
+        case .confirmStart: return "Click Start work when ready."
+        case .work: return "Declared work grows separately from recorded time."
         case .takeBreak: return "Click Take a break to recharge."
         case .startBreak: return "Click Start break."
         case .returned: return "Back? Click I’m back."
         case .progress: return "Aim for one hour each day."
-        case .save: return "Click Stop & save to finish."
+        case .save: return "Click End work to finish."
         case .sessions: return "Find your work in Sessions."
         case .savedSession: return "Your work is saved here."
         case .profile: return "Click Profile to make it yours."
@@ -61,6 +61,25 @@ enum QuickTourAction: Equatable {
 @MainActor
 final class QuickTourController: ObservableObject {
     static let shared = QuickTourController()
+    @Published private(set) var demoAutomatic = false
+    @Published private(set) var demoContext = ActivityContext.unknown
+    @Published private(set) var demoPaused = false
+    func practiceAutomatic() {
+        guard isPresented, phase == .start else { return }
+        demoAutomatic = true; demoContext = .unknown; demoPaused = false
+    }
+    func practiceWork() {
+        guard isPresented, phase == .start, demoAutomatic, !demoPaused else { return }
+        demoContext = .work
+    }
+    func practiceNotWorkingNotification() {
+        guard isPresented, phase == .start, demoAutomatic, !demoPaused else { return }
+        demoContext = .nonWork
+    }
+    func practicePauseResume() {
+        guard isPresented, phase == .start, demoAutomatic else { return }
+        demoPaused.toggle(); demoContext = .unknown
+    }
     @Published private(set) var isPresented = false
     @Published private(set) var phase: QuickTourPhase = .start
     @Published private(set) var visit = UUID()
@@ -128,6 +147,7 @@ final class QuickTourController: ObservableObject {
     }
 
     private func reset(to value: QuickTourPhase) {
+        demoAutomatic = false; demoContext = .unknown; demoPaused = false
         visit = UUID(); phase = value; minutes = 60; demoName = "Alex"
         demoGroupIndex = value.index >= 9 ? 1 : 0
         demoMetric = value.index >= 10 ? .habits : .work
