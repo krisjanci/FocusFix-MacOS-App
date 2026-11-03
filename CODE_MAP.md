@@ -34,6 +34,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | Account services | `AccountAPI.swift`, `AccountController.swift`, `UserProfile.swift` | Supabase authentication, profile sync and account Keychain storage |
 | `FF: RESEARCH SHARING` | `ResearchSharing.swift`, `ResearchSharingController.swift`, `AccountViews.swift` | Consent snapshots, ZIP allowlisting, delivery queue, retries and withdrawal |
 | Research backend | `supabase/functions/`, `supabase/migrations/` (repository root) | Server consent, private Storage policies, approval and deletion |
+| Automatic preferences/login | `AutomaticRecordingPreferences.swift`, `LoginLaunch.swift` | Separate versioned automatic opt-in, persistent pause, stale-callback generation and explicit OS login registration |
 | `FF: PRIVACY` | `RecordingNotice.swift`, `RecordingNoticeView.swift`, `PrivacyInfo.xcprivacy` | First-use recording notice, remembered acknowledgement and profile privacy details |
 | `FF: RELEASE` | `AboutView.swift`, `scripts/check-release-content.py`, `scripts/verify-release.sh` | Release content and distribution checks on an exported signed/notarized app |
 
