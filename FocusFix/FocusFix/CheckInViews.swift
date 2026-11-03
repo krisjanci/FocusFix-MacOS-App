@@ -103,7 +103,7 @@ struct SessionCheckInView: View {
                     Button("Skip & start") { start(skippingFatigue: true) }
                         .disabled(!draft.validPlan)
                 }
-                Button("Start session") { start() }
+                Button("Start work") { start() }
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
@@ -128,7 +128,8 @@ struct WorkCheckInView: View {
     // Ask for fatigue and self-reported productivity during work without guessing unanswered values.
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Check-in").font(.title2.weight(.semibold))
+            Text("Optional study check-in").font(.title2.weight(.semibold))
+            if let recall = tracker.studyRecallDescription { Text(recall).font(.callout).foregroundStyle(.secondary) }
             FatigueSlider(rating: $fatigue)
             RatingSlider(title: SurveyEntry.productivityQuestion,
                 low: "Not productive", high: "Extremely productive", rating: $productivity)
