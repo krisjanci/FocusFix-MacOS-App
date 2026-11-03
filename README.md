@@ -1,3 +1,14 @@
+## Recording status and history — November 2, 2026
+
+The main window and menu share Working, Not working, automatic Unknown, Paused,
+Idle and Permission needed states. Start/End work and Pause/Resume have different
+effects. Recorded elapsed time includes unknown/non-work use; declared-work time
+is shown separately. History lists recording segments and observed work/non-work/
+unknown/break/unavailable coverage. Missing observations are unavailable, not zero
+activity. Quick tour includes isolated automatic-recording/label/pause practice.
+Component previews are in `verification/recording-status-previews.png`; full
+keyboard, VoiceOver and real-device qualification remain manual.
+
 ## Contextual reminders — November 2, 2026
 
 The fixed timer/idle policy suggests work breaks during declared work. Settings has
