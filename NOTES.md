@@ -684,3 +684,20 @@ and model versions for deletion. Existing revoke-before-delete, withdrawal latch
 account isolation and receipts remain unchanged. Generated archive/boundary/path/
 retry tests run alongside the old regressions; local Debug compiled. Real service
 qualification/configuration remains required. Nothing was deployed or activated.
+
+## November 2, 2026 — disabled experimental policy seam
+
+I kept the shipped fixed timer/idle provider active. The alternate provider is an
+explicitly disabled synthetic preview with the exact Python seven-rate float32
+contract. It checks full coverage, version/model compatibility, model age, context,
+pause, cooldown and unknown distance. Missing/unsupported/stale inputs use baseline,
+not a made-up fatigue score. No real model, randomization or data collection is on.
+
+Swift and Python share a generated parity fixture. Tests exercise event cutoffs,
+missing/break coverage, unsupported versions, stale models, unknown clusters and
+safe fallback. Full Swift tests and Debug passed; Python's generated comparison/
+leakage/time-order tests passed under the pinned environment. The small demo reports
+insufficient evidence. My private research-plan draft proposes independent sparse
+ratings before any frozen randomized reminder comparison and leaves reader/IRB
+choices explicit. Real cluster stability, fatigue improvement and intervention
+benefit remain distinct and unestablished; nothing was deployed or pushed.
