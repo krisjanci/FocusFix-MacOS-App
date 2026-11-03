@@ -15,6 +15,8 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var userContext: ActivityContext = .unknown
     var interventionPhase: InterventionPhase { breakPolicy.phase == .resting ? .explicitBreak : InterventionPhase(legacyPhase: activityPhase) }
     @Published private(set) var isRecording = false
+    var recordingStatus: String { RecordingPresentation.status(state: captureState, mode: recordingMode, context: userContext, phase: interventionPhase) }
+    @Published private(set) var declaredWorkSeconds: Double = 0
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var eventCount = 0
     @Published private(set) var movementRows = 0
@@ -298,6 +300,8 @@ final class ActivityTracker: ObservableObject {
             start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
         }
         captureState = isRecording ? .recording : lifecycle.state
+        needsPermission = captureState == .permissionUnavailable
+        if needsPermission { message = "Input Monitoring is needed. Enable it explicitly to set up capture; saved automatic consent never grants OS access." }
         captureReason = lifecycle.reason
     }
     func disableRecording() {
@@ -371,6 +375,7 @@ final class ActivityTracker: ObservableObject {
             }
             suspendedBy = []
             elapsed = 0
+            declaredWorkSeconds = 0
             eventsRecorded = 0
             rowsRecorded = 0
             eventCount = 0
@@ -555,6 +560,9 @@ final class ActivityTracker: ObservableObject {
             startedAt: nextStart, mode: recordingMode, continuingContract: next, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
         writer = replacement; sessionFolder = replacement.folder
+        if let activeBreak = breakPolicy.activeBreak {
+            try replacement.logBreak(breakPolicy.entry(at: time, action: "segment_continued", record: activeBreak))
+        }
         startedAt = nextStart; recordingDay = RecordingDay.key(at: nextStart)
         removeMonitors(); installMonitors()
         backgroundActivity = ProcessInfo.processInfo.beginActivity(
@@ -1008,6 +1016,7 @@ final class ActivityTracker: ObservableObject {
             calendar: DailyProgress.calendar())
         if credited > 0 { SocialController.shared.record(kind: "work", seconds: credited) }
         dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
+        declaredWorkSeconds += credited
         sessionWorkPlan.credit(credited)
         progressDirty = progressDirty || previous != dailyProgress
         guard persist || time - lastProgressSave >= 15 else { return }
