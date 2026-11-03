@@ -1,6 +1,6 @@
 # FocusFix Mac App Store submission package
 
-Prepared October 26, 2026. Draft materials and verification instructions, not a
+Updated November 2, 2026. Draft materials and verification instructions, not a
 submitted/approved app. No Apple agreement, license exception or rights assignment
 is accepted or created by this implementation.
 
@@ -15,29 +15,23 @@ OS/hardware combinations before advertising them. **Bundle ID:** io.github.krisj
 
 **Description:**
 
-FocusFix helps you notice activity patterns and make time for breaks on your Mac.
-Start a session to record keyboard timing, clicks, scrolling and summarized mouse
-movement. Plan breaks, receive reminders, and optionally reflect on fatigue and
-productivity through short check-ins.
+FocusFix records local computer-use patterns with optional user-declared work labels
+and fixed timer/idle break reminders. Start work manually, or separately opt into
+automatic recording while the app runs, including non-work use. Automatic activity
+starts Unknown. Work declarations and recorded time are not objective productivity.
 
-Choose whether to enable activity recording, then start each session yourself.
-Browse saved sessions, export recordings or delete local copies. Input Monitoring
-permission allows activity measurement across apps. FocusFix does not save typed
-text, individual letter keys, app names, screenshots or exact cursor paths.
+Pause/Resume recording, End work and Quit have distinct controls. Closing a window
+keeps the menu-bar app running. Optional login launch never bypasses consent/pause.
+Input Monitoring is a separate OS permission. No typed text, letter identities, app
+names, window titles, URLs, screenshots or exact cursor paths are saved. Browse,
+correct bounded context intervals, export or delete local recordings. Ordinary use
+is survey-free; optional study checks require separate opt-in and reviewed configuration.
 
-Use FocusFix locally as a guest, or create a private account for your profile.
-Optionally enable progress sync and join private groups with invite codes. Work
-and Healthy habits leaderboards award daily points for 60 minutes of work and a
-completed one-minute break. Three automatic monthly freezes protect your weekday
-work streak without adding points. Group members see only names, standard avatars
-and scores.
-If an approved study is open, eligible adults can request to participate. Research
-participation requires manual approval and separate consent before new completed
-sessions upload to private storage. Declining research does not remove local features.
-Manage recording and sharing in Settings → Privacy & Research.
-
-FocusFix is experimental. Break reminders use timing and idle rules; the app is not
-a medical device or a validated fatigue or productivity detector.
+Guests need no account. Optional private groups keep their existing thresholds and
+freeze rules, but new declared-work sync is held until a correction-compatible server
+is qualified; do not advertise new group Work scoring as release-ready. Research
+collection and new-format archives remain disabled. No cluster is a validated fatigue
+measure and no health/productivity or intervention benefit is claimed.
 
 ## Privacy answers by shipped configuration
 
@@ -65,13 +59,20 @@ The research restriction to adults does not by itself determine the store age ra
 
 ## Reviewer instructions
 
-Guest use requires no account. On first entry, choose Enable recording or Not now.
-Consent does not start recording or grant OS permission. Use Start session, then
-separately enable Input Monitoring in System Settings when prompted. Relaunch if
-macOS requests it and start a session again. Surveys and notifications are optional.
-The menu bar and main window show recording state. Stop & save, disabling recording,
-permission interruption or Quit ends capture. Closing the main window leaves the
-menu-bar app running.
+Guest use requires no account. Choose Enable recording or Not now. Start work begins
+manual capture only after recording consent and Input Monitoring are available.
+Automatic recording needs its own scope acknowledgement in Privacy & Research; old
+consent/OS permission/account choices cannot enable it. Setup requests occur only on
+explicit action. Ordinary starts/breaks ask no survey; no reviewed study configuration
+is bundled. Notification denial leaves useful in-app controls.
+
+Inspect Unknown/Working/Not working, paused/idle/permission states in both main/menu.
+End work keeps automatic activity running as Unknown, while manual-only capture
+saves/stops. Pause persists across relaunch; permission restoration cannot override it.
+Quit stops capture; closing a window leaves the menu-bar app running. Login launch
+is separate. A notification Not working action labels from now without rewriting
+preceding time; bounded history corrections retain provenance. New work sync and
+research delivery remain gated as described in the readiness report.
 
 The app uses a sandboxed, passive listen-only CGEventTap and NSWorkspace app-switch
 notifications. It does not modify/post input or request Accessibility access. Secure
@@ -113,6 +114,17 @@ generated sessions on a disposable environment; local fakes do not establish thi
   App Store terms. The repository's GPL-3.0-only license remains unchanged. Ownership
   cannot be established or a separate distribution license granted by code generation.
 
-No signing identity was available on this Mac during implementation. An unsigned
-or ad hoc build is not a Store-distributable app. See RELEASE.md for the existing
+Signing/provisioning was not configured or qualified during this redesign. Local
+builds are unsigned and are not Store-distributable apps. See RELEASE.md for the existing
 archive, provisioning and fresh-Mac workflow.
+
+
+## Redesign release gates
+
+See [REDESIGN-READINESS.md](REDESIGN-READINESS.md) and the unperformed signed-device
+checklist. Local synthetic checks/unsigned builds are not live Input Monitoring,
+login/notification qualification, study approval or submission readiness. The current
+manifest's account/social off-device categories remain; new automatic activity and
+study checks stay local/disabled, so no additional off-device category is activated.
+Re-review against actual approved flows before any research-enabled submission.
+Nothing in this draft confirms rights/signing identities or authorizes submission.
