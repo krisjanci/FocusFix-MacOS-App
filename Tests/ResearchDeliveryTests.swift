@@ -98,7 +98,7 @@ struct ResearchDeliveryTests {
             let folder = recordings.appendingPathComponent(id)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for name in ResearchArchive.files { try Data("synthetic".utf8).write(to: folder.appendingPathComponent(name)) }
-            try JSONSerialization.data(withJSONObject: ["duration_seconds": duration])
+            try JSONSerialization.data(withJSONObject: ["schema_version": 10, "duration_seconds": duration])
                 .write(to: folder.appendingPathComponent("session.json"))
             research.finished(folder: folder, startedAt: Date(), captured: consent)
         }
@@ -149,7 +149,7 @@ struct ResearchDeliveryTests {
         let folder = recordings.appendingPathComponent(id)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic".utf8).write(to: folder.appendingPathComponent(name)) }
-        try JSONSerialization.data(withJSONObject: ["duration_seconds": 900])
+        try JSONSerialization.data(withJSONObject: ["schema_version": 10, "duration_seconds": 900])
             .write(to: folder.appendingPathComponent("session.json"))
         pause = true
         restored.finished(folder: folder, startedAt: Date(), captured: consent)
