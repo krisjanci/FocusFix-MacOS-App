@@ -23,6 +23,7 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 | Search | Files | What I can find there |
 | --- | --- | --- |
 | `FF: TRACKING` | `ActivityTracker.swift`, `InputMonitor.swift` | Passive Input Monitoring tap, start/stop, input events, session clock and coordination with breaks/surveys |
+| `FF: RECORDING CONTRACT` | `RecordingContract.swift`, `RECORDING-CONTRACT.md` | Schema 11, independent mode/capture/context/phase, validated atomic label snapshot and local-only research boundary |
 | `FF: STORAGE` | `RecordingData.swift`, `SavedSession.swift` | CSV writing, one-second mouse summaries, key hold timing, saved sessions and exports |
 | `FF: BREAKS` | `BreakPolicy.swift`, `BreakViews.swift` | 25-minute/idle reminder rules, snooze, actual break duration and break controls |
 | `FF: SURVEYS` | `SurveyPreferences.swift`, `TimedCheckIn.swift`, `SurveyData.swift`, `CheckInViews.swift` | Saved survey switches, session snapshots, 10-minute opportunities, rating validation, CSV answers and sliders |
