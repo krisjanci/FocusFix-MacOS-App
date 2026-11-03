@@ -54,6 +54,12 @@ final class ActivityTracker: ObservableObject {
     private var breakCheckIn: CheckInPrompt?
     private var timedCheckInSheet: CheckInPrompt?
     private var timedCheckInPolicy = TimedCheckInPolicy()
+    private var sessionStudyConfiguration: StudyCheckInConfiguration?
+    private var studyPrompt: StudyPromptSnapshot?
+    private var studyBudget = StudyPromptBudget()
+    var studyRecallDescription: String? {
+        studyPrompt.map { "Think about the \(Int($0.recallEnd - $0.recallStart)) seconds before this prompt was requested. Context then: \($0.contextAtPrompt.rawValue)." }
+    }
     // Whether a survey sheet is currently taking attention away from work.
     private var checkInOpen: Bool { breakCheckIn != nil || timedCheckInSheet != nil }
     // Keep survey interactions distinct from work and post-timer return waiting.
@@ -125,6 +131,8 @@ final class ActivityTracker: ObservableObject {
                 self.updateProgress(at: self.now, persist: true)
             }
         }
+        studyBudget = SurveyPreferences.shared.loadBudget()
+        SurveyPreferences.shared.onRevoke = { [weak self] in self?.revokeStudyCheckIns() }
         installLifecycleObservers()
     }
     // Connect macOS notification actions to the same controls used by the app.
@@ -186,7 +194,7 @@ final class ActivityTracker: ObservableObject {
         if AutomaticRecordingPreferences.shared.enabled, lifecycle.blockers.isEmpty {
             AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
             lifecycle.failed = false
-            sessionSurveyOptions = SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false)
+            sessionSurveyOptions = SurveyPreferences.shared.snapshot
             start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
             if isRecording { setContext(.work) }
             return
@@ -296,7 +304,7 @@ final class ActivityTracker: ObservableObject {
         case .none: break
         case .stop(let reason): stop(reason: reason)
         case .start:
-            sessionSurveyOptions = SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false)
+            sessionSurveyOptions = SurveyPreferences.shared.snapshot
             start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
         }
         captureState = isRecording ? .recording : lifecycle.state
@@ -354,9 +362,11 @@ final class ActivityTracker: ObservableObject {
         do {
             let root = try SessionFiles.root()
             startedAt = Date()
+            sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
+            studyPrompt = nil
             researchConsent = ResearchSharingController.shared.capturedConsent
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
-                mode: mode, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
+                mode: mode, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
             writer = newWriter
             sessionFolder = newWriter.folder
             sessionTags = tags
@@ -505,8 +515,21 @@ final class ActivityTracker: ObservableObject {
             updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
-                if let item = timedCheckInPolicy.tick(at: elapsed,
+                if let configuration = sessionStudyConfiguration,
+                   studyBudget.eligible(at: Date(), configuration: configuration),
+                   let item = timedCheckInPolicy.tick(at: elapsed,
                     canPrompt: breakPolicy.phase == .work && !checkInOpen) {
+                    let requestDate = Date()
+                    guard studyBudget.request(at: requestDate, configuration: configuration) else { return }
+                    try SurveyPreferences.shared.saveBudget(studyBudget)
+                    if let contract = writer?.contract {
+                        studyPrompt = StudyPromptSnapshot(id: item.id, scheduleVersion: configuration.version,
+                            configurationScope: configuration.scope, recordingID: contract.recordingID, contextAtPrompt: userContext,
+                            requestedElapsed: elapsed, recallStart: max(contract.elapsedOrigin, elapsed - configuration.recallSeconds),
+                            recallEnd: elapsed, requestedAtUTC: requestDate)
+                        if let studyPrompt { try writer?.logStudyPrompt(StudyPromptLogEntry(prompt: studyPrompt,
+                            action: "requested", elapsed: elapsed, recordedAtUTC: requestDate)) }
+                    }
                     try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "requested", time: elapsed))
                     timedCheckInPending = true
                     breakNotifications.sendCheckIn(session: sessionFolder?.lastPathComponent ?? "", token: item.id)
@@ -557,7 +580,7 @@ final class ActivityTracker: ObservableObject {
         let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
             startedAt: nextStart, elapsedOrigin: time, continuing: context)
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
-            startedAt: nextStart, mode: recordingMode, continuingContract: next, surveyOptions: sessionSurveyOptions,
+            startedAt: nextStart, mode: recordingMode, continuingContract: next, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
         writer = replacement; sessionFolder = replacement.folder
         if let activeBreak = breakPolicy.activeBreak {
@@ -911,9 +934,21 @@ final class ActivityTracker: ObservableObject {
         }
     }
     // Schedule one ratings opportunity 10 minutes after session start or an actual break return.
+    private func revokeStudyCheckIns() {
+        sessionCheckInPresented = false; sessionCheckIn = nil
+        if isRecording {
+            do {
+                try finishTimedCheckIn(action: "consent_withdrawn", at: now)
+                try finishBreakCheckIn(status: .cancelled, at: now)
+            } catch { fail(error) }
+        }
+        breakSetupPresented = false
+        sessionSurveyOptions = SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false)
+        sessionStudyConfiguration = nil; studyPrompt = nil
+    }
     private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
-        guard let item = timedCheckInPolicy.scheduleIfEnabled(from: time, afterBreak: afterBreak,
-            options: sessionSurveyOptions) else { return }
+        guard let configuration = sessionStudyConfiguration, sessionSurveyOptions.duringWork else { return }
+        let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak, delay: configuration.minimumSpacingSeconds)
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "scheduled", time: time))
     }
     // Open the requested survey and mark its interaction time separately from work.
@@ -930,6 +965,7 @@ final class ActivityTracker: ObservableObject {
             resetMouse(at: time, phase: "check_in")
             try record(type: "check_in_start", at: time)
             try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "opened", time: time))
+            if let studyPrompt { try writer?.logStudyPrompt(StudyPromptLogEntry(prompt: studyPrompt, action: "opened", elapsed: time, recordedAtUTC: Date())) }
             breakNotifications.clearCheckIn()
             timedCheckInPresented = true
             openMainWindow?()
@@ -978,6 +1014,11 @@ final class ActivityTracker: ObservableObject {
             }
         }
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: action, time: time))
+        if let studyPrompt { try writer?.logStudyPrompt(StudyPromptLogEntry(prompt: studyPrompt, action: action, elapsed: time, recordedAtUTC: Date())) }
+        studyPrompt = nil
+        if ["answered", "skipped", "cancelled"].contains(action), isRecording, sessionStudyConfiguration != nil {
+            try scheduleTimedCheckIn(at: time)
+        }
     }
     private func loadProgress() {
         do {
