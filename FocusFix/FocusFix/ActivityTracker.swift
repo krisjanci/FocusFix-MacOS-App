@@ -79,6 +79,14 @@ final class ActivityTracker: ObservableObject {
     private var backgroundActivity: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var quitObserver: NSObjectProtocol?
+    private var lifecycle = RecordingLifecycle()
+    private var lifecycleTimer: Timer?
+    private var lifecycleObservers: [NSObjectProtocol] = []
+    private var activationObserver: NSObjectProtocol?
+    private var lastSamplingTick: Double = 0
+    private var lastObservedTime: Double = 0
+    private var recordingDay = ""
+    private var quitting = false
 
     // Format the session's elapsed time for the main timer.
     var formattedTime: String {
@@ -93,6 +101,8 @@ final class ActivityTracker: ObservableObject {
     // Load the saved-session list and arrange to finish a recording when the app quits.
     private init() {
         loadProgress()
+        do { _ = try SessionFiles.recoverPending(in: SessionFiles.root()) }
+        catch { libraryError = "An interrupted recording could not be finalized; original files were kept." }
         refreshSessions()
         AutomaticRecordingPreferences.shared.onChange = { [weak self] in self?.automaticPreferencesChanged() }
         captureState = RecordingNotice().enabled ? .ready : .disabled
@@ -101,10 +111,12 @@ final class ActivityTracker: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.stop(reason: "app_quit")
+                self.quitting = true
+                self.reconcileLifecycle()
                 self.updateProgress(at: self.now, persist: true)
             }
         }
+        installLifecycleObservers()
     }
     // Connect macOS notification actions to the same controls used by the app.
     func configureNotifications() {
@@ -182,14 +194,65 @@ final class ActivityTracker: ObservableObject {
         captureReason = nil
         recordingNoticePresented = false
     }
-    func automaticPreferencesChanged() {
+    func automaticPreferencesChanged() { reconcileLifecycle() }
+    func prepareToQuit() { quitting = true; reconcileLifecycle() }
+    func pauseRecording() {
+        AutomaticRecordingPreferences.shared.setUserPaused(true)
+        reconcileLifecycle()
+    }
+    func resumeRecording() {
+        lifecycle.failed = false
+        AutomaticRecordingPreferences.shared.setUserPaused(false)
+        if !AutomaticRecordingPreferences.shared.enabled { requestStart() }
+        else { reconcileLifecycle() }
+    }
+    private func installLifecycleObservers() {
+        let center = NSWorkspace.shared.notificationCenter
+        let pairs: [(Notification.Name, Notification.Name, String)] = [
+            (NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification, "sleep"),
+            (NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification, "display"),
+            (NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification, "lock")
+        ]
+        for (pause, resume, reason) in pairs {
+            lifecycleObservers.append(center.addObserver(forName: pause, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.lifecycle.blockers.insert(reason); self?.reconcileLifecycle() }
+            })
+            lifecycleObservers.append(center.addObserver(forName: resume, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.lifecycle.blockers.remove(reason); self?.reconcileLifecycle() }
+            })
+        }
+        activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reconcileLifecycle() }
+        }
+        lifecycleTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.reconcileLifecycle()
+                if self.isRecording { self.tick() }
+            }
+        }
+        if let lifecycleTimer { RunLoop.main.add(lifecycleTimer, forMode: .common) }
+        // Evaluates saved opt-in silently; never asks macOS for permission on launch.
+        reconcileLifecycle()
+    }
+    private func reconcileLifecycle() {
         let preferences = AutomaticRecordingPreferences.shared
-        if (!preferences.enabled || preferences.userPaused), isRecording, recordingMode == .automatic {
-            stop(reason: preferences.userPaused ? "user_pause" : "automatic_disabled")
+        lifecycle.recordingAllowed = RecordingNotice().enabled
+        lifecycle.automaticEnabled = preferences.enabled
+        lifecycle.userPaused = preferences.userPaused
+        lifecycle.permissionAvailable = InputMonitor.hasPermission
+        lifecycle.quitting = quitting
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .null)
+        let effect = lifecycle.reconcile(recording: isRecording, mode: isRecording ? recordingMode : .automatic, idle: idle)
+        switch effect {
+        case .none: break
+        case .stop(let reason): stop(reason: reason)
+        case .start:
+            sessionSurveyOptions = SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false)
+            start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
         }
-        if !isRecording {
-            captureState = !RecordingNotice().enabled ? .disabled : preferences.userPaused ? .userPaused : .ready
-        }
+        captureState = isRecording ? .recording : lifecycle.state
+        captureReason = lifecycle.reason
     }
     func disableRecording() {
         AutomaticRecordingPreferences.shared.disable()
@@ -217,7 +280,7 @@ final class ActivityTracker: ObservableObject {
               prompt: prompt, plan: selection.plan, tags: selection.tags, tagColors: selection.tagColors)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String]) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String], mode: RecordingMode = .manual) {
         guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
@@ -226,6 +289,16 @@ final class ActivityTracker: ObservableObject {
             message = "Activity recording needs Input Monitoring access. Allow access, then start again."
             return
         }
+        if mode == .automatic {
+            guard AutomaticRecordingPreferences.shared.enabled,
+                  !AutomaticRecordingPreferences.shared.userPaused, !quitting, lifecycle.blockers.isEmpty else { return }
+        } else {
+            lifecycle.failed = false
+            // Deliberate manual Start may proceed after an earlier user pause.
+            if AutomaticRecordingPreferences.shared.userPaused {
+                AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
+            }
+        }
         needsPermission = false
         hasError = false
         do {
@@ -233,12 +306,15 @@ final class ActivityTracker: ObservableObject {
             startedAt = Date()
             researchConsent = ResearchSharingController.shared.capturedConsent
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
-                surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
+                mode: mode, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
             writer = newWriter
             sessionFolder = newWriter.folder
             sessionTags = tags
             sessionTagColors = tagColors
             startInstant = clock.now
+            lastSamplingTick = 0
+            lastObservedTime = 0
+            recordingDay = RecordingDay.key(at: startedAt)
             if let prompt, sessionSurveyOptions.beforeSession {
                 let beforeStart = prompt.instant.duration(to: startInstant).components
                 let checkInDuration = Double(beforeStart.seconds) + Double(beforeStart.attoseconds) / 1e18
@@ -266,10 +342,10 @@ final class ActivityTracker: ObservableObject {
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
             sessionWorkPlan = plan
             isRecording = true
-            recordingMode = .manual
+            recordingMode = mode
             captureState = .recording
             captureReason = nil
-            userContext = .work
+            userContext = mode == .manual ? .work : .unknown
             progressClock = ProgressClock()
             lastProgressSave = 0
             updateProgress(at: 0, persist: true)
@@ -286,19 +362,17 @@ final class ActivityTracker: ObservableObject {
                 message = "Could not attach input monitors. Check Input Monitoring access and relaunch FocusFix."
                 return
             }
-            let clock = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
-            }
-            timer = clock
-            RunLoop.main.add(clock, forMode: .common)
             message = "Recording locally. You can close this window and keep working."
             refreshNotificationPermission()
         } catch { fail(error) }
     }
     // Finish local files and any open break/check-in, remove monitors, then offer eligible data to the upload queue.
-    func stop(reason: String = "user_stop") {
+    func stop(reason: String = "user_stop", observedEnd: Double? = nil) {
         guard isRecording else { return }
-        let end = now
+        if reason == "user_stop", recordingMode == .automatic {
+            AutomaticRecordingPreferences.shared.setUserPaused(true, notify: false)
+        }
+        let end = observedEnd ?? min(now, max(lastObservedTime, lastSamplingTick) + 2)
         updateProgress(at: end)
         defer { updateProgress(at: end, persist: true) }
         // Close an abandoned break setup before finishing the recording.
@@ -308,6 +382,7 @@ final class ActivityTracker: ObservableObject {
         do { try finishTimedCheckIn(action: "session_stopped", at: end) }
         catch { checkInSaveError = error }
         isRecording = false
+        if reason == "recording_error" || reason == "monitor_unavailable" || reason == "input_monitor_interrupted" { lifecycle.failed = true }
         captureState = reason == "permission_lost" ? .permissionUnavailable : (RecordingNotice().enabled ? .ready : .disabled)
         captureReason = reason
         userContext = .unknown
@@ -367,6 +442,14 @@ final class ActivityTracker: ObservableObject {
         }
         do {
             elapsed = now
+            // A stalled run loop has no continuously observed coverage. Do not backfill bins.
+            guard elapsed - lastSamplingTick <= 5 else {
+                stop(reason: "capture_gap", observedEnd: lastObservedTime)
+                return
+            }
+            lastSamplingTick = elapsed
+            lastObservedTime = max(lastObservedTime, elapsed)
+            if recordingMode == .automatic, RecordingDay.key(at: Date()) != recordingDay { try rotateRecording(at: elapsed) }
             updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
@@ -378,7 +461,7 @@ final class ActivityTracker: ObservableObject {
                 }
                 if breakPolicy.phase != .resting { append(mouse.advance(to: elapsed)) }
             }
-            try writer?.flush()
+            try writer?.checkpoint(at: elapsed)
             eventCount = eventsRecorded
             movementRows = rowsRecorded
             updateBreakUI(at: elapsed)
@@ -386,14 +469,16 @@ final class ActivityTracker: ObservableObject {
     }
     // Listen for local/global input, app switches and sleep/login changes while recording.
     private func installMonitors() {
+        let segment = writer?.contract.segmentID
         _ = inputMonitor.start(onInput: { [weak self] event in
-            self?.receive(event, outsideApp: event.isOutsideApp(processID: ProcessInfo.processInfo.processIdentifier))
+            guard let self, self.writer?.contract.segmentID == segment else { return }
+            self.receive(event, outsideApp: event.isOutsideApp(processID: ProcessInfo.processInfo.processIdentifier))
         }, onInterruption: { [weak self] in self?.inputInterrupted() })
         let center = NSWorkspace.shared.notificationCenter
         workspaceObservers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main) { [weak self] notification in
                 MainActor.assumeIsolated {
-                    guard let self, self.isRecording, self.suspendedBy.isEmpty,
+                    guard let self, self.isRecording, self.writer?.contract.segmentID == segment, self.suspendedBy.isEmpty,
                           let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                           app.processIdentifier != self.lastApplication else { return }
                     self.lastApplication = app.processIdentifier
@@ -408,24 +493,36 @@ final class ActivityTracker: ObservableObject {
                     catch { self.fail(error) }
                 }
             })
-        let suspensions: [(Notification.Name, Notification.Name, String)] = [
-            (NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification, "system"),
-            (NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification, "screen"),
-            (NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification, "login")
-        ]
-        for (name, wake, reason) in suspensions {
-            workspaceObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.suspendForBreak(reason) }
-            })
-            workspaceObservers.append(center.addObserver(forName: wake, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.resumeAfterSuspension(reason) }
-            })
-        }
+    }
+    private func rotateRecording(at time: Double) throws {
+        guard let previous = writer, let context = previous.contract.intervals.last else { return }
+        if breakPolicy.phase != .resting { append(mouse.stop(at: time)) }
+        try previous.finish(startedAt: startedAt, duration: time, reason: "local_day_rotation")
+        let root = try SessionFiles.root()
+        writer = nil
+        _ = try SessionFiles.retainRecording(previous.folder, duration: time - previous.contract.elapsedOrigin, root: root)
+        let nextStart = Date()
+        let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
+            startedAt: nextStart, elapsedOrigin: time, continuing: context)
+        let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
+            startedAt: nextStart, mode: recordingMode, continuingContract: next, surveyOptions: sessionSurveyOptions,
+            tags: sessionTags, tagColors: sessionTagColors)
+        writer = replacement; sessionFolder = replacement.folder
+        startedAt = nextStart; recordingDay = RecordingDay.key(at: nextStart)
+        removeMonitors(); installMonitors()
+        backgroundActivity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep, reason: "Recording a FocusFix session")
+        guard inputMonitor.isEnabled else { throw CocoaError(.fileWriteUnknown) }
+        resetMouse(at: time, phase: activityPhase)
+        refreshSessions()
+        // Break policy, work intent, cooldown, progress clock and monotonic origin continue.
     }
     // Turn an input event into a generic activity record; never store typed text or a cursor path.
     private func receive(_ event: ActivityInput, outsideApp: Bool) {
         guard isRecording, suspendedBy.isEmpty else { return }
         let time = now
+        guard time - lastSamplingTick <= 5 else { stop(reason: "capture_gap", observedEnd: lastObservedTime); return }
+        lastObservedTime = max(lastObservedTime, time)
         do {
             if breakPolicy.phase != .work { try advanceBreakClock(at: time) }
             if breakPolicy.phase != .work {
@@ -481,6 +578,7 @@ final class ActivityTracker: ObservableObject {
     }
     // Show a recording error and stop safely instead of pretending data is still being saved.
     private func fail(_ error: Error) {
+        lifecycle.failed = true
         stop(reason: "recording_error")
         writer = nil
         hasError = true
@@ -824,7 +922,7 @@ final class ActivityTracker: ObservableObject {
     private func updateProgress(at time: Double, persist: Bool = false) {
         let previous = dailyProgress
         let credited = progressClock.update(&dailyProgress, elapsed: time, date: Date(),
-            working: isRecording && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
+            working: isRecording && userContext == .work && breakPolicy.phase == .work && !checkInOpen && suspendedBy.isEmpty,
             calendar: DailyProgress.calendar())
         if credited > 0 { SocialController.shared.record(kind: "work", seconds: credited) }
         dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
