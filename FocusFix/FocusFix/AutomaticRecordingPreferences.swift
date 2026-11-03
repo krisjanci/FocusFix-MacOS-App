@@ -35,10 +35,10 @@ import Combine
         generation = UUID() // Invalidates pending automatic callbacks before stopping capture.
         onChange?()
     }
-    func setUserPaused(_ paused: Bool) {
+    func setUserPaused(_ paused: Bool, notify: Bool = true) {
         defaults.set(paused, forKey: "focusfix.automatic.userPaused")
         userPaused = paused
         generation = UUID()
-        onChange?()
+        if notify { onChange?() }
     }
 }
