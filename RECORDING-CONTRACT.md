@@ -173,3 +173,19 @@ stay local. The new ZIP builder is test-flag-only and marked-generated-fixture-o
 Shipping delivery qualification is a constant false, and the original live queue
 continues to reject schema 11. Reviewed configuration and disposable-service end-to-
 end checks, including cumulative server caps/races, are still release dependencies.
+
+
+## Final compatibility/qualification audit
+
+Earlier local v11 snapshots with ISO UTC dates and omitted elapsed origin/scoring
+zone load without rewriting: missing origin is zero, unknown historical scoring
+zone defaults to UTC. Current snapshots use numeric Unix UTC dates and an explicit
+zone. Malformed new metadata or a context sidecar attached to legacy metadata is
+never silently accepted as an older format. Unreadable/unsupported folders stay on
+disk and are reported while compatible history remains available; Export All fails
+closed for such folders. Readable export folder names do not change stored identity.
+
+The idle reader uses Apple's any-input token, not a null-event query. Missing idle
+status is not zero activity. Pending OS login approval can be turned off explicitly.
+Fresh signed-device/system/accessibility and service qualification remain separate
+from generated tests and component previews; see the readiness/manual checklists.
