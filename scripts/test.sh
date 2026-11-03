@@ -10,8 +10,13 @@ run_test() {
     local name="$1"
     shift
     echo "Testing $name"
-    xcrun swiftc -module-cache-path "$test_build_dir/module-cache" \
-        "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
+    local sources=("$source_dir/SessionTags.swift") candidate existing duplicate
+    for candidate in "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
+        duplicate=false
+        for existing in "${sources[@]}"; do if [ "$candidate" = "$existing" ]; then duplicate=true; break; fi; done
+        if [ "$duplicate" = false ]; then sources+=("$candidate"); fi
+    done
+    xcrun swiftc -module-cache-path "$test_build_dir/module-cache" "${sources[@]}" "Tests/$name.swift" -o "$test_build_dir/$name"
     "$test_build_dir/$name"
 }
 
@@ -21,6 +26,7 @@ run_test ContextEditingTests "$source_dir/SavedSession.swift" "$source_dir/Recor
 run_test ReminderEligibilityTests
 run_test RecordingCoverageTests "$source_dir/RecordingCoverage.swift" "$source_dir/RecordingPresentation.swift" "$source_dir/SavedSession.swift"
 run_test StudyCheckInTests "$source_dir/SurveyPreferences.swift" "$source_dir/SurveyData.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/TimedCheckIn.swift"
+run_test DeclaredWorkProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
