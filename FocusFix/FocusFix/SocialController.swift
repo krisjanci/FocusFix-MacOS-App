@@ -138,6 +138,9 @@ final class SocialController: ObservableObject {
         guard let scope = declaredWorkScope, let capturedOwner, let capturedOrigin, var value = ledger,
               value.stageDeclaredWork(DeclaredWorkPending(ownerID: capturedOwner, origin: capturedOrigin,
                 segmentID: segmentID, contractVersion: 2, days: days), owner: scope.owner, origin: scope.origin) else { return }
+        let previous = ledger?.declaredWorkPending?[segmentID.uuidString]
+        if previous == nil && days.values.allSatisfy({ $0 == 0 }) { return }
+        if previous == value.declaredWorkPending?[segmentID.uuidString] { return }
         ledger = value
         persist()
         notice = "New declared-work totals stay on this Mac until correction-compatible group sync is verified. Existing group scores are preserved."
