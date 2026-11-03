@@ -6,7 +6,7 @@ import SwiftUI
 struct PrivacyNoticeDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("While a session is recording, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing and any survey answers you choose to give.")
+            Text("While recording manually or automatically, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing and any survey answers you choose to give.")
             Text("It does not save typed text, individual letter keys, app names, window titles, screenshots or cursor paths. Detailed activity timing can still be sensitive. Stop recording before doing anything you don't want included.")
             Text("Sessions stay in FocusFix's private storage on this Mac until you delete them. Use Sessions → Show in Finder to locate them. They are not separately encrypted by FocusFix. Exports and Mac backups can contain copies. Deleting a session moves the local folder to Trash; empty Trash when you want to remove that copy.")
             Text("Input Monitoring permission lets the app observe keyboard and mouse activity across apps without changing or blocking your input. You can stop with Stop & save or Quit, and revoke access in System Settings. macOS may withhold keyboard events during secure input, such as password entry. Such gaps are not proof of inactivity. During a planned break detailed logging pauses; it resumes when the break timer ends or you return early.")
@@ -38,5 +38,26 @@ struct RecordingNoticeView: View {
                     .buttonStyle(.borderedProminent)
             }
         }.padding(26).frame(width: 510, height: 520)
+    }
+}
+
+
+struct AutomaticRecordingNoticeView: View {
+    let onEnable: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Label("Automatic recording", systemImage: "record.circle").font(.title2.weight(.semibold))
+            Text("If you enable this, FocusFix can record computer use while it is running, including non-work activity. Start work is optional; automatic activity begins Unknown.")
+            Text("It records keyboard timing, delete events, clicks, scrolling, app-switch counts and one-second mouse summaries. It does not save typed text, letter identities, app names, URLs, window titles, screenshots or exact cursor paths. Secure Input and other capture gaps remain possible.")
+            Text("The menu bar shows recording status. Use Pause/Resume recording or Quit to stop. Closing a window keeps the menu-bar app running. Login launch, Input Monitoring and research sharing are separate choices. New-format recordings stay local.")
+            Text("Input Monitoring must already be available before automatic capture can start. You can set it up with Manage Input Monitoring after this choice; opening Settings does not request it.")
+                .font(.callout).foregroundStyle(.secondary)
+            HStack {
+                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Enable automatic recording") { onEnable(); dismiss() }.buttonStyle(.borderedProminent)
+            }
+        }.padding(26).frame(width: 530)
     }
 }
