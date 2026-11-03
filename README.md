@@ -1,3 +1,14 @@
+## Prepared research format remains disabled — November 2, 2026
+
+New-schema recordings remain local. The prepared version-2 archive includes context,
+label provenance, reminder logs and optional study checks, but old consent cannot
+authorize it. Production eligibility stays disabled pending reviewed scope and
+configuration plus disposable-service qualification. Long automatic recordings do
+not bypass the existing 180-minute study cap or ZIP limits. Account/consent changes
+create scope boundaries; sign-in/consent never backfills old recordings. Private local
+eligibility snapshots contain pseudonymous IDs, not credentials; explicit folder
+exports may include them. See [research operations](supabase/RESEARCH-OPERATIONS.md).
+
 ## Declared-work scoring compatibility — November 2, 2026
 
 Goals use declared work with observed coverage, excluding unknown/non-work, missing
