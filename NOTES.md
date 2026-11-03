@@ -539,3 +539,25 @@ used fake login operations for tests, so I did not register this Mac's app or
 change Input Monitoring. The focused consent/pause/login tests passed after I
 fixed an actor-isolation issue in the injected client initializer. Real login,
 permissions and signed-app behavior still need device qualification.
+
+## November 2, 2026 — automatic recording, Step 3
+
+I added the automatic lifecycle, keeping one input tap/writer and invalidating
+callbacks at segment changes. Automatic starts are unknown and never request OS
+access. Idle pause uses the public OS idle counter; sleep/display/login loss
+stops capture. User pause survives relaunch and permission restoration. Quit
+blocks new starts. Disk/write errors stop capture and need deliberate retry.
+
+I checkpoint synchronized activity before declaring it durably observed. Crash
+recovery finalizes that bound, ignores raw tails beyond it and never fills downtime.
+A sampling gap over five seconds also closes capture instead of making bins for
+missing observations. Daily rotation keeps the monotonic logical clock, work
+context ID and break cooldown. I moved short-auto retention forward from Step 6
+because otherwise lifecycle stops would immediately delete these new recordings.
+Unknown auto time is already excluded from the old live work-credit path; full
+correction/scoring behavior remains Step 8.
+
+Generated lifecycle/recovery/rotation tests passed. Local Debug compilation passed;
+Release and the full Swift suite also passed. These do not establish actual
+Input Monitoring, sleep/wake, signed login launch or long-run resource coverage.
+I did not change system permissions, enable research or access participant data.
