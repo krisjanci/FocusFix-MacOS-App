@@ -11,13 +11,14 @@ run_test() {
     shift
     echo "Testing $name"
     xcrun swiftc -module-cache-path "$test_build_dir/module-cache" \
-        "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
+        "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$@" "Tests/$name.swift" -o "$test_build_dir/$name"
     "$test_build_dir/$name"
 }
 
 run_test AutomaticRecordingPreferencesTests "$source_dir/AutomaticRecordingPreferences.swift" "$source_dir/RecordingNotice.swift" "$source_dir/LoginLaunch.swift"
 run_test RecordingLifecycleTests "$source_dir/RecordingLifecycle.swift" "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test ContextEditingTests "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
+run_test ReminderEligibilityTests
 run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
