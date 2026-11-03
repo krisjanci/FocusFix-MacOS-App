@@ -94,6 +94,7 @@ final class ActivityTracker: ObservableObject {
     private init() {
         loadProgress()
         refreshSessions()
+        AutomaticRecordingPreferences.shared.onChange = { [weak self] in self?.automaticPreferencesChanged() }
         captureState = RecordingNotice().enabled ? .ready : .disabled
         quitObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
@@ -181,7 +182,17 @@ final class ActivityTracker: ObservableObject {
         captureReason = nil
         recordingNoticePresented = false
     }
+    func automaticPreferencesChanged() {
+        let preferences = AutomaticRecordingPreferences.shared
+        if (!preferences.enabled || preferences.userPaused), isRecording, recordingMode == .automatic {
+            stop(reason: preferences.userPaused ? "user_pause" : "automatic_disabled")
+        }
+        if !isRecording {
+            captureState = !RecordingNotice().enabled ? .disabled : preferences.userPaused ? .userPaused : .ready
+        }
+    }
     func disableRecording() {
+        AutomaticRecordingPreferences.shared.disable()
         if isRecording { stop() }
         sessionCheckInPresented = false
         sessionCheckIn = nil
