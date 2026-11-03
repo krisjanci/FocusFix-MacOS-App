@@ -13,7 +13,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var captureState: CaptureState = .disabled
     @Published private(set) var captureReason: String?
     @Published private(set) var userContext: ActivityContext = .unknown
-    var interventionPhase: InterventionPhase { InterventionPhase(legacyPhase: activityPhase) }
+    var interventionPhase: InterventionPhase { breakPolicy.phase == .resting ? .explicitBreak : InterventionPhase(legacyPhase: activityPhase) }
     @Published private(set) var isRecording = false
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var eventCount = 0
@@ -87,6 +87,13 @@ final class ActivityTracker: ObservableObject {
     private var lastObservedTime: Double = 0
     private var recordingDay = ""
     private var quitting = false
+    private var reminderEligibility = ReminderEligibility()
+    private let reminderClockOrigin = ContinuousClock.now
+    private var reminderMonotonic: Double {
+        let value = reminderClockOrigin.duration(to: clock.now).components
+        return Double(value.seconds) + Double(value.attoseconds) / 1e18
+    }
+    var screenUseReminders: Bool { UserDefaults.standard.bool(forKey: "focusfix.screenUseReminders") }
 
     // Format the session's elapsed time for the main timer.
     var formattedTime: String {
@@ -206,6 +213,11 @@ final class ActivityTracker: ObservableObject {
             updateProgress(at: time)
             if breakPolicy.phase != .resting { append(mouse.stop(at: time)) }
             try writer.changeContext(context, at: time, effectiveAt: Date(), source: source)
+            if userContext != writer.contract.currentContext {
+                reminderEligibility.invalidate()
+                breakNotifications.clearBreaks()
+                breakPolicy.contextChanged(at: time, beginsWork: context == .work)
+            }
             userContext = writer.contract.currentContext
             lastObservedTime = max(lastObservedTime, time)
             resetMouse(at: time, phase: activityPhase)
@@ -422,6 +434,7 @@ final class ActivityTracker: ObservableObject {
         userContext = .unknown
         removeMonitors()
         breakNotifications.clear()
+        reminderEligibility.invalidate()
         breakSetupPresented = false
         do {
             if breakPolicy.phase != .resting && suspendedBy.isEmpty { append(mouse.stop(at: end)) }
@@ -653,23 +666,43 @@ final class ActivityTracker: ObservableObject {
         returnWindowStart = time
         keys = KeyTiming() // Never match a key press across a paused interval.
     }
+    func reminderPreferenceChanged() {
+        guard !ReminderEligibility.eligible(context: userContext, screenUseEnabled: screenUseReminders) else { return }
+        reminderEligibility.invalidate()
+        breakNotifications.clearBreaks()
+        breakPolicy.contextChanged(at: now, beginsWork: false)
+        updateBreakUI(at: now)
+    }
     // Advance the break rules, record transitions and send a reminder when needed.
     private func advanceBreakClock(at time: Double, samplingStart: Double? = nil) throws {
+        if breakPolicy.phase == .work {
+            guard ReminderEligibility.eligible(context: userContext, screenUseEnabled: screenUseReminders),
+                  reminderMonotonic >= reminderEligibility.cooldownUntil else { return }
+        }
         guard let entry = breakPolicy.tick(at: time) else { return }
         try writer?.logBreak(entry)
         if entry.action == "timer_elapsed" {
             resetMouse(at: samplingStart ?? entry.time, phase: "awaiting_return")
             if let record = breakPolicy.activeBreak {
-                breakNotifications.send(session: sessionFolder?.lastPathComponent ?? "", token: record.id, finished: true)
+                breakNotifications.send(session: writer?.contract.recordingID.uuidString ?? "", token: record.id, finished: true)
             }
         } else if entry.action == "prompt" {
-            breakNotifications.send(session: sessionFolder?.lastPathComponent ?? "", token: entry.promptID, finished: false)
+            if let contract = writer?.contract, let interval = contract.intervals.last,
+               let request = reminderEligibility.schedule(token: entry.promptID, recordingID: contract.recordingID,
+                    interval: interval, elapsed: time, monotonic: reminderMonotonic, date: Date(), screenUseEnabled: screenUseReminders) {
+                try writer?.logReminder(ReminderLogEntry(request: request, action: "scheduled", effectiveElapsed: time, recordedAtUTC: Date()))
+                try writer?.logReminder(ReminderLogEntry(request: request, action: "requested", effectiveElapsed: time, recordedAtUTC: Date()))
+                breakNotifications.send(session: contract.recordingID.uuidString, token: entry.promptID, finished: false,
+                    screenUse: request.screenUse, workPeriodID: request.workPeriodID?.uuidString ?? "")
+            }
         }
         updateBreakUI(at: time)
     }
     // Open the pre-break ratings and setup; opening this sheet is not yet taking a break.
     func chooseBreak() {
         guard isRecording, breakPolicy.phase == .work, !checkInOpen else { return }
+        reminderEligibility.invalidate()
+        breakNotifications.clearBreaks()
         let time = now
         updateProgress(at: time)
         defer { updateProgress(at: time, persist: true) }
@@ -740,6 +773,13 @@ final class ActivityTracker: ObservableObject {
     }
     // Delay the next reminder by 10 or 25 minutes without changing the last actual break time.
     func deferBreak(snooze: Bool) {
+        if let pending = reminderEligibility.pending, let contract = writer?.contract,
+           let interval = contract.intervals.last,
+           let request = reminderEligibility.consume(token: pending.id, recordingID: contract.recordingID,
+                contextID: interval.logicalID, active: isRecording, monotonic: reminderMonotonic, snooze: snooze) {
+            do { try writer?.logReminder(ReminderLogEntry(request: request, action: snooze ? "snooze" : "skip", effectiveElapsed: now, recordedAtUTC: Date())) }
+            catch { fail(error); return }
+        }
         guard isRecording, let entry = breakPolicy.deferPrompt(at: now, snooze: snooze) else { return }
         do {
             try finishBreakCheckIn(status: .cancelled, at: now)
@@ -836,20 +876,28 @@ final class ActivityTracker: ObservableObject {
     }
     // Route a notification button to its action only if its session and prompt are still current.
     private func notificationAction(session: String, token: String, action: String) {
-        guard isRecording, sessionFolder?.lastPathComponent == session else { return }
-        if timedCheckInPolicy.hasPending, token == timedCheckInPolicy.current?.id {
+        guard isRecording, let contract = writer?.contract else { return }
+        if timedCheckInPolicy.hasPending, token == timedCheckInPolicy.current?.id,
+           sessionFolder?.lastPathComponent == session {
             if action == "answer_check_in" || action == UNNotificationDefaultActionIdentifier {
                 openTimedCheckIn()
             } else if action == "skip_check_in" { skipTimedCheckIn() }
-        } else if token == breakPolicy.promptID {
+        } else if session == contract.recordingID.uuidString, let interval = contract.intervals.last,
+                  reminderEligibility.accepts(token: token, recordingID: contract.recordingID, contextID: interval.logicalID, active: true) {
+            if action == UNNotificationDefaultActionIdentifier { openMainWindow?(); return }
+            guard ["take", "skip", "snooze", "not_working"].contains(action),
+                  let request = reminderEligibility.consume(token: token, recordingID: contract.recordingID,
+                    contextID: interval.logicalID, active: true, monotonic: reminderMonotonic, snooze: action == "snooze") else { return }
+            do { try writer?.logReminder(ReminderLogEntry(request: request, action: action, effectiveElapsed: now, recordedAtUTC: Date())) }
+            catch { fail(error); return }
             switch action {
             case "take": chooseBreak(); openMainWindow?()
             case "skip": deferBreak(snooze: false)
             case "snooze": deferBreak(snooze: true)
-            case UNNotificationDefaultActionIdentifier: openMainWindow?()
-            default: break // Dismissing a banner isn't a skip or a new prompt.
+            case "not_working": setContext(.nonWork, source: .notification)
+            default: break
             }
-        } else if token == breakPolicy.activeBreak?.id {
+        } else if session == contract.recordingID.uuidString, token == breakPolicy.activeBreak?.id {
             if action == "back" { returnFromBreak(); openMainWindow?() }
             else if action == UNNotificationDefaultActionIdentifier { openMainWindow?() }
         }
