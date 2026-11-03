@@ -35,12 +35,29 @@ struct SocialState: Codable {
     let groups: [SocialGroup]
 }
 
+struct DeclaredWorkPending: Codable, Equatable {
+    let ownerID: UUID
+    let origin: String
+    let segmentID: UUID
+    let contractVersion: Int
+    let days: [String: Double]
+}
+
 struct SocialLedger: Codable {
     var timezone: String
     var activatedAt: Double = Date().timeIntervalSince1970
     var progress = DailyProgress()
     var pending: [SocialEvent] = []
     var submitted: Set<UUID> = []
+    // These replacement totals must never be sent to the increment-only legacy RPC.
+    var declaredWorkPending: [String: DeclaredWorkPending]? = nil
+    mutating func stageDeclaredWork(_ value: DeclaredWorkPending, owner: UUID, origin: String) -> Bool {
+        guard value.ownerID == owner, value.origin == origin, value.contractVersion == 2,
+              value.days.values.allSatisfy({ $0.isFinite && $0 >= 0 }) else { return false }
+        if declaredWorkPending == nil { declaredWorkPending = [:] }
+        declaredWorkPending?[value.segmentID.uuidString] = value
+        return true
+    }
 
     mutating func append(_ event: SocialEvent) {
         guard event.seconds.isFinite, event.seconds > 0, !pending.contains(where: { $0.id == event.id }) else { return }
