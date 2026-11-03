@@ -1,5 +1,5 @@
 // MARK: - FF: TRACKING
-// Coordinates recording, breaks, check-ins and the session library. Nothing starts recording until the user chooses Start.
+// Coordinates consent-gated manual/automatic recording, work labels, breaks, check-ins and history.
 
 import AppKit
 import CoreGraphics
@@ -28,6 +28,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var hasError = false
     @Published private(set) var sessions: [SavedSession] = []
     @Published private(set) var libraryError: String?
+    @Published private(set) var libraryNotice: String?
     @Published private(set) var breakPhase: BreakPolicy.Phase = .work
     @Published private(set) var breakPromptPending = false
     @Published private(set) var currentBreak: BreakRecord?
@@ -315,7 +316,7 @@ final class ActivityTracker: ObservableObject {
         lifecycle.userPaused = preferences.userPaused
         lifecycle.permissionAvailable = InputMonitor.hasPermission
         lifecycle.quitting = quitting
-        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .null)
+        let idle = SystemIdleTime.seconds()
         let effect = lifecycle.reconcile(recording: isRecording, mode: isRecording ? recordingMode : .automatic, idle: idle)
         switch effect {
         case .none: break
@@ -454,7 +455,7 @@ final class ActivityTracker: ObservableObject {
         if reason == "user_stop", recordingMode == .automatic {
             AutomaticRecordingPreferences.shared.setUserPaused(true, notify: false)
         }
-        let end = observedEnd ?? min(now, max(lastObservedTime, lastSamplingTick) + 2)
+        let end = observedEnd ?? RecordingLifecycle.observedEnd(now: now, lastSamplingTick: lastSamplingTick, lastObserved: lastObservedTime)
         updateProgress(at: end)
         defer { updateProgress(at: end, persist: true) }
         // Close an abandoned break setup before finishing the recording.
@@ -1086,6 +1087,16 @@ final class ActivityTracker: ObservableObject {
     }
 
     func reconcileProgress() {
+        // Restore the current owner's latest replacement totals after account switches;
+        // corrections made while signed out never transfer to the next account.
+        if let scope = SocialController.shared.declaredWorkScope {
+            for (segment, owner) in dailyProgress.declaredOwners where owner.ownerID == scope.owner && owner.origin == scope.origin {
+                if let id = UUID(uuidString: segment), let days = dailyProgress.declaredSegments[segment] {
+                    SocialController.shared.stageDeclaredWork(segmentID: id, days: days,
+                        capturedOwner: owner.ownerID, capturedOrigin: owner.origin)
+                }
+            }
+        }
         let previous = dailyProgress
         dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
         progressDirty = progressDirty || previous != dailyProgress
@@ -1154,7 +1165,9 @@ final class ActivityTracker: ObservableObject {
     // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
         do {
-            sessions = try SessionFiles.list(in: SessionFiles.root())
+            let listing = try SessionFiles.inspect(in: SessionFiles.root())
+            sessions = listing.sessions
+            libraryNotice = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
             libraryError = nil
             reconcileSavedProgress()
         } catch { libraryError = error.localizedDescription }
