@@ -236,3 +236,20 @@ regressions are run. Local Debug compiled; real reviewed consent, disposable-ser
 end-to-end/race checks and cumulative server compatibility remain absent. No
 migrations/functions deployed, settings enabled, billing changed or data accessed.
 Next: Step 10 a separate local clustering experiment on generated fixtures.
+
+## Automatic tracking Step 11 — November 2, 2026
+
+I added a versioned provider seam with the fixed timer selected. The only alternate
+provider is an explicitly disabled synthetic preview: exact seven-rate/float32
+parity, full coverage, context/pause/cooldown, version, model age and unknown-cluster
+checks all fall back safely. It returns descriptive IDs, never a fatigue score.
+The backend independently compares prompt-linked fatigue against mean and context/
+time/prior-work baselines, with added clusters, separate person/time splits and
+count/missingness/uncertainty reports. Small generated demos report insufficient
+evidence. The private planning draft separates validation from a proposed future
+randomized comparison; no course/IRB document was changed or randomization enabled.
+
+Full Swift regressions, synthetic Python validation/parity tests and Debug passed.
+Cluster structure is demonstrated only synthetically; real fatigue improvement is
+not established; intervention benefit is not tested. Next: Step 12 integrated audit,
+release documentation, remaining regressions and explicit manual qualification.
