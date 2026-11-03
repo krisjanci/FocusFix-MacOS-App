@@ -1,3 +1,16 @@
+## Automatic lifecycle — November 2, 2026
+
+After explicit automatic opt-in, capture can begin while FocusFix runs if Input
+Monitoring is already granted. It starts Unknown. Pause/Resume is in the menu bar;
+a user pause survives relaunch. Sleep/lock or five continuous idle minutes stop
+capture; eligible lifecycle resumes start Unknown. Quit stops capture; closing a
+window keeps the menu-bar app running. Errors stop capture until deliberate retry.
+Files rotate by local day with stable logical recording/context IDs. Checkpoints
+bound crash recovery and missing coverage is never filled. Short automatic
+recordings are retained; unknown activity does not count as work. See the
+[recording contract](RECORDING-CONTRACT.md) for elapsed origins across segments.
+Actual capture, sleep/wake, permissions and long-run operation need device tests.
+
 ## Automatic-recording choice — November 2, 2026
 
 Settings → Privacy & Research now has a separate **Enable automatic recording**
