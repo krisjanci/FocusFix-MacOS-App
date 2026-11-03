@@ -20,8 +20,8 @@ import SwiftUI
                     }
                     Text("A long custom activity label wraps without becoming evidence of work or changing recording status.")
                         .font(.caption).fixedSize(horizontal: false, vertical: true)
-                    Text("Legacy / empty history: context unknown. Missing coverage is unavailable.")
-                        .font(.caption).fixedSize(horizontal: false, vertical: true)
+                    RecordingHistorySummary(contract: nil, summary: "Declared work 0m · Unknown 3m · Unavailable 7m. Missing coverage is not non-work.")
+                    EmptyRecordingHistoryView().frame(height: 190)
                 }.padding(20).frame(width: 270).frame(maxHeight: .infinity, alignment: .top)
                     .background(dark ? Color.black : Color.white)
                     .environment(\.colorScheme, dark ? .dark : .light)
