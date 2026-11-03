@@ -1,3 +1,13 @@
+## Contextual reminders — November 2, 2026
+
+The fixed timer/idle policy suggests work breaks during declared work. Settings has
+a separate, off-by-default choice for screen-use break reminders during Unknown or
+Not working activity. **I’m not working** labels from the notification action time
+onward and keeps recording; correct an earlier interval in Sessions. Older requests
+cannot overwrite a later context choice. Notification requests are logged separately
+from actions and do not prove delivery, viewing or fatigue. In-app controls remain
+available without notification permission.
+
 ## Optional work labels and corrections — November 2, 2026
 
 **Start work** in the menu labels activity from now, including during automatic
