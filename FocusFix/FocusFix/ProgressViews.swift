@@ -7,8 +7,8 @@ struct DailyProgressCard: View {
     var body: some View {
         // Refresh the local day even when the app is idle across midnight.
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let calendar = social.enabled ? social.calendar : DailyProgress.calendar()
-            let progress = social.ledger?.progress ?? tracker.dailyProgress
+            let calendar = DailyProgress.calendar()
+            let progress = tracker.dailyProgress
             let day = progress.day(at: context.date, calendar: calendar)
             let streak = progress.streak(at: context.date, calendar: calendar)
             let weekend = DailyProgress.isWeekend(context.date, calendar: calendar)
@@ -17,9 +17,9 @@ struct DailyProgressCard: View {
                 breakCount: day.completedBreakIDs.count, weekend: weekend, complete: complete,
                 recharged: tracker.rechargeDate.map {
                     calendar.isDate($0, inSameDayAs: context.date) && context.date.timeIntervalSince($0) < 20
-                } ?? false, notice: tracker.progressNotice, workSeconds: day.workSeconds,
+                } ?? false, notice: tracker.progressNotice ?? (social.declaredWorkSyncHeld ? "Declared work stays local; group work sync needs a compatible server update." : nil), workSeconds: day.workSeconds,
                 freezes: progress.tokensRemaining(at: context.date, calendar: calendar), pending: social.pendingConfirmation,
-                active: tracker.isRecording && tracker.breakPhase == .work)
+                active: tracker.isRecording && tracker.userContext == .work && tracker.breakPhase == .work)
                 .onChange(of: DailyProgress.key(for: context.date, calendar: calendar)) { _, _ in
                     tracker.reconcileProgress()
                     Task { await social.refresh() }
@@ -47,7 +47,7 @@ struct DailyProgressDisplay: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Today · \(workMinutes) / 60 min",
+                Label("Declared work · \(workMinutes) / 60 min",
                       systemImage: complete ? "checkmark.circle.fill" : "target")
                     .font(.callout.weight(.medium))
                 Spacer()
