@@ -155,3 +155,21 @@ opted-in account/origin and retained separately from legacy increment events. Th
 old RPC cannot reconcile decreases: new work sync fails closed. Existing group
 scores/thresholds/freezes and explicit-break rules are unchanged. See
 `supabase/DECLARED-WORK-SYNC.md` for the required server capability before release.
+
+## Step 9: prepared archive version 2, delivery still disabled
+
+`research_eligibility.json` is a private local snapshot of the segment's account/
+consent identity and scope (or local-only nil). It contains no credentials and is
+excluded from research ZIPs. Explicit user folder exports can include this local
+pseudonymous consent reference. A versioned research scope must separately cover
+automatic/non-work capture, context/revisions, optional checks, retention/deletion
+and training uses; old consent decodes with no such scope and fails closed.
+
+The prepared allowlist adds context, reminder and study-check logs to the existing
+six files. Metadata/capabilities and snapshot IDs must match, capture must begin
+after consent, and the active identity must still match. Daily cap remains 180
+minutes; 100 MiB raw/25 MiB ZIP limits remain deliberate. Oversized whole segments
+stay local. The new ZIP builder is test-flag-only and marked-generated-fixture-only.
+Shipping delivery qualification is a constant false, and the original live queue
+continues to reject schema 11. Reviewed configuration and disposable-service end-to-
+end checks, including cumulative server caps/races, are still release dependencies.
