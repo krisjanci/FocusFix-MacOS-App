@@ -1,3 +1,12 @@
+## Automatic-tracking foundation — November 2, 2026
+
+I added the [schema 11 recording contract](RECORDING-CONTRACT.md): manual Start
+records a user-declared work label separately from the old intervention phase.
+Legacy sessions remain readable with unknown context. Context snapshots save
+atomically without rewriting activity CSVs. New-schema recordings stay local
+and are rejected by research queueing and archive construction. Automatic capture
+and its opt-in are subsequent steps; nothing starts automatically in this step.
+
 ## Private groups and automatic streak freezes
 
 Groups now supports private invite codes, creator controls, and separate all-time Work and Healthy habits leaderboards. A 60-minute work day earns one work point; a day with a completed one-minute break earns one healthy-habit point. Scores start at joining, and weekends can earn points. The existing weekday streak receives three automatic monthly freezes, without rollover or consecutive calendar-day use. Frozen days add no points or streak days.
@@ -463,7 +472,7 @@ There is no separate mouse duration column: subtract `start_seconds` from
 `end_seconds` if needed. The final partial interval can be excluded when analysing
 full seconds. Break boundaries can also create partial intervals. Position and key
 hold state reset when tracking resumes so paused time doesn't become a mouse jump
-or a very long key hold. New sessions use **schema version 8**; older files are left
+or a very long key hold. Current sessions use **schema version 11** (see the recording contract); schema 8 introduced these timing fields.; older files are left
 unchanged and remain available in the library.
 
 **breaks.csv — append-only decisions and break lifecycle**
