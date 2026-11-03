@@ -33,12 +33,12 @@ struct SessionLibraryView: View {
                 Text("\(tracker.sessions.count)").font(.title2.monospacedDigit()).foregroundStyle(teal)
             }.padding(24)
             Divider()
+            if let notice = tracker.libraryNotice { Text(notice).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20) }
             if let error = tracker.libraryError {
                 ContentUnavailableView("Couldn't load sessions", systemImage: "exclamationmark.triangle",
                     description: Text(error))
             } else if tracker.sessions.isEmpty {
-                ContentUnavailableView("No sessions yet", systemImage: "clock",
-                    description: Text("Record automatically after opting in, or start a manual work session. Legacy history stays available."))
+                EmptyRecordingHistoryView()
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -62,12 +62,8 @@ struct SessionLibraryView: View {
                 }
             }
             if let selected {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(selected.recordingContract.map { "Recording \($0.recordingID.uuidString.prefix(8)) · segment \($0.segmentID.uuidString.prefix(8))" } ?? "Legacy recording · context unknown")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if let coverage { Text(coverage.summary).font(.caption).fixedSize(horizontal: false, vertical: true) }
-                    else { Text(coverageError ?? "Loading observed coverage…").font(.caption).foregroundStyle(.secondary) }
-                }.padding(.horizontal, 20).padding(.vertical, 8)
+                RecordingHistorySummary(contract: selected.recordingContract, summary: coverage?.summary,
+                    error: coverageError).padding(.horizontal, 20).padding(.vertical, 8)
             }
             Divider()
             HStack {
