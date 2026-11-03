@@ -9,6 +9,11 @@ import UserNotifications
 @MainActor
 final class ActivityTracker: ObservableObject {
     static let shared = ActivityTracker()
+    @Published private(set) var recordingMode: RecordingMode = .manual
+    @Published private(set) var captureState: CaptureState = .disabled
+    @Published private(set) var captureReason: String?
+    @Published private(set) var userContext: ActivityContext = .unknown
+    var interventionPhase: InterventionPhase { InterventionPhase(legacyPhase: activityPhase) }
     @Published private(set) var isRecording = false
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var eventCount = 0
@@ -89,6 +94,7 @@ final class ActivityTracker: ObservableObject {
     private init() {
         loadProgress()
         refreshSessions()
+        captureState = RecordingNotice().enabled ? .ready : .disabled
         quitObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -171,6 +177,8 @@ final class ActivityTracker: ObservableObject {
     // Avoid stacking two SwiftUI sheets during the same dismissal animation.
     func acceptRecordingNotice() {
         RecordingNotice().acknowledge()
+        captureState = .ready
+        captureReason = nil
         recordingNoticePresented = false
     }
     func disableRecording() {
@@ -178,6 +186,8 @@ final class ActivityTracker: ObservableObject {
         sessionCheckInPresented = false
         sessionCheckIn = nil
         RecordingNotice().decline()
+        captureState = .disabled
+        captureReason = "recording_disabled"
         message = "Recording is off. Enable it in Settings → Privacy & Research when you are ready."
     }
     func declineRecordingNotice() {
@@ -200,6 +210,8 @@ final class ActivityTracker: ObservableObject {
         guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
+            captureState = .permissionUnavailable
+            captureReason = "input_monitoring_required"
             message = "Activity recording needs Input Monitoring access. Allow access, then start again."
             return
         }
@@ -243,6 +255,10 @@ final class ActivityTracker: ObservableObject {
             lastApplication = NSWorkspace.shared.frontmostApplication?.processIdentifier
             sessionWorkPlan = plan
             isRecording = true
+            recordingMode = .manual
+            captureState = .recording
+            captureReason = nil
+            userContext = .work
             progressClock = ProgressClock()
             lastProgressSave = 0
             updateProgress(at: 0, persist: true)
@@ -281,6 +297,9 @@ final class ActivityTracker: ObservableObject {
         do { try finishTimedCheckIn(action: "session_stopped", at: end) }
         catch { checkInSaveError = error }
         isRecording = false
+        captureState = reason == "permission_lost" ? .permissionUnavailable : (RecordingNotice().enabled ? .ready : .disabled)
+        captureReason = reason
+        userContext = .unknown
         removeMonitors()
         breakNotifications.clear()
         breakSetupPresented = false
