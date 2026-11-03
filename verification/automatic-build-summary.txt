@@ -1,0 +1,2 @@
+Debug: xcodebuild -project FocusFix/FocusFix.xcodeproj -scheme FocusFix -configuration Debug -derivedDataPath /tmp/focusfix-auto-build -arch arm64 -arch x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build — PASSED; arm64 + x86_64; unsigned; not launched
+Release: xcodebuild -project FocusFix/FocusFix.xcodeproj -scheme FocusFix -configuration Release -derivedDataPath /tmp/focusfix-auto-build -arch arm64 -arch x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build — PASSED; arm64 + x86_64; unsigned; not launched
