@@ -172,7 +172,7 @@ final class ResearchSharingController: ObservableObject {
 
     func finished(folder: URL, startedAt: Date, captured: ResearchConsent?) {
         guard enabled, let saved = try? SavedSession(folder: folder),
-              let duration = saved.duration, SessionFiles.qualifies(duration: duration) else { return }
+              saved.schemaVersion < 11, let duration = saved.duration, SessionFiles.qualifies(duration: duration) else { return }
         let old = state
         if state.enqueue(id: folder.lastPathComponent, startedAt: startedAt, endedAt: Date(), captured: captured) {
             do { try persist(); notice = "\(state.sessions.count) new sessions waiting for delivery."; checkDue() }
