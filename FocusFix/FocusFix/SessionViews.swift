@@ -12,6 +12,7 @@ struct SessionLibraryView: View {
     @State private var notice: String?
     @State private var exportingAll = false
     @State private var tagging: SavedSession?
+    @State private var editingContext: SavedSession?
     @ObservedObject var tagLibrary = SessionTagLibrary.shared
 
     // Find the saved session matching the current list selection.
@@ -66,6 +67,8 @@ struct SessionLibraryView: View {
                     if let selected { NSWorkspace.shared.activateFileViewerSelecting([selected.folder]) }
                 }.disabled(selected == nil)
                 Spacer()
+                Button("Edit context…") { editingContext = selected }
+                    .disabled(selected?.recordingContract?.finalized != true || selected.map(tracker.isActive) == true)
                 Button("Delete…", role: .destructive) {
                     pendingDeletion = selected
                     confirmDeletion = true
@@ -81,6 +84,11 @@ struct SessionLibraryView: View {
         .frame(minWidth: 650, minHeight: 400)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { tracker.refreshSessions() }
+        .sheet(item: $editingContext) { session in
+            ContextCorrectionView(session: session) { context, start, end in
+                try tracker.correctContext(context, start: start, end: end, session: session)
+            }
+        }
         .sheet(item: $tagging) { session in
             SessionTagEditor(tags: session.tags, colors: session.tagColors, library: tagLibrary) { tags, colors in
                 try tracker.updateTags(tags, colors: colors, for: session)
@@ -214,5 +222,44 @@ struct TrackingTestView: View {
             Text(value, format: .number).font(.largeTitle).monospacedDigit()
             Text(name).font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+
+struct ContextCorrectionView: View {
+    let session: SavedSession
+    let save: (ActivityContext, Double, Double) throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var context = ActivityContext.unknown
+    @State private var start = "0"
+    @State private var end = ""
+    @State private var error: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Correct an activity interval").font(.title2)
+            Text("Choose seconds from the start of this recording segment. This changes only the selected labels; original labels stay in the revision history. It does not create activity in missing coverage.")
+                .font(.callout).foregroundStyle(.secondary)
+            Picker("Activity context", selection: $context) {
+                Text("Work · user declared").tag(ActivityContext.work)
+                Text("Not working").tag(ActivityContext.nonWork)
+                Text("Unknown").tag(ActivityContext.unknown)
+            }
+            TextField("Start seconds", text: $start)
+            TextField("End seconds (exclusive)", text: $end)
+            if let error { Text(error).foregroundStyle(.red) }
+            HStack {
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save correction") {
+                    guard let lower = Double(start), let upper = Double(end) else {
+                        error = "Enter a valid start and end in seconds."; return
+                    }
+                    let origin = session.recordingContract?.elapsedOrigin ?? 0
+                    do { try save(context, lower + origin, upper + origin); dismiss() }
+                    catch { self.error = "The interval must be within this recording and based on its latest labels. Refresh and try again." }
+                }.buttonStyle(.borderedProminent)
+            }
+        }.padding(24).frame(width: 480)
+            .onAppear { end = String(session.duration ?? 0) }
     }
 }
