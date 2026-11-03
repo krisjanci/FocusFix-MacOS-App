@@ -115,3 +115,13 @@ It is an unsigned verification build, not a distributable App Store app.
 Operational instructions: `supabase/RESEARCH-OPERATIONS.md`.
 Submission copy and checklist: `STORE-SUBMISSION.md`.
 Local website privacy draft: `../FocusFix-Website/dist/privacy.html`.
+
+## Automatic tracking Step 1 — November 2, 2026
+
+I added schema 11 and an atomic context snapshot with independent mode, capture
+state, context and intervention phase. Manual Start declares work; old phase
+values and raw CSV layouts keep their original meaning. Legacy history remains
+unknown without destructive migration. New formats fail closed for research at
+queueing and ZIP construction. See `RECORDING-CONTRACT.md` for the exact contract.
+Automatic capture is not enabled by this foundation. Next: Step 2 explicit
+versioned automatic-recording consent and optional login launch.
