@@ -45,7 +45,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         let seconds = metadata["duration_seconds"] as? Double
         let validDuration = seconds.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         if let contract = recordingContract, contract.finalized {
-            guard validDuration == contract.observedThrough else { throw RecordingContract.Invalid.bounds }
+            guard validDuration == contract.observedThrough - contract.elapsedOrigin else { throw RecordingContract.Invalid.bounds }
         }
         duration = validDuration
         endedAt = (metadata["ended_at_utc"] as? String).flatMap { formatter.date(from: $0) }
@@ -84,13 +84,39 @@ nonisolated enum SessionFiles {
     // Only the current recording is removed; existing saved sessions are never pruned.
     static func retainRecording(_ folder: URL, duration: Double, root: URL) throws -> URL? {
         try validate(folder, in: pendingRoot(in: root), active: nil)
-        guard qualifies(duration: duration) else {
+        let saved = try SavedSession(folder: folder)
+        guard saved.recordingContract?.mode == .automatic || qualifies(duration: duration) else {
             try FileManager.default.removeItem(at: folder)
             return nil
         }
-        let saved = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
-        try FileManager.default.moveItem(at: folder, to: saved)
-        return saved
+        let destination = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+        try FileManager.default.moveItem(at: folder, to: destination)
+        return destination
+    }
+
+    // Never extend a crashed recording to launch time. Keep unreadable files for inspection.
+    static func recoverPending(in root: URL) throws -> Int {
+        let pending = pendingRoot(in: root)
+        guard FileManager.default.fileExists(atPath: pending.path) else { return 0 }
+        var count = 0
+        for folder in try FileManager.default.contentsOfDirectory(at: pending, includingPropertiesForKeys: nil) {
+            try validate(folder, in: pending, active: nil)
+            guard var contract = try? RecordingContract.load(from: folder) else { continue }
+            let url = folder.appendingPathComponent("session.json")
+            let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard properties.isRegularFile == true, properties.isSymbolicLink != true else { continue }
+            guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else { continue }
+            if !contract.finalized { try contract.finish(at: contract.observedThrough); try contract.save(to: folder) }
+            metadata["duration_seconds"] = contract.observedThrough - contract.elapsedOrigin
+            metadata["status"] = "crash_recovered_observed_only"
+            // Raw CSV tails beyond the checkpoint remain original bytes; readers must exclude them.
+            metadata["recovery_policy"] = "Only data strictly before observedThrough are eligible; ignore any uncheckpointed raw tail. No downtime filled."
+            try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
+            let destination = root.appendingPathComponent(folder.lastPathComponent)
+            try FileManager.default.moveItem(at: folder, to: destination)
+            count += 1
+        }
+        return count
     }
 
     // Directory URLs may differ only by a trailing slash or a parent-directory alias.
