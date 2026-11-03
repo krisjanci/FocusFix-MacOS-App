@@ -40,6 +40,7 @@ struct PrivacyResearchSettings: View {
     @ObservedObject private var surveys = SurveyPreferences.shared
     @ObservedObject private var automatic = AutomaticRecordingPreferences.shared
     @StateObject private var login = LoginLaunch()
+    @AppStorage("focusfix.screenUseReminders") private var screenUseReminders = false
     @State private var automaticConsentPresented = false
     @State private var recordingEnabled = RecordingNotice().enabled
     @State private var recordingConsentPresented = false
@@ -59,6 +60,10 @@ struct PrivacyResearchSettings: View {
                     if value { automaticConsentPresented = true } else { automatic.disable() }
                 })).disabled(!recordingEnabled)
                 Text("Includes unknown and non-work computer use while FocusFix is running. Work labels are optional. Pause recording or Quit to stop capture.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Screen-use break reminders outside declared work", isOn: $screenUseReminders)
+                    .onChange(of: screenUseReminders) { _, _ in tracker.reminderPreferenceChanged() }
+                Text("Off by default. These are screen-use reminders during Unknown or Not working activity, without inferring work. ‘I’m not working’ labels from now and keeps recording; edit earlier labels in Sessions.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Launch at login", isOn: Binding(get: { login.enabled }, set: { login.setEnabled($0) }))
                 Text(login.explanation).font(.caption).foregroundStyle(.secondary)
