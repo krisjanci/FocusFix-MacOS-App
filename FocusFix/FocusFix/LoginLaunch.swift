@@ -18,6 +18,7 @@ import ServiceManagement
     private let client: any LoginLaunchClient
     init(client: (any LoginLaunchClient)? = nil) { self.client = client ?? SystemLoginLaunchClient(); refresh() }
     var enabled: Bool { status == .enabled }
+    var requested: Bool { status == .enabled || status == .requiresApproval }
     var explanation: String {
         switch status {
         case .enabled: "FocusFix will open at login. Recording still follows your consent and pause choices."
