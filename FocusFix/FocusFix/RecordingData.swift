@@ -103,17 +103,20 @@ final class RecordingWriter {
     private let surveys: FileHandle
     private let surveyPrompts: FileHandle
     private let reminderLog: FileHandle
+    private let studyLog: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
     private var breakBuffer = ""
+    private let studyConfiguration: StudyCheckInConfiguration?
     private let surveyOptions: SurveyOptions
     private var tags: [String]
     private var tagColors: [String: String]
     private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, studyConfiguration: StudyCheckInConfiguration? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
         contract = continuingContract ?? RecordingContract(mode: mode, startedAt: startedAt)
+        self.studyConfiguration = studyConfiguration
         self.surveyOptions = surveyOptions
         self.tags = try SessionTags.validated(tags)
         self.tagColors = try SessionTags.colors(tagColors, for: self.tags)
@@ -131,6 +134,8 @@ final class RecordingWriter {
         let promptURL = folder.appendingPathComponent("survey_prompts.csv")
         let reminderURL = folder.appendingPathComponent("reminders.jsonl")
         try Data().write(to: reminderURL)
+        let studyURL = folder.appendingPathComponent("study_check_ins.jsonl")
+        try Data().write(to: studyURL)
         try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
         try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
         try Data(BreakLogEntry.header.utf8).write(to: breakURL)
@@ -142,6 +147,7 @@ final class RecordingWriter {
         surveys = try FileHandle(forWritingTo: surveyURL)
         surveyPrompts = try FileHandle(forWritingTo: promptURL)
         reminderLog = try FileHandle(forWritingTo: reminderURL)
+        studyLog = try FileHandle(forWritingTo: studyURL)
         try events.seekToEnd()
         try mouse.seekToEnd()
         try breaks.seekToEnd()
@@ -196,6 +202,11 @@ final class RecordingWriter {
         guard surveyOptions.duringWork else { return }
         try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
         try surveyPrompts.synchronize()
+    }
+    func logStudyPrompt(_ entry: StudyPromptLogEntry) throws {
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970
+        var data = try encoder.encode(entry); data.append(10)
+        try studyLog.write(contentsOf: data); try studyLog.synchronize()
     }
     func logReminder(_ entry: ReminderLogEntry) throws {
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970
@@ -275,6 +286,10 @@ final class RecordingWriter {
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
         ]
+        if let studyConfiguration {
+            fields["study_check_in_schedule"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(studyConfiguration))
+            fields["study_check_in_logging"] = "study_check_ins.jsonl joins immutable prompt IDs to context and preceding recall bounds. Scheduled/requested/opened/answered/skipped/cancelled are distinct. Never use check-in interaction or future data as preceding predictors."
+        }
         fields["sharing_policy"] = "Optional account-based research sharing requires researcher approval and server-recorded, versioned consent captured at session start. Opt-out cancels queued deliveries. Local recording does not require an account."
         if let duration {
             fields["duration_seconds"] = duration - contract.elapsedOrigin
@@ -284,5 +299,5 @@ final class RecordingWriter {
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
     }
     // Close all recording file handles when this writer is released.
-    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close(); try? surveyPrompts.close(); try? reminderLog.close() }
+    deinit { try? events.close(); try? mouse.close(); try? breaks.close(); try? surveys.close(); try? surveyPrompts.close(); try? reminderLog.close(); try? studyLog.close() }
 }
