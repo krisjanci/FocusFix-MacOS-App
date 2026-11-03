@@ -161,3 +161,14 @@ revision checks, retry IDs and atomic original-label provenance; raw files stay
 unchanged. Generated tests cover mixed labels, repeated Start, bounded/retried/
 stale edits, preserved original labels and byte-identical events. Live capture
 interaction still needs device qualification. Next: Step 5 contextual reminders.
+
+## Automatic tracking Step 5 — November 2, 2026
+
+I added forward-only Not working notification actions, stable policy/recording/
+work-period targeting, duplicate/stale checks and append-only request/action logs.
+The fixed baseline remains active, defaulting to declared work; screen-use reminders
+outside work are separately opt-in. Dismissal/no response does not label context or
+prove fatigue/rest. Denied notifications still leave useful in-app controls.
+Pure reminder tests cover current/stale/duplicate/no response, context changes,
+pause/revoke and midnight cooldown. Debug compiled; actual banner delivery/actions
+remain manual device checks. Next: Step 6 main/menu/history and isolated tour.
