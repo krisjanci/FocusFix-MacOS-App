@@ -638,3 +638,26 @@ I added generated gating/rate/quiet/recall/revoke tests and adapted the eight-op
 preference tests to explicit synthetic scope. Debug compiled. The full Swift runner
 passed for this iteration; actual study configuration, approval and live-service
 qualification remain absent, not established by these tests.
+
+## November 2, 2026 — automatic recording, Step 8
+
+I changed work goals to use durably observed slices intersecting declared work,
+excluding unknown/non-work, unavailable coverage, check-ins and explicit breaks.
+Quiet observed reading can count; missing bins cannot. I preserve legacy earned
+credit and replace only each new segment's own contribution when labels change.
+Revision-aware recovery makes repeated correction/relaunch reconciliation idempotent.
+The scoring timezone is captured, and midnight allocation uses monotonic duration.
+
+I inspected the existing social RPC: it only adds positive events and ignores a
+reused ID. It cannot safely reconcile decreases. I prepared a local version-2
+replacement outbox scoped to its owner/service and kept those summaries out of the
+old RPC. Existing private groups, work/healthy thresholds, explicit-break scoring
+and freeze rules are unchanged. New local Work totals can differ from group scores
+until a correction-capable server change is implemented and separately qualified.
+No real group or participant service was used for tests or deployment.
+
+Generated tests cover midnight, repeat/reduced corrections, protected legacy credit,
+explicit breaks, offline replacement persistence and wrong-account/service rejection.
+The full Swift runner, local unsigned Debug build and isolated PostgreSQL suite
+passed. I restored its pinned PGlite dependency into /tmp with install scripts off.
+That database models server rules; it does not establish live-service compatibility.
