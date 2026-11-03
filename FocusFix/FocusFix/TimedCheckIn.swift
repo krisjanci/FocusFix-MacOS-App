@@ -24,8 +24,8 @@ struct TimedCheckInPolicy {
     }
 
     // Replace the previous opportunity with one due 10 minutes from this start or break return.
-    mutating func schedule(from time: Double, afterBreak: String = "") -> TimedCheckIn {
-        let item = TimedCheckIn(id: UUID().uuidString, due: time + 600, referenceBreakID: afterBreak)
+    mutating func schedule(from time: Double, afterBreak: String = "", delay: Double = 600) -> TimedCheckIn {
+        let item = TimedCheckIn(id: UUID().uuidString, due: time + delay, referenceBreakID: afterBreak)
         current = item
         return item
     }
