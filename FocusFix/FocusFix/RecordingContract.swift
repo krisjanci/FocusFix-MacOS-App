@@ -46,6 +46,7 @@ nonisolated struct RecordingContract: Codable, Hashable {
     let format: String
     let recordingID: UUID
     let segmentID: UUID
+    let scoringTimeZone: String
     let mode: RecordingMode
     let elapsedOrigin: Double
     var observedThrough: Double
@@ -55,8 +56,9 @@ nonisolated struct RecordingContract: Codable, Hashable {
 
     init(recordingID: UUID = UUID(), segmentID: UUID = UUID(), mode: RecordingMode,
          startedAt: Date, initialContext: ActivityContext? = nil, logicalID: UUID = UUID(),
-         elapsedOrigin: Double = 0, continuing: ContextInterval? = nil) {
+         elapsedOrigin: Double = 0, continuing: ContextInterval? = nil, scoringTimeZone: String = TimeZone.current.identifier) {
         format = Self.format
+        self.scoringTimeZone = scoringTimeZone
         self.recordingID = recordingID; self.segmentID = segmentID; self.mode = mode
         self.elapsedOrigin = elapsedOrigin
         observedThrough = elapsedOrigin; finalized = false; revisions = []
@@ -72,7 +74,7 @@ nonisolated struct RecordingContract: Codable, Hashable {
     enum Invalid: Error { case contract, bounds, overlap, revision, finalized }
 
     func validate() throws {
-        guard format == Self.format, observedThrough.isFinite, elapsedOrigin.isFinite, elapsedOrigin >= 0, observedThrough >= elapsedOrigin else { throw Invalid.contract }
+        guard TimeZone(identifier: scoringTimeZone) != nil, format == Self.format, observedThrough.isFinite, elapsedOrigin.isFinite, elapsedOrigin >= 0, observedThrough >= elapsedOrigin else { throw Invalid.contract }
         var previousEnd = elapsedOrigin
         var ids = Set<UUID>()
         for (index, item) in intervals.enumerated() {
