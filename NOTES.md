@@ -618,3 +618,23 @@ full runner found old tour-copy assertions; I updated those assertions to the ne
 Start/End work wording and reran it. Local Debug compiled. Actual capture and
 signed-device qualification remain manual. Future commits now use short descriptive
 messages without step numbers, as requested; earlier commits are unchanged.
+
+## November 2, 2026 — automatic recording, Step 7
+
+I made ordinary use survey-free. I retained old options/answers, but old switches,
+accounts and research sharing cannot activate the new Optional study check-ins
+scope. It starts off and needs its own versioned action plus a complete reviewed
+configuration. No reviewed configuration is bundled; synthetic schedules are only
+injected by isolated generated tests. I did not invent an approved prompt schedule.
+
+The configuration fixes its version, recall window, spacing, maximum prompt rate
+and quiet hours. Prompt context is captured at request, including non-work/unknown,
+and the recall window ends before check-in interaction. Requested/opened/answered/
+skipped/cancelled remain distinct and missing answers remain blank. Study withdrawal
+cancels pending prompts. Original survey exports keep their meanings; the old
+work-only backend cannot ingest these cross-context checks as-is.
+
+I added generated gating/rate/quiet/recall/revoke tests and adapted the eight-option
+preference tests to explicit synthetic scope. Debug compiled. The full Swift runner
+passed for this iteration; actual study configuration, approval and live-service
+qualification remain absent, not established by these tests.
