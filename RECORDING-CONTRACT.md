@@ -40,3 +40,28 @@ review the allowlist for `context_intervals.json`, all required capabilities,
 provenance/revisions and any future coverage/check-in files. Old consent must not
 cover new automatic/non-work data. Increasing ZIP limits cannot bypass daily study
 caps. These changes do not enable research or establish study approval.
+
+## Step 3: file segments and durable coverage
+
+Rotation keeps one logical recording clock. A segment's `elapsed_origin_seconds`
+(and context `elapsedOrigin`) is its start on that clock. CSV elapsed values and
+label bounds stay on the logical clock; segment duration is observedThrough minus
+origin. Recording ID and an active label's logical ID survive rotation; segment
+IDs change. Break-policy timing and cooldown do not reset. UTC segment start is
+sampled separately; timezone changes may trigger a new segment without changing
+elapsed bounds. This avoids negative/overlapping elapsed intervals after clock edits.
+
+Each sampling tick synchronizes event/mouse bytes before atomically checkpointing
+`observedThrough`. After interruption, recovery finalizes only that checkpoint,
+keeps raw bytes intact and marks any uncheckpointed tail ineligible. There is no
+attempt to infer activity between the checkpoint and restart. A run-loop sampling
+gap over five seconds closes capture at its last observation rather than generating
+stationary bins across the gap. Automatic recordings, including short ones, are
+retained. Unknown computer use is not credited to work goals.
+
+One controller evaluates recording consent, automatic scope, durable user pause,
+permission availability, sleep/display/login blockers, idle, failure and quit.
+Idle cutoff defaults to 300 continuous seconds; idle resume reads the public OS
+idle counter and does not install a second logger. Lifecycle resume creates a new
+unknown recording. Failures require deliberate Resume/Start to retry. Actual
+sleep/wake/lock, permission delivery and long-run resource use remain manual checks.
