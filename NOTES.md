@@ -596,3 +596,25 @@ Synthetic gate tests passed for current/stale/duplicate/no-response requests,
 changed context, pause/revoke and midnight cooldown. Debug compiled. Full Swift
 regressions passed for the iteration. Notification denial/delivery and actual
 macOS action routing still require device qualification; no permissions changed.
+
+## November 2, 2026 — automatic recording, Step 6
+
+I made the main/menu status use the same value-driven presentation. Start work is
+optional and distinct from Pause and End work. The timer is recorded elapsed time;
+declared work is shown separately. History now treats files as recording segments,
+identifies logical recordings and calculates coverage without turning missing bins
+into non-work. Breaks/check-ins remain separate from activity context.
+
+The Quick tour has in-memory automatic/Unknown, work, notification-label and pause
+practice controls. They have no tracker, consent, OS or cloud dependencies. I kept
+the existing People/profile/appearance flows and keyboard history selection. Icon
+controls have explicit accessible names; Reduce Motion handling stays in the tour.
+
+I rendered and inspected the actual shared status component in light/dark at a
+narrow width, including long text and idle/pause/permission/break states. This is
+component evidence, not a claim that I exercised the whole app with VoiceOver or
+completed keyboard navigation. Generated coverage/status tests passed. The first
+full runner found old tour-copy assertions; I updated those assertions to the new
+Start/End work wording and reran it. Local Debug compiled. Actual capture and
+signed-device qualification remain manual. Future commits now use short descriptive
+messages without step numbers, as requested; earlier commits are unchanged.
