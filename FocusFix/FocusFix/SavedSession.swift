@@ -24,9 +24,17 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         self.folder = folder
         let values = try folder.resourceValues(forKeys: [.creationDateKey])
         let metadataURL = folder.appendingPathComponent("session.json")
-        let data = try? Data(contentsOf: metadataURL)
-        let metadata = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        let metadata: [String: Any]
+        if FileManager.default.fileExists(atPath: metadataURL.path) {
+            let properties = try metadataURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard properties.isRegularFile == true, properties.isSymbolicLink != true,
+                  (properties.fileSize ?? Int.max) <= 16 * 1024 * 1024,
+                  let decoded = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any] else { throw RecordingContract.Invalid.contract }
+            metadata = decoded
+        } else { metadata = [:] }
         schemaVersion = metadata["schema_version"] as? Int ?? 0
+        if schemaVersion < RecordingContract.schemaVersion,
+           FileManager.default.fileExists(atPath: folder.appendingPathComponent("context_intervals.json").path) { throw RecordingContract.Invalid.contract }
         if schemaVersion >= RecordingContract.schemaVersion {
             guard schemaVersion == RecordingContract.schemaVersion,
                   metadata["recording_format"] as? String == RecordingContract.format,
@@ -173,15 +181,22 @@ nonisolated enum SessionFiles {
 
     // Read valid session folders and sort them newest first, without following symlinks.
     static func list(in root: URL) throws -> [SavedSession] {
-        guard FileManager.default.fileExists(atPath: root.path) else { return [] }
-        return try FileManager.default.contentsOfDirectory(at: root,
+        try inspect(in: root).sessions
+    }
+    static func inspect(in root: URL) throws -> (sessions: [SavedSession], unreadable: Int) {
+        guard FileManager.default.fileExists(atPath: root.path) else { return ([], 0) }
+        let folders = try FileManager.default.contentsOfDirectory(at: root,
             includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
             .filter { url in
                 let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
                 return values.isDirectory == true && values.isSymbolicLink != true
             }
-            .map { try SavedSession(folder: $0) }
-            .sorted { $0.startedAt > $1.startedAt }
+        var sessions: [SavedSession] = [], unreadable = 0
+        for folder in folders {
+            do { sessions.append(try SavedSession(folder: folder)) }
+            catch { unreadable += 1 }
+        }
+        return (sessions.sorted { $0.startedAt > $1.startedAt }, unreadable)
     }
 
     // Only operate on a direct session directory, never the storage root or a symlink.
@@ -217,7 +232,9 @@ nonisolated enum SessionFiles {
     // Remove an incomplete batch if any copy fails, leaving originals untouched.
     static func exportAll(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
         let target = try exportDestination(destination, root: root)
-        let sessions = try list(in: root).filter { !sameFolder($0.folder, active) }
+        let listing = try inspect(in: root)
+        guard listing.unreadable == 0 else { throw RecordingContract.Invalid.contract }
+        let sessions = listing.sessions.filter { !sameFolder($0.folder, active) }
         guard !sessions.isEmpty else {
             throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
                 "There are no saved sessions to export. Stop and save the current recording first."])
