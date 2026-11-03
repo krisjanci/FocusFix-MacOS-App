@@ -1,0 +1,70 @@
+Testing AutomaticRecordingPreferencesTests
+PASS: explicit automatic scope, old-install/manual default, revoke, persistent pause, callback generation and fake login registration/failure
+Testing RecordingLifecycleTests
+PASS: deterministic lifecycle, idle/resume, permission/pause/lock/quit/failure, midnight/timezone boundaries, durable-only recovery, short-auto retention and rotation IDs
+Testing ContextEditingTests
+PASS: forward-only labels, repeated Start, End/unknown, mixed context, bounded revisions, stale/retried edits and unchanged raw bytes
+Testing ReminderEligibilityTests
+PASS: work/screen-use eligibility, current/stale/duplicate/no-response, changed context/account, pause/revoke and midnight cooldown
+Testing RecordingCoverageTests
+PASS: mixed-context observed coverage, stationary/absent distinction, breaks/check-ins/gaps, legacy unknown, overlap rejection, multiline CSV and shared UI status
+Testing StudyCheckInTests
+PASS: ordinary/upgrade survey-free gating, explicit study scope, missing reviewed config, synthetic cross-context recall snapshots, missing/skip semantics, revoke and rate/quiet limits
+Testing DeclaredWorkProgressTests
+PASS: observed-work allocation, midnight, correction decreases/idempotence, protected legacy points, explicit-break rules, offline pending replacements and account isolation
+Testing ResearchArchiveContractTests
+PASS: versioned synthetic archive, old scope/new schema rejection, consent/account/withdrawal boundaries, no backfill, daily cap, ZIP allowlist, retries, path safety and disabled real eligibility
+Testing ExperimentalActivityPolicyTests
+PASS: Python/Swift float32 feature parity, full coverage, unsupported/missing/stale models, context/pause/cooldown and safe baseline fallback
+Testing AutomaticTrackingIntegrationTests
+PASS: generated consent/permission lifecycle, mixed context, break/coverage scoring, rotation IDs/cooldown, edits, byte-preserving export, pause/resume, research rejection and quarantined malformed history
+Testing RecordingContractTests
+PASS: context round-trip, separate phase/context, half-open bounds, malformed/overlapping rejection and monotonic elapsed validation
+Testing SocialProgressTests
+Automatic freezes, month limits, weekday boundaries, migration, idempotent summaries and in-flight acknowledgement passed
+Testing SocialControllerTests
+Social opt-in, durable offline outbox, account isolation, stale responses and retry acknowledgement passed
+Testing GroupPresentationTests
+Shared group selection, access states, tied and zero-score podium rules, and screen-clamped expansion passed
+Testing QuickTourTests
+Practice tour actions, stale callbacks, replay, isolation, short copy and measured placement passed
+Testing SessionWorkPlanTests
+Per-session planning, survey choices, reset, shared work credit and one-time completion passed
+Testing SessionRetentionTests
+Session retention tests passed
+Testing SessionTagsTests
+Session tags: defaults, validation, remembered custom/renamed/deleted labels, failure preservation, legacy edits, unchanged data, and single/batch exports passed
+Testing LaunchCoordinatorTests
+Offline preview navigation preserved real account, preferences and credentials
+First launch, guest persistence, registration, remembered sign-in, menu gating and cancellation passed
+Testing AccountTests
+Account configuration, fake authentication, private profile sync, recovery and sign-out passed
+Testing ResearchDeliveryTests
+Per-session delivery, approval checks, quota failures, durable retry keys, export and in-flight opt-out passed
+Testing ResearchSharingTests
+Research consent snapshots, cancellation, retry batches and ZIP allowlisting passed
+Testing UserProfileTests
+sandbox-exec: sandbox_apply: Operation not permitted
+sandbox-exec: sandbox_apply: Operation not permitted
+User profile validation, photo import and persistence passed
+Testing DailyProgressTests
+Daily progress tests passed
+Testing RecordingDataTests
+PASS: recording schema and timing, session reload, single and batch exports, duplicate protection, legacy and unfinished sessions, active-session and path guards.
+Testing BreakPolicyTests
+PASS: distinct idle gaps, 25/10 minute delays, no duplicate prompts, early/late return, activity corrections, truncated breaks, paused intervals, break CSV and escaping.
+Testing SurveyDataTests
+PASS: fatigue/productivity ranges, start vs break items, blank skipped/cancelled answers, immediate CSV persistence, timestamps, versioned metadata and check-in activity phase.
+Testing TimedCheckInTests
+PASS: ten-minute boundary, one prompt per work period, deferral, stale/duplicate actions, stop/break cancellation, actual return timing and linked prompt/answer CSVs.
+Testing NotificationAccessTests
+PASS: notification onboarding, explicit permission requests, denial, banners off, settings refresh, duplicate clicks, failure and retry.
+Testing RecordingNoticeTests
+Recording notice: defaults, explicit acknowledgement and version changes passed.
+Testing InputMonitorTests
+2026-11-02 21:35:11.425 InputMonitorTests[48011:8107891] Connection Invalid error for service com.apple.hiservices-xpcservice.
+2026-11-02 21:35:11.425 InputMonitorTests[48011:8107887] Error received in message reply handler: Connection invalid
+Input monitoring: key/repeat/delete, pointer, scroll, target routing and stale-session isolation passed.
+Testing SurveyPreferencesTests
+Survey preferences: all eight combinations, persistence, snapshots, scheduling and saved data passed.
+All FocusFix tests passed.
