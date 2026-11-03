@@ -115,3 +115,27 @@ limit. Legacy recordings retain unknown context. Local deletion, exports and
 research deletion keep their separate meanings. The main status and menu use one
 pure presentation function. The tour's automatic/label/pause controls modify only
 its in-memory practice model, never the real tracker, consent, permissions or cloud.
+
+## Step 7: optional study measurement, ordinary use survey-free
+
+The original survey switches and answers remain intact, but an independent new
+study-check-in opt-in (version, accepted scope and action UTC) is required. Old
+preferences/research sharing do not activate it. With no complete reviewed bundled
+configuration, live snapshots disable every survey. The repository supplies no
+reviewed configuration. A synthetic configuration is accepted only through an
+explicit isolated test injection. Real approval/consent terms are not fabricated.
+
+A configuration names its review reference, consent scope, frozen schedule version,
+spacing, recall window, rolling-24-hour cap and quiet local hours. The stored rate
+budget survives relaunch; malformed state fails closed. Ordinary automatic/manual
+starts and break flows require no ratings. Explicit study revocation immediately
+cancels pending opportunities. Enabling/options changes wait for a new recording.
+
+`study_check_ins.jsonl` joins immutable check-in IDs to activity context at request,
+schedule/scope, recording ID and preceding recall bounds. End of recall is request
+time, before opening/answering; check-in interaction is never preceding predictor
+data. The existing survey/prompt CSVs retain their original meanings and blank
+skip/cancel values. Separate logs distinguish requested/opened/answered/skipped/
+cancelled/withdrawn; requests are not proof of delivery. The new file will require
+Step 9 allowlist/scope review. The old work-only supervised backend rejects schema
+11 and cannot consume cross-context study checks without a new adapter/evaluation.
