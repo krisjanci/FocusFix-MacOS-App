@@ -8,6 +8,7 @@ nonisolated struct ResearchConsent: Codable, Equatable {
     let origin: String
     let startedAt: Date
     let studyVersion: String
+    var archiveScope: ResearchArchiveScope? = nil
 }
 nonisolated struct ResearchSession: Codable, Equatable, Identifiable {
     let id: String
