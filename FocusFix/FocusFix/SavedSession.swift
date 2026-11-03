@@ -13,6 +13,9 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     let status: String
     let tags: [String]
     let tagColors: [String: String]
+    let schemaVersion: Int
+    let recordingContract: RecordingContract?
+    var legacyContext: ActivityContext { .unknown }
     // Use the unique session folder name as the library row's identity.
     var id: String { folder.lastPathComponent }
 
@@ -23,11 +26,27 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         let metadataURL = folder.appendingPathComponent("session.json")
         let data = try? Data(contentsOf: metadataURL)
         let metadata = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        schemaVersion = metadata["schema_version"] as? Int ?? 0
+        if schemaVersion >= RecordingContract.schemaVersion {
+            guard schemaVersion == RecordingContract.schemaVersion,
+                  metadata["recording_format"] as? String == RecordingContract.format,
+                  metadata["required_capabilities"] as? [String] == RecordingContract.requiredCapabilities else {
+                throw RecordingContract.Invalid.contract
+            }
+            let contract = try RecordingContract.load(from: folder)
+            guard metadata["recording_id"] as? String == contract.recordingID.uuidString,
+                  metadata["segment_id"] as? String == contract.segmentID.uuidString,
+                  metadata["recording_mode"] as? String == contract.mode.rawValue else { throw RecordingContract.Invalid.contract }
+            recordingContract = contract
+        } else { recordingContract = nil }
         let formatter = ISO8601DateFormatter()
         let start = (metadata["started_at_utc"] as? String).flatMap { formatter.date(from: $0) }
         startedAt = start ?? values.creationDate ?? .distantPast
         let seconds = metadata["duration_seconds"] as? Double
         let validDuration = seconds.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        if let contract = recordingContract, contract.finalized {
+            guard validDuration == contract.observedThrough else { throw RecordingContract.Invalid.bounds }
+        }
         duration = validDuration
         endedAt = (metadata["ended_at_utc"] as? String).flatMap { formatter.date(from: $0) }
             ?? start.flatMap { date in validDuration.map { date.addingTimeInterval($0) } }
