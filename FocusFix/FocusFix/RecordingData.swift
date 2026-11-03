@@ -111,8 +111,8 @@ final class RecordingWriter {
     private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         mode: RecordingMode = .manual, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
-        contract = RecordingContract(mode: mode, startedAt: startedAt)
+         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+        contract = continuingContract ?? RecordingContract(mode: mode, startedAt: startedAt)
         self.surveyOptions = surveyOptions
         self.tags = try SessionTags.validated(tags)
         self.tagColors = try SessionTags.colors(tagColors, for: self.tags)
@@ -193,6 +193,15 @@ final class RecordingWriter {
         try surveyPrompts.write(contentsOf: Data(entry.csv(sessionID: folder.lastPathComponent).utf8))
         try surveyPrompts.synchronize()
     }
+    // Checkpoint only after raw bytes are durable; crash recovery stops at this bound.
+    func checkpoint(at time: Double) throws {
+        try flush()
+        try events.synchronize(); try mouse.synchronize()
+        var snapshot = contract
+        try snapshot.observe(through: time)
+        try snapshot.save(to: folder)
+        contract = snapshot
+    }
     // Flush and synchronize session files, then save the final duration and stop reason.
     func finish(startedAt: Date, duration: Double, reason: String) throws {
         try flush()
@@ -226,6 +235,8 @@ final class RecordingWriter {
             "recording_id": contract.recordingID.uuidString, "segment_id": contract.segmentID.uuidString,
             "recording_mode": contract.mode.rawValue,
             "context_file": "context_intervals.json",
+            "elapsed_origin_seconds": contract.elapsedOrigin,
+            "elapsed_basis": "logical recording monotonic elapsed; segment duration subtracts elapsed_origin_seconds",
             "legacy_phase_semantics": "activity_phase=work means normal intervention phase, not a user-declared work label",
             "tags": tags, "tag_colors": tagColors,
             "survey_options": surveyOptions.metadata,
@@ -239,7 +250,7 @@ final class RecordingWriter {
             "productivity_scale": "0 = Not productive; 10 = Extremely productive",
             "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks and during_work timed check-ins. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Open check-in sheets and break setup are marked check_in; exclude them from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores must not be relabelled as productivity.",
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
-            "timestamp_basis": "continuous monotonic main-queue processing time including sleep, relative to session start; passive input callbacks are queued without disk I/O",
+            "timestamp_basis": "continuous monotonic main-queue processing time within logical recording; subtract elapsed_origin_seconds for segment-relative time; passive input callbacks are queued without disk I/O; capture gaps are not filled",
             "capture_method": "passive CGEventTap with Input Monitoring permission; NSWorkspace activation events; no event modification",
             "mouse_interval_seconds": 1,
             "break_policy": "25 work minutes, two distinct >=5-second idle stretches in the past 60 seconds; prompt only while idle; skip 25 minutes; snooze 10 minutes",
@@ -250,8 +261,8 @@ final class RecordingWriter {
         ]
         fields["sharing_policy"] = "Optional account-based research sharing requires researcher approval and server-recorded, versioned consent captured at session start. Opt-out cancels queued deliveries. Local recording does not require an account."
         if let duration {
-            fields["duration_seconds"] = duration
-            fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration))
+            fields["duration_seconds"] = duration - contract.elapsedOrigin
+            fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration - contract.elapsedOrigin))
         }
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: folder.appendingPathComponent("session.json"), options: .atomic)
