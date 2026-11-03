@@ -99,6 +99,14 @@ nonisolated enum ResearchArchive {
         guard values.isDirectory == true, values.isSymbolicLink != true else {
             throw AccountFailure(message: "A queued recording is missing or unsafe. It was not shared.")
         }
+        let metadataURL = folder.appendingPathComponent("session.json")
+        let metadataInfo = try metadataURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard metadataInfo.isRegularFile == true, metadataInfo.isSymbolicLink != true,
+              let metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any],
+              let schema = metadata["schema_version"] as? Int, (1...10).contains(schema),
+              metadata["required_capabilities"] == nil, metadata["recording_format"] == nil else {
+            throw AccountFailure(message: "This recording format is local only. Research archive and consent compatibility have not been qualified.")
+        }
         return try files.map { name in
             let url = folder.appendingPathComponent(name)
             let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
