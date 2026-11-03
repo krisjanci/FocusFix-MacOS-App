@@ -12,6 +12,13 @@ struct QuickTourTests {
         act(.start)
         precondition(tour.phase == .start && !tour.isPresented)
         tour.restart()
+        tour.practiceAutomatic()
+        precondition(tour.demoAutomatic && tour.demoContext == .unknown && !tour.demoPaused)
+        tour.practiceWork(); precondition(tour.demoContext == .work)
+        tour.practiceNotWorkingNotification(); precondition(tour.demoContext == .nonWork)
+        tour.practicePauseResume(); precondition(tour.demoPaused && tour.demoContext == .unknown)
+        tour.practiceWork(); precondition(tour.demoContext == .unknown)
+        tour.practicePauseResume(); precondition(!tour.demoPaused && tour.demoContext == .unknown)
         for action in [QuickTourAction.save, .done, .minutes(60), .next, .startBreak] { act(action) }
         precondition(tour.phase == .start)
         let originalVisit = tour.visit
@@ -134,9 +141,9 @@ struct QuickTourTests {
             measured: CGSize(width: 248, height: 76)) == nil)
         precondition(QuickTourLayout.caption(target: .zero, in: CGSize(width: 100, height: 100),
             measured: CGSize(width: 248, height: 112)) == nil)
-        precondition(QuickTourPhase.start.caption.contains("Start session"))
-        precondition(QuickTourPhase.confirmStart.caption.contains("Start session"))
-        precondition(QuickTourPhase.save.caption.contains("Stop & save"))
+        precondition(QuickTourPhase.start.caption.contains("Start work"))
+        precondition(QuickTourPhase.confirmStart.caption.contains("Start work"))
+        precondition(QuickTourPhase.save.caption.contains("End work"))
         print("Practice tour actions, stale callbacks, replay, isolation, short copy and measured placement passed")
     }
 }
