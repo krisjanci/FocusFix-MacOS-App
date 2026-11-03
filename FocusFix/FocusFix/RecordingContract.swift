@@ -90,6 +90,11 @@ nonisolated struct RecordingContract: Codable, Hashable {
         }
         guard revisions.enumerated().allSatisfy({ $0.element.sequence == $0.offset + 1 }),
               Set(revisions.map(\.id)).count == revisions.count else { throw Invalid.revision }
+        for revision in revisions {
+            guard revision.recordedAtUTC.timeIntervalSince1970.isFinite else { throw Invalid.revision }
+            var prior = self; prior.intervals = revision.previousIntervals; prior.revisions = []
+            try prior.validate()
+        }
     }
     mutating func observe(through time: Double) throws {
         guard !finalized, time.isFinite, time >= observedThrough else { throw Invalid.bounds }
@@ -104,19 +109,72 @@ nonisolated struct RecordingContract: Codable, Hashable {
         finalized = true
         try validate()
     }
+    var currentContext: ActivityContext { intervals.last?.context ?? .unknown }
+    var currentWorkPeriodID: UUID? { currentContext == .work ? intervals.last?.logicalID : nil }
+
+    // Forward-only actions never relabel earlier unknown use. Repeating a label is a no-op.
+    mutating func changeContext(_ context: ActivityContext, at time: Double, effectiveAt: Date,
+                                recordedAt: Date, source: ContextSource, actionID: UUID = UUID()) throws {
+        guard !finalized else { throw Invalid.finalized }
+        try observe(through: time)
+        guard currentContext != context else { return }
+        if let index = intervals.indices.last, intervals[index].end == nil {
+            if intervals[index].start == time { intervals.removeLast() }
+            else { intervals[index].end = time }
+        }
+        intervals.append(ContextInterval(id: actionID, logicalID: UUID(), start: time, end: nil,
+            context: context, source: source, effectiveAtUTC: effectiveAt, recordedAtUTC: recordedAt))
+        try validate()
+    }
+
+    // A history action is one atomic snapshot, with the prior labels retained as provenance.
+    mutating func correctContext(_ context: ActivityContext, start: Double, end: Double,
+                                 effectiveAt: Date, recordedAt: Date, actionID: UUID,
+                                 expectedRevision: Int) throws {
+        if revisions.contains(where: { $0.id == actionID }) { return }
+        guard finalized, expectedRevision == revisions.count else { throw Invalid.revision }
+        guard start.isFinite, end.isFinite, start >= elapsedOrigin, start < end,
+              end <= observedThrough else { throw Invalid.bounds }
+        let before = intervals
+        var replacement: [ContextInterval] = []
+        var covered = 0.0
+        for item in before {
+            guard let itemEnd = item.end else { throw Invalid.overlap }
+            let left = max(start, item.start), right = min(end, itemEnd)
+            if right <= left { replacement.append(item); continue }
+            covered += right - left
+            if item.start < left {
+                var fragment = item; fragment.end = left
+                replacement.append(fragment)
+            }
+            replacement.append(ContextInterval(id: UUID(), logicalID: actionID, start: left, end: right,
+                context: context, source: .historyEdit, effectiveAtUTC: effectiveAt, recordedAtUTC: recordedAt))
+            if right < itemEnd {
+                replacement.append(ContextInterval(id: UUID(), logicalID: item.logicalID, start: right, end: itemEnd,
+                    context: item.context, source: item.source, effectiveAtUTC: item.effectiveAtUTC, recordedAtUTC: item.recordedAtUTC))
+            }
+        }
+        guard abs(covered - (end - start)) < 0.000001 else { throw Invalid.bounds }
+        intervals = replacement
+        revisions.append(ContextRevision(id: actionID, sequence: revisions.count + 1,
+            recordedAtUTC: recordedAt, previousIntervals: before))
+        try validate()
+    }
     func save(to folder: URL) throws {
         try validate()
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .secondsSince1970
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(self).write(to: folder.appendingPathComponent("context_intervals.json"), options: .atomic)
+        let data = try encoder.encode(self)
+        guard data.count <= 16 * 1024 * 1024 else { throw Invalid.contract }
+        try data.write(to: folder.appendingPathComponent("context_intervals.json"), options: .atomic)
     }
     static func load(from folder: URL) throws -> Self {
         let url = folder.appendingPathComponent("context_intervals.json")
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true,
               (values.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw Invalid.contract }
-        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .secondsSince1970
         let result = try decoder.decode(Self.self, from: Data(contentsOf: url))
         try result.validate()
         return result
