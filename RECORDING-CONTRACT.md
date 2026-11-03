@@ -139,3 +139,19 @@ skip/cancel values. Separate logs distinguish requested/opened/answered/skipped/
 cancelled/withdrawn; requests are not proof of delivery. The new file will require
 Step 9 allowlist/scope review. The old work-only supervised backend rejects schema
 11 and cannot consume cross-context study checks without a new adapter/evaluation.
+
+## Step 8: declared-work progress
+
+Live work credit comes only from completed mouse-summary slices intersecting declared
+work in normal phase, after raw bytes are synchronized. Stationary observed bins
+are included; gaps, check-ins, awaiting return and explicit breaks are excluded.
+Segment day allocations use a captured scoring timezone and monotonic durations.
+The local progress ledger's additive version 2 stores replaceable segment allocations
+and revision counts alongside the protected legacy baseline. Reconciliation detects
+changed labels or recovered segments and replaces contributions idempotently.
+
+Social replacement summaries are captured only under the matching signed-in,
+opted-in account/origin and retained separately from legacy increment events. The
+old RPC cannot reconcile decreases: new work sync fails closed. Existing group
+scores/thresholds/freezes and explicit-break rules are unchanged. See
+`supabase/DECLARED-WORK-SYNC.md` for the required server capability before release.
