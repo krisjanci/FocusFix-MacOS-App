@@ -15,6 +15,7 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test AutomaticRecordingPreferencesTests "$source_dir/AutomaticRecordingPreferences.swift" "$source_dir/RecordingNotice.swift" "$source_dir/LoginLaunch.swift"
 run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
