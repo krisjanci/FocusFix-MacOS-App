@@ -701,3 +701,40 @@ insufficient evidence. My private research-plan draft proposes independent spars
 ratings before any frozen randomized reminder comparison and leaves reader/IRB
 choices explicit. Real cluster stability, fatigue improvement and intervention
 benefit remain distinct and unestablished; nothing was deployed or pushed.
+
+## November 2, 2026 — integrated audit and release readiness
+
+I reconciled the twelve-step source rather than treating earlier reports as proof.
+The audit caught the null-event idle query, pending-login approval cancellation,
+additive early-v11 snapshot dates/origin/zone compatibility, malformed new metadata
+falling back to legacy, readable export-name identity and restoring corrected held
+work only to its owning account. I fixed those and added regressions. Compatible
+history stays available while unreadable files remain untouched; Export All cannot
+silently claim a partial batch is complete.
+
+I rewrote the current README and reviewer/privacy/support drafts around what is
+actually implemented: automatic opt-in, optional declared work, Unknown, forward
+notification labels, pause/quit/login, ordinary use without surveys, observed
+coverage and separate research. I reviewed the privacy manifest against unchanged
+account/social off-device flows; no new off-device category is activated. The
+research/experimental gates stay off and new Work sync stays local pending server
+compatibility. The local website download is still disabled and nothing published.
+
+My integrated generated fixture covers lifecycle, context, explicit breaks, coverage
+scoring, rotation/cooldown IDs, corrections, exports and research rejection. The
+32 Swift executables passed. The pinned Python 3.13 environment passed 40 tests,
+including old supervised/Core ML and new clustering/independent validation. Seven
+mocked Node function tests and isolated PostgreSQL suites passed. Native Core ML
+compilation needed unsandboxed temporary-directory access; no service was contacted.
+Universal unsigned Debug/Release and release-content checks passed and are recorded
+in the readiness report and verification/automatic-tracking-verification.json. The App Store gate correctly rejects the missing public policy URL.
+
+I rendered and inspected actual shared status, legacy and empty-history components
+in narrow light/dark layouts with long text and paused/permission states. I did not
+claim this as full-window keyboard/VoiceOver or real capture qualification. I made
+an explicit unperformed signed fresh-Mac checklist for permissions, idle/sleep/lock,
+login, notifications, offline/crash/disk/resource, accessibility, OS/hardware and
+service checks. No useful real ML accuracy, study approval or intervention benefit
+is established. Next I qualify a stable signed build on a fresh Mac before release,
+while keeping research and unsupported scoring sync off. Commits remain local,
+one file per iteration, with the requested short messages and no later step numbers.
