@@ -82,6 +82,13 @@ final class ActivityTracker: ObservableObject {
     private var returnWindowStart: Double = 0
     private var suspendedBy: Set<String> = []
     private var researchConsent: ResearchConsent?
+    private var researchCaptureIdentity: ResearchCaptureIdentity? {
+        ResearchSharingController.shared.capturedConsent.map { consent in
+            ResearchCaptureIdentity(owner: consent.owner, origin: consent.origin, consentID: consent.id,
+                studyVersion: consent.studyVersion, consentStartedAtUTC: consent.startedAt, scope: consent.archiveScope)
+        }
+    }
+    private var capturedResearchIdentity: ResearchCaptureIdentity?
     private var writer: RecordingWriter?
     private var mouse = MouseAccumulator(initialPosition: .zero)
     private var keys = KeyTiming()
@@ -377,8 +384,9 @@ final class ActivityTracker: ObservableObject {
             sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
             studyPrompt = nil
             researchConsent = ResearchSharingController.shared.capturedConsent
+            capturedResearchIdentity = researchCaptureIdentity
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
-                mode: mode, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
+                mode: mode, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
             writer = newWriter
             sessionFolder = newWriter.folder
             sessionTags = tags
@@ -523,9 +531,12 @@ final class ActivityTracker: ObservableObject {
                 return
             }
             lastSamplingTick = elapsed
-            lastObservedTime = max(lastObservedTime, elapsed)
-            if activeAccountKey != captureAccountKey { try rotateRecording(at: elapsed, reason: "account_boundary") }
+            if activeAccountKey != captureAccountKey || researchCaptureIdentity != capturedResearchIdentity {
+                try rotateRecording(at: lastObservedTime, reason: "consent_or_account_boundary")
+                resetMouse(at: elapsed, phase: activityPhase)
+            }
             else if recordingMode == .automatic, RecordingDay.key(at: Date()) != recordingDay { try rotateRecording(at: elapsed) }
+            lastObservedTime = max(lastObservedTime, elapsed)
             updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
@@ -596,8 +607,10 @@ final class ActivityTracker: ObservableObject {
         let nextStart = Date()
         let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
             startedAt: nextStart, elapsedOrigin: time, continuing: context, scoringTimeZone: previous.contract.scoringTimeZone)
+        capturedResearchIdentity = researchCaptureIdentity
+        researchConsent = ResearchSharingController.shared.capturedConsent
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
-            startedAt: nextStart, mode: recordingMode, continuingContract: next, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
+            startedAt: nextStart, mode: recordingMode, continuingContract: next, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
         writer = replacement; sessionFolder = replacement.folder
         segmentWorkDays = [:]; pendingWorkSlices = []
@@ -620,8 +633,12 @@ final class ActivityTracker: ObservableObject {
         guard isRecording, suspendedBy.isEmpty else { return }
         let time = now
         guard time - lastSamplingTick <= 5 else { stop(reason: "capture_gap", observedEnd: lastObservedTime); return }
-        lastObservedTime = max(lastObservedTime, time)
         do {
+            if activeAccountKey != captureAccountKey || researchCaptureIdentity != capturedResearchIdentity {
+                try rotateRecording(at: min(time, lastObservedTime), reason: "consent_or_account_boundary")
+                resetMouse(at: time, phase: activityPhase) // The transition gap is unobserved.
+            }
+            lastObservedTime = max(lastObservedTime, time)
             if breakPolicy.phase != .work { try advanceBreakClock(at: time) }
             if breakPolicy.phase != .work {
                 if outsideApp && isReturnInput(event, at: time) {
