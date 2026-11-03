@@ -172,3 +172,21 @@ prove fatigue/rest. Denied notifications still leave useful in-app controls.
 Pure reminder tests cover current/stale/duplicate/no response, context changes,
 pause/revoke and midnight cooldown. Debug compiled; actual banner delivery/actions
 remain manual device checks. Next: Step 6 main/menu/history and isolated tour.
+
+## Automatic tracking Step 6 — November 2, 2026
+
+I aligned the main window/menu around recording status, optional Start/End work,
+Pause/Resume and context. Recorded elapsed time is labeled separately from declared
+work. History identifies recording/segment IDs and shows observed work/non-work/
+unknown/break/unavailable coverage, with check-in/return time separate. Short auto
+retention is already in the lifecycle. Legacy history/export/deletion remain.
+The isolated tour now practices automatic Unknown capture, optional work labels,
+notification Not working and pause/resume without live dependencies.
+
+Generated coverage/status/tour checks and unsigned Debug compilation were run.
+The actual shared status component was rendered and visually inspected in light/
+dark at narrow width, including paused/idle/permission and long text. Evidence:
+`verification/recording-status-previews.png`. These are component previews, not
+full-window or spoken VoiceOver qualification. Source inspection confirms keyboard
+history controls and explicit labels; full keyboard navigation remains manual.
+Next: Step 7 ordinary use without surveys and separately gated study checks.
