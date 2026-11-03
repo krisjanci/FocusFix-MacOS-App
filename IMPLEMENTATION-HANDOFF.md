@@ -151,3 +151,13 @@ Pure lifecycle/recovery/rotation tests passed and Debug compiled. Release and th
 full Swift runner passed for this iteration. Real sleep/lock, permission,
 long-running memory/disk behavior and signed-device operation remain manual.
 Next: Step 4 work/non-work/unknown actions and bounded history revisions.
+
+## Automatic tracking Step 4 — November 2, 2026
+
+I connected optional Start work to forward labels on the existing automatic writer,
+and End work to unknown (automatic) or stop/save (manual). Work/Not working/Unknown
+are in the menu. History has a minimal bounded context editor with optimistic
+revision checks, retry IDs and atomic original-label provenance; raw files stay
+unchanged. Generated tests cover mixed labels, repeated Start, bounded/retried/
+stale edits, preserved original labels and byte-identical events. Live capture
+interaction still needs device qualification. Next: Step 5 contextual reminders.
