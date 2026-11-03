@@ -34,6 +34,21 @@ import Foundation
         var open = automatic
         open.intervals[0].end = nil
         rejects { try open.validate() }
+        // Earlier local additive snapshots used ISO UTC strings and omitted the new origin/zone.
+        let url = root.appendingPathComponent("context_intervals.json")
+        var old = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        old.removeValue(forKey: "elapsedOrigin"); old.removeValue(forKey: "scoringTimeZone")
+        var labels = old["intervals"] as! [[String: Any]]
+        labels[0]["effectiveAtUTC"] = "1970-01-01T00:01:40Z"
+        labels[0]["recordedAtUTC"] = "1970-01-01T00:01:40Z"
+        old["intervals"] = labels
+        let oldBytes = try JSONSerialization.data(withJSONObject: old)
+        try oldBytes.write(to: url)
+        let compatible = try RecordingContract.load(from: root)
+        precondition(compatible.elapsedOrigin == 0 && compatible.scoringTimeZone == "UTC")
+        precondition(compatible.intervals[0].effectiveAtUTC == date)
+        let kept = try Data(contentsOf: url)
+        precondition(kept == oldBytes)
         var manual = RecordingContract(mode: .manual, startedAt: date)
         precondition(manual.intervals[0].context == .work && manual.intervals[0].source == .manualStart)
         try manual.finish(at: 0)
