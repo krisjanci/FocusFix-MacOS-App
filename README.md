@@ -1,3 +1,13 @@
+## Ordinary use without surveys — November 2, 2026
+
+Manual/automatic capture and breaks do not require surveys. Optional study check-ins
+are off by default, including upgrades with old survey preferences. They require
+separate explicit opt-in and a complete reviewed study configuration; none is bundled.
+Research sharing does not activate prompts. Old answers/exports are preserved, with
+missing ratings kept blank. Generated tests cover a synthetic cross-context schedule;
+this is not an approved study schedule. The original supervised backend cannot
+consume these new context/recall measurements without adaptation.
+
 ## Recording status and history — November 2, 2026
 
 The main window and menu share Working, Not working, automatic Unknown, Paused,
