@@ -1,3 +1,13 @@
+## Experimental policies remain off — November 2, 2026
+
+The shipped fixed timer/idle policy stays selected. A disabled synthetic preview
+provider checks the separate seven-rate feature contract and falls back for missing
+coverage, incompatible/stale models, unknown clusters, pause or ineligible context.
+It returns descriptive cluster IDs, never fatigue scores. Independent backend
+validation is separate from cluster stability and intervention benefit; neither
+fatigue improvement nor benefit has been established for real users. No model or
+randomization is activated.
+
 ## Prepared research format remains disabled — November 2, 2026
 
 New-schema recordings remain local. The prepared version-2 archive includes context,
