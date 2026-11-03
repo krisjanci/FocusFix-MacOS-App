@@ -203,3 +203,19 @@ The original supervised backend remains work-only and cannot consume schema 11.
 Debug compiled; generated preference/schedule/recall/withdrawal checks and the
 existing Swift runner are used. Real study configuration/approval remains absent.
 Next: Step 8 declared-work progress and fail-closed unsupported social corrections.
+
+## Automatic tracking Step 8 — November 2, 2026
+
+I replaced live wall-time credit with synchronized observation slices intersecting
+declared work. Version-2 local progress stores replaceable segment/day allocations,
+revision counts and account-scoped social ownership; legacy credit is preserved.
+Corrections and recovery reconcile idempotently. Explicit break rules, private
+groups, point thresholds and freezes are unchanged. The increment-only server RPC
+cannot reconcile decreases, so new work stays in a separate local replacement
+outbox and is never sent as legacy events. Existing healthy-break sync remains.
+`supabase/DECLARED-WORK-SYNC.md` describes the server release dependency.
+
+Generated progress/outbox/account tests, full Swift regressions, unsigned Debug and
+the isolated PostgreSQL suite passed. PGlite 0.5.12 was restored into /tmp with
+package scripts disabled; the suite uses an in-memory database, not real groups.
+Next: Step 9 research archive/scope preparation, with new-format delivery disabled.
