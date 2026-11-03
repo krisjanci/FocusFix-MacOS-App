@@ -661,3 +661,26 @@ explicit breaks, offline replacement persistence and wrong-account/service rejec
 The full Swift runner, local unsigned Debug build and isolated PostgreSQL suite
 passed. I restored its pinned PGlite dependency into /tmp with install scripts off.
 That database models server rules; it does not establish live-service compatibility.
+
+## November 2, 2026 — automatic recording, Step 9
+
+I prepared a versioned archive contract without enabling delivery. The old consent
+cannot authorize automatic/non-work archives. New scope must include those data,
+context/revisions, optional checks, retention/deletion and training terms; no real
+reviewed scope or approval reference was invented. The live queue and legacy ZIP
+path still reject schema 11, and production qualification is hard off.
+
+Segments snapshot account/consent identity; changed scope starts another segment
+before new captured input is written. Current identity, start-after-consent, schema/
+capabilities and archive paths must match. The prepared allowlist includes context,
+reminder and study-check logs, excludes credentials/profile/private eligibility data,
+and generates an archive-version manifest. Its ZIP builder only exists under the
+synthetic test flag and also requires marked generated fixtures.
+
+I kept the 180-minute daily cap and 100 MiB raw/25 MiB ZIP limits. Whole longer
+segments stay local rather than bypassing limits. Research operations now explains
+mapping archive/consent/recording IDs to downloaded data, features, datasets, runs
+and model versions for deletion. Existing revoke-before-delete, withdrawal latches,
+account isolation and receipts remain unchanged. Generated archive/boundary/path/
+retry tests run alongside the old regressions; local Debug compiled. Real service
+qualification/configuration remains required. Nothing was deployed or activated.
