@@ -53,20 +53,20 @@ struct SessionCheckInView: View {
         self.tracker = tracker
         self.tagLibrary = tagLibrary ?? .shared
         _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession,
-            tags: tracker.sessionFolder == nil ? tracker.sessionTags : [],
-            tagColors: tracker.sessionFolder == nil ? tracker.sessionTagColors : [:]))
+            tags: tracker.isRecording || tracker.sessionFolder == nil ? tracker.sessionTags : [],
+            tagColors: tracker.isRecording || tracker.sessionFolder == nil ? tracker.sessionTagColors : [:]))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Before you start").font(.title2.weight(.semibold))
+            Text("Plan session").font(.title2.weight(.semibold))
             if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
             HStack {
-                if draft.planning { Text("Plan session").font(.headline) }
-                else { Button("Plan session") { draft.addPlan() } }
+                if draft.planning { Text("Work target").font(.headline) }
+                else { Button("Add work target") { draft.addPlan() } }
                 Button { editingTags = true } label: { Label("Tags…", systemImage: "tag") }
                 Spacer()
-                if draft.planning { Button("Remove plan") { draft.removePlan() } }
+                if draft.planning { Button("Remove target") { draft.removePlan() } }
             }
             if !draft.tags.isEmpty {
                 SessionTagChips(tags: draft.tags, colors: tagLibrary.resolvedColors(for: draft.tags, saved: draft.tagColors))
@@ -103,7 +103,7 @@ struct SessionCheckInView: View {
                     Button("Skip & start") { start(skippingFatigue: true) }
                         .disabled(!draft.validPlan)
                 }
-                Button("Start work") { start() }
+                Button("Start") { start() }
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
