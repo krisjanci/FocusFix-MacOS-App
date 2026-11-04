@@ -206,26 +206,39 @@ final class ActivityTracker: ObservableObject {
         needsPermission = false
         message = "Input Monitoring is enabled. Press Start when you are ready."
     }
-    // Open planning, with an optional fatigue check-in, before every session.
+    // Start immediately; planning and its optional check-in are a separate action.
     func requestStart() {
-        if isRecording { setContext(.work); return }
-        if AutomaticRecordingPreferences.shared.enabled, lifecycle.blockers.isEmpty {
-            AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
-            lifecycle.failed = false
-            sessionSurveyOptions = SurveyPreferences.shared.snapshot
-            start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(), tags: [], tagColors: [:], mode: .automatic)
-            if isRecording { setContext(.work) }
+        guard !sessionCheckInPresented, !recordingNoticePresented else { return }
+        if isRecording {
+            let beginsWork = userContext != .work
+            setContext(.work)
+            if isRecording, beginsWork { sessionWorkPlan = SessionWorkPlan() }
             return
         }
-        guard !isRecording, !sessionCheckInPresented, !recordingNoticePresented else { return }
         guard !RecordingNotice().needsAcknowledgement else {
             recordingNoticePresented = true
             return
         }
-        // Planning needs no monitoring permission. start() checks again before creating files or recording.
-        // Freeze the choices before any survey opens; changes during a session wait until the next one.
         sessionSurveyOptions = SurveyPreferences.shared.snapshot
-        sessionCheckIn = sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: 0) : nil
+        let automatic = AutomaticRecordingPreferences.shared.enabled
+        AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
+        lifecycle.failed = false
+        start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(),
+              tags: sessionFolder == nil ? sessionTags : [],
+              tagColors: sessionFolder == nil ? sessionTagColors : [:],
+              mode: automatic ? .automatic : .manual)
+        if automatic, isRecording { setContext(.work) }
+    }
+    func requestPlannedStart() {
+        guard !(isRecording && userContext == .work), !sessionCheckInPresented,
+              !recordingNoticePresented else { return }
+        guard !RecordingNotice().needsAcknowledgement else {
+            recordingNoticePresented = true
+            return
+        }
+        // Use the recording's frozen survey choices when automatic capture is already running.
+        if !isRecording { sessionSurveyOptions = SurveyPreferences.shared.snapshot }
+        sessionCheckIn = sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: elapsed) : nil
         sessionCheckInPresented = true
     }
     func endWork() {
@@ -270,16 +283,6 @@ final class ActivityTracker: ObservableObject {
     }
     func automaticPreferencesChanged() { reconcileLifecycle() }
     func prepareToQuit() { quitting = true; reconcileLifecycle() }
-    func pauseRecording() {
-        AutomaticRecordingPreferences.shared.setUserPaused(true)
-        reconcileLifecycle()
-    }
-    func resumeRecording() {
-        lifecycle.failed = false
-        AutomaticRecordingPreferences.shared.setUserPaused(false)
-        if !AutomaticRecordingPreferences.shared.enabled { requestStart() }
-        else { reconcileLifecycle() }
-    }
     private func installLifecycleObservers() {
         let center = NSWorkspace.shared.notificationCenter
         let pairs: [(Notification.Name, Notification.Name, String)] = [
@@ -346,14 +349,34 @@ final class ActivityTracker: ObservableObject {
     }
     // Accept a selected fatigue score, or an explicit skip, then start the session.
     func completeSessionCheckIn(_ selection: SessionStartSelection) {
-        guard sessionCheckInPresented, !isRecording,
+        guard sessionCheckInPresented,
               selection.fatigue.map({ (0...10).contains($0) }) ?? true else { return }
         let prompt = sessionCheckIn
         guard !sessionSurveyOptions.beforeSession || prompt != nil else { return }
+        if isRecording {
+            // Automatic capture continues while the user plans; label work only on confirmation.
+            do {
+                try updateCurrentTags(selection.tags, colors: selection.tagColors)
+                if let prompt {
+                    try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
+                        status: selection.fatigue == nil ? .skipped : .answered, breakID: "",
+                        shownAt: prompt.shownAt, answeredAt: Date(), shownElapsed: prompt.elapsed,
+                        answeredElapsed: now, fatigue: selection.fatigue, productivity: nil))
+                }
+            } catch { fail(error); return }
+            setContext(.work)
+            if isRecording { sessionWorkPlan = selection.plan }
+        } else {
+            let automatic = AutomaticRecordingPreferences.shared.enabled
+            AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
+            lifecycle.failed = false
+            start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
+                  prompt: prompt, plan: selection.plan, tags: selection.tags, tagColors: selection.tagColors,
+                  mode: automatic ? .automatic : .manual)
+            if automatic, isRecording { setContext(.work) }
+        }
         sessionCheckIn = nil
         sessionCheckInPresented = false
-        start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
-              prompt: prompt, plan: selection.plan, tags: selection.tags, tagColors: selection.tagColors)
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
     private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String], mode: RecordingMode = .manual) {
