@@ -231,14 +231,14 @@ struct ContentView: View {
                 Button {
                     if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else { tracker.requestStart() }
                 } label: {
-                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work",
+                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start",
                           systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
                         .frame(minWidth: 124)
-                }.buttonStyle(.bordered).tint(teal).controlSize(.large)
-                if tracker.isRecording {
-                    Button("Pause") { tracker.pauseRecording() }.accessibilityLabel("Pause recording")
-                } else if tracker.captureState == .userPaused || tracker.captureState == .idlePaused {
-                    Button("Resume") { tracker.resumeRecording() }.accessibilityLabel("Resume recording")
+                }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                if !(tracker.isRecording && tracker.userContext == .work) {
+                    Button("Plan session…") { tracker.requestPlannedStart() }
+                        .controlSize(.large)
+                        .help("Choose a work target and tags before starting")
                 }
                 Button { openWindow(id: "sessions") } label: {
                     Image(systemName: "folder").accessibilityLabel("Sessions")
