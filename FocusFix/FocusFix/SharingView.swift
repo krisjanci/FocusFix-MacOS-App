@@ -59,7 +59,7 @@ struct PrivacyResearchSettings: View {
                 Toggle("Enable automatic recording", isOn: Binding(get: { automatic.enabled }, set: { value in
                     if value { automaticConsentPresented = true } else { automatic.disable() }
                 })).disabled(!recordingEnabled)
-                Text("Includes unknown and non-work computer use while FocusFix is running. Work labels are optional. Pause recording or Quit to stop capture.")
+                Text("Includes unknown and non-work computer use while FocusFix is running. Work labels are optional. Disable recording in Settings or choose Quit to stop capture.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Screen-use break reminders outside declared work", isOn: $screenUseReminders)
                     .onChange(of: screenUseReminders) { _, _ in tracker.reminderPreferenceChanged() }
