@@ -84,7 +84,7 @@ private struct RecordingMenu: View {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work") {
+        Button(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start") {
             if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else {
                 launch.requestStart(start: { tracker.requestStart() }, showWindow: {
                     openWindow(id: "collector")
@@ -127,10 +127,12 @@ private struct RecordingMenu: View {
                 }
             }
         }
-        if tracker.isRecording {
-            Button("Pause recording") { tracker.pauseRecording() }
-        } else if tracker.captureState == .userPaused || AutomaticRecordingPreferences.shared.enabled {
-            Button("Resume recording") { tracker.resumeRecording() }
+        if !(tracker.isRecording && tracker.userContext == .work) {
+            Button("Plan session…") {
+                openWindow(id: "collector")
+                NSApp.activate(ignoringOtherApps: true)
+                tracker.requestPlannedStart()
+            }
         }
         Button("Sessions") {
             openWindow(id: "sessions")
