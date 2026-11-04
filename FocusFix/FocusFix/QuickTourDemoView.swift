@@ -65,17 +65,16 @@ struct QuickTourDemoView: View {
             if tour.phase == .start {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Practice automatic recording").font(.headline)
-                    RecordingStatusPanel(state: tour.demoPaused ? .userPaused : tour.demoAutomatic ? .recording : .disabled,
+                    RecordingStatusPanel(state: tour.demoAutomatic ? .recording : .disabled,
                         mode: .automatic, context: tour.demoContext, phase: .normal)
                     Text("These controls only change this demo. Non-work labels apply from now; earlier labels can be corrected in history.")
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button("Enable automatic") { tour.practiceAutomatic() }
-                        Button("Start work") { tour.practiceWork() }.disabled(!tour.demoAutomatic || tour.demoPaused)
+                        Button("Start work") { tour.practiceWork() }.disabled(!tour.demoAutomatic)
                     }
                     HStack {
-                        Button("Notification: I’m not working") { tour.practiceNotWorkingNotification() }.disabled(!tour.demoAutomatic || tour.demoPaused)
-                        Button(tour.demoPaused ? "Resume" : "Pause") { tour.practicePauseResume() }.disabled(!tour.demoAutomatic)
+                        Button("Notification: I’m not working") { tour.practiceNotWorkingNotification() }.disabled(!tour.demoAutomatic)
                     }
                 }.padding(12).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
@@ -97,7 +96,9 @@ struct QuickTourDemoView: View {
             }
             HStack {
                 if tour.phase == .start || tour.saved {
-                    practiceButton("Start work", symbol: "record.circle", phase: .start, action: .start)
+                    Button("Start") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }
+                        .buttonStyle(.borderedProminent).disabled(tour.phase != .start)
+                    practiceButton("Plan session…", phase: .start, action: .start)
                 } else {
                     practiceButton("End work", symbol: "stop.fill", phase: .save, action: .save)
                 }
@@ -165,11 +166,11 @@ struct QuickTourDemoView: View {
     private var planning: some View {
         let visit = tour.visit
         return VStack(alignment: .leading, spacing: 24) {
-            Text("Before you start").font(.title2.weight(.semibold))
+            Text("Plan session").font(.title2.weight(.semibold))
             if tour.phase == .plan {
-                practiceButton("Plan session", phase: .plan, action: .plan)
+                practiceButton("Add work target", phase: .plan, action: .plan)
             } else {
-                Text("Plan session").font(.headline)
+                Text("Work target").font(.headline)
                 HStack(spacing: 12) {
                     ForEach([30, 60, 90], id: \.self) { value in
                         Button("\(value) min") {
@@ -182,7 +183,7 @@ struct QuickTourDemoView: View {
             }
             HStack {
                 Spacer()
-                practiceButton("Start work", phase: .confirmStart, action: .confirmStart)
+                practiceButton("Start", phase: .confirmStart, action: .confirmStart)
                     .buttonStyle(.borderedProminent)
             }
         }.padding(20)
