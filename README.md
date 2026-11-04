@@ -10,8 +10,8 @@ is active. See [readiness](REDESIGN-READINESS.md) for verification and release g
 
 1. Choose **Enable recording** or **Not now**. Recording acknowledgement is separate
    from macOS Input Monitoring, automatic mode, login launch, group sync and research.
-2. **Start work** starts manual work capture after consent/permission checks. The
-   planning sheet can optionally set a target and tags; ordinary use asks no survey.
+2. **Start** begins work immediately after consent/permission checks. Choose
+   **Plan session…** to optionally set a target and tags before starting.
    Use **Enable Input Monitoring** explicitly to request setup. Opening Settings or
    accepting automatic scope does not grant/request OS access. Relaunch if macOS asks.
 3. Optionally enable **automatic recording** in Settings → Privacy & Research and
@@ -21,8 +21,8 @@ is active. See [readiness](REDESIGN-READINESS.md) for verification and release g
    from now in the existing recording, without a second input tap or writer.
 4. **End work** returns automatic activity to Unknown; manual-only capture saves and
    stops. Work/Not working/Unknown are explicit context choices. They do not establish
-   productivity or fatigue. **Pause recording** stops capture and persists until Resume.
-   Resume after lifecycle/user pause does not inherit an old automatic work label.
+   productivity or fatigue. Take a break with the break controls; there are no Pause/Resume buttons.
+   Disable recording in Settings or Quit to stop automatic capture.
 5. Five continuous idle minutes, sleep/lock/display loss or permission loss stop
    capture. Eligible lifecycle resumes start Unknown; permission restoration cannot
    override user pause. Errors require deliberate retry. Missing coverage is not zero
