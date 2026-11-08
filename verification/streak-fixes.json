@@ -1,0 +1,38 @@
+{
+  "sourceRevision": "4624c34924fc47a4bd50af55122059e7169023d0",
+  "date": "2026-11-07",
+  "mainWindow": {
+    "removedTimerExplanations": true,
+    "keptDailyDeclaredWorkCard": true,
+    "removedOptionalBadge": true,
+    "replacedHeaderRecordingPillWithFlame": true,
+    "nativeAccessibilityLabelsChecked": true
+  },
+  "streaks": {
+    "rootCause": "Work leaderboard previously ranked lifetime qualifying work-day points, not current streaks.",
+    "currentRanksImplemented": true,
+    "serverRecomputesInactiveMembers": true,
+    "freezeLimit": 3,
+    "consecutiveCalendarFreezesAllowed": false,
+    "liveMigrationApplied": false
+  },
+  "menuCrash": {
+    "evidence": "Four November 7 crash reports show repeated SwiftUI MenuBehavior/MainMenuItemHost rendering and stack overflow.",
+    "change": "Removed TimelineView from native menu progress summary.",
+    "manualOpenCheck": "pending"
+  },
+  "verification": {
+    "debugBuild": "passed",
+    "swiftSuites": 32,
+    "swiftSuitesPassed": true,
+    "databaseMigrationsAndRegression": "passed",
+    "nodeTests": 7,
+    "nodeTestsPassed": true,
+    "streakLightDarkPreview": "streak-appearances.png"
+  },
+  "remaining": [
+    "Apply and verify the current-streak migration on the connected Supabase project.",
+    "Confirm top-right menu opens without crashing."
+  ],
+  "accessBlocker": "Browser page APIs fail with timeoutMs errors; native page tree empty and screenshots blank. Supabase integration suggested but not yet confirmed connected."
+}
