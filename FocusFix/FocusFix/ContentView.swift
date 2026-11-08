@@ -99,11 +99,7 @@ struct ContentView: View {
                         .tracking(2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label(tracker.isRecording ? "Recording" : "FocusFix", systemImage: onBreak ? "leaf.fill" : "circle.fill")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(tracker.isRecording ? teal : Color.secondary)
-                    .padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(teal.opacity(0.08), in: Capsule())
+                WorkStreakBadge(tracker: tracker)
             }
             HStack(alignment: .top) {
                 RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
@@ -127,10 +123,6 @@ struct ContentView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     SessionClockFace(time: tracker.formattedTime)
-                    Text("Recorded elapsed time · includes unknown and non-work")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("Declared work · \(RecordingCoverage.time(tracker.declaredWorkSeconds))")
-                        .font(.callout).monospacedDigit()
                 }
                 if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
                     Text(tracker.sessionWorkPlan.summary)
