@@ -5,13 +5,13 @@ import CoreGraphics
 enum LeaderboardMetric: String, Codable, CaseIterable, Identifiable {
     case work, habits
     var id: String { rawValue }
-    var title: String { self == .work ? "Work" : "Healthy habits" }
-    var scoreTitle: String { self == .work ? "WORK DAYS" : "HEALTHY DAYS" }
+    var title: String { self == .work ? "Work streak" : "Healthy habits" }
+    var scoreTitle: String { self == .work ? "DAY STREAK" : "HEALTHY DAYS" }
     var explanation: String {
-        self == .work ? "60 minutes of work earns one daily point." : "A completed 1-minute break earns one daily point."
+        self == .work ? "Current weekday streaks since joining: 60 minutes of declared work earns a day. An unprotected missed weekday resets the streak to 0." : "A completed 1-minute break earns one daily point."
     }
-    func score(_ member: SocialMember) -> Int { self == .work ? member.work : member.habits }
-    func rank(_ member: SocialMember) -> Int { self == .work ? member.workRank : member.habitsRank }
+    func score(_ member: SocialMember) -> Int { self == .work ? (member.workStreak ?? 0) : member.habits }
+    func rank(_ member: SocialMember) -> Int { self == .work ? (member.workStreakRank ?? 0) : member.habitsRank }
     func sorted(_ members: [SocialMember]) -> [SocialMember] {
         members.sorted {
             if score($0) != score($1) { return score($0) > score($1) }
