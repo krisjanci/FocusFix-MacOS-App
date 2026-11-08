@@ -154,9 +154,38 @@ struct DailyProgress: Codable, Equatable {
         }
     }
 
+    // Resolve against the current date even when a cached ledger has not synced yet.
+    // A historical freeze must not make a subsequently broken streak look frozen.
+    func streakStatus(at date: Date, calendar: Calendar) -> WorkStreakStatus {
+        var current = self
+        current.reconcile(at: date, calendar: calendar)
+        let count = current.streak(at: date, calendar: calendar)
+        guard count > 0 else { return WorkStreakStatus(count: 0, frozen: false) }
+        if !Self.isWeekend(date, calendar: calendar), current.day(at: date, calendar: calendar).workSeconds >= Self.goalSeconds {
+            return WorkStreakStatus(count: count, frozen: false)
+        }
+        var cursor = calendar.startOfDay(for: date)
+        repeat {
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else {
+                return WorkStreakStatus(count: count, frozen: false)
+            }
+            cursor = previous
+        } while Self.isWeekend(cursor, calendar: calendar)
+        return WorkStreakStatus(count: count, frozen: current.frozenDays.contains(Self.key(for: cursor, calendar: calendar)))
+    }
+
     var isValid: Bool {
         (version == 1 || version == 2) && days.values.allSatisfy { $0.workSeconds.isFinite && $0.workSeconds >= 0 }
             && declaredSegments.values.allSatisfy { $0.values.allSatisfy { $0.isFinite && $0 >= 0 } }
+    }
+}
+
+struct WorkStreakStatus: Equatable {
+    let count: Int
+    let frozen: Bool
+    var description: String {
+        if count == 0 { return "No current streak · complete 60 minutes of declared work to start" }
+        return "\(count)-day weekday streak\(frozen ? " · protected by a freeze" : "")"
     }
 }
 
