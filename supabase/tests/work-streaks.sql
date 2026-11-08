@@ -25,6 +25,18 @@ begin
  if result.streak<>1 or not result.frozen then raise exception 'Weekend freeze failed'; end if;
  select * into result from public.social_group_work_streak(b,g,'2026-10-28T16:00:00Z');
  if result.streak<>0 or result.frozen then raise exception 'Missed Tuesday did not end frozen streak'; end if;
+ -- Exhausting three freezes ends the streak on the next uncovered weekday.
+ delete from public.social_member_days where group_id=g and user_id=b;
+ insert into public.social_member_days(group_id,user_id,day,seconds)
+  select g,b,d::date,3600 from unnest(array['2026-10-19','2026-10-21','2026-10-23','2026-10-27']) d;
+ select * into result from public.social_group_work_streak(b,g,'2026-10-28T16:00:00Z');
+ if result.streak<>4 or result.frozen then raise exception 'Today was prematurely broken or frozen'; end if;
+ select * into result from public.social_group_work_streak(b,g,'2026-10-29T16:00:00Z');
+ if result.streak<>0 or result.frozen then raise exception 'Monthly freeze limit exceeded'; end if;
+ -- Late qualifying work thaws the last protected day without adding a freeze day.
+ insert into public.social_member_days(group_id,user_id,day,seconds) values(g,b,'2026-10-26',3600);
+ select * into result from public.social_group_work_streak(b,g,'2026-10-29T16:00:00Z');
+ if result.streak<>5 or not result.frozen then raise exception 'Late work did not return the freeze token'; end if;
  -- Month refill cannot bypass the no-consecutive-date rule.
  delete from public.social_member_days where group_id=g;
  update public.social_members set joined_at='2026-09-29' where group_id=g;
