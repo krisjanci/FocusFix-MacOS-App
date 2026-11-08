@@ -20,6 +20,22 @@ import Foundation
         progress.reconcile(at: date("2026-10-22T16:00:00Z"), calendar: cal)
         precondition(progress.frozenDays == ["2026-10-21"])
         precondition(progress.streak(at: date("2026-10-22T16:00:00Z"), calendar: cal) == 2)
+        // A stale cache must age across missed days before showing the header badge.
+        var cached = DailyProgress()
+        cached.reconcile(at: monday, calendar: cal)
+        cached.addWork(seconds: 3600, endingAt: monday, calendar: cal)
+        precondition(cached.streakStatus(at: monday, calendar: cal) == WorkStreakStatus(count: 1, frozen: false))
+        precondition(cached.streakStatus(at: date("2026-10-21T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 1, frozen: true))
+        precondition(cached.streakStatus(at: date("2026-10-22T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 0, frozen: false))
+        precondition(cached.streakStatus(at: date("2026-11-07T17:00:00Z"), calendar: cal) == WorkStreakStatus(count: 0, frozen: false))
+        precondition(cached.frozenDays.isEmpty) // Presentation cannot rewrite persisted history.
+        cached.addWork(seconds: 3600, endingAt: date("2026-10-21T16:00:00Z"), calendar: cal)
+        precondition(cached.streakStatus(at: date("2026-10-21T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 2, frozen: false))
+        var fridayFrozen = DailyProgress()
+        fridayFrozen.reconcile(at: date("2026-10-22T16:00:00Z"), calendar: cal)
+        fridayFrozen.addWork(seconds: 3600, endingAt: date("2026-10-22T16:00:00Z"), calendar: cal)
+        precondition(fridayFrozen.streakStatus(at: date("2026-10-24T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 1, frozen: true))
+        precondition(fridayFrozen.streakStatus(at: date("2026-10-26T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 1, frozen: true))
         let saved = progress
         progress.reconcile(at: date("2026-10-22T16:00:00Z"), calendar: cal)
         precondition(saved == progress)
