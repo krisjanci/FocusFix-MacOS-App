@@ -78,18 +78,7 @@ struct LeaderboardRow: View {
             Spacer(minLength: 4)
             if metric == .work {
                 if let count = member.workStreak {
-                    HStack(spacing: 5) {
-                        Image(systemName: "flame.fill")
-                            .overlay(alignment: .bottomTrailing) {
-                                if member.workStreakFrozen == true && count > 0 {
-                                    Image(systemName: "snowflake").font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(.white).padding(1).background(.blue, in: Circle()).offset(x: 3, y: 2)
-                                }
-                            }
-                        Text("\(count)").monospacedDigit()
-                    }
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(count == 0 ? Color.secondary : member.workStreakFrozen == true ? .blue : .orange)
+                    WorkStreakFlame(status: WorkStreakStatus(count: count, frozen: member.workStreakFrozen == true), compact: true)
                 } else {
                     Text("—").foregroundStyle(.secondary).help("Current streaks need the group server update. Lifetime points are not a streak.")
                 }
