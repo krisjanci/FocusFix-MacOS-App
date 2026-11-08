@@ -6,7 +6,7 @@ revoke all on function public.social_state_daily_points(text,jsonb) from public,
 
 create function public.social_group_work_streak(member_id uuid, selected_group uuid, as_of timestamptz)
 returns table(streak integer, frozen boolean)
-language plpgsql stable set search_path = '' as $$
+language plpgsql volatile set search_path = '' as $$
 declare
  zone text; joined timestamptz; today date; d date; month_key text := '';
  used integer := 0; last_frozen date; seconds_worked double precision;
