@@ -14,12 +14,13 @@
     "serverRecomputesInactiveMembers": true,
     "freezeLimit": 3,
     "consecutiveCalendarFreezesAllowed": false,
-    "liveMigrationApplied": false
+    "liveMigrationApplied": false,
+    "liveMigrationStatus": "Request completed with a duplicate preserved-function error; actual server definitions require readback before any further migration action."
   },
   "menuCrash": {
     "evidence": "Four November 7 crash reports show repeated SwiftUI MenuBehavior/MainMenuItemHost rendering and stack overflow.",
     "change": "Removed TimelineView from native menu progress summary.",
-    "manualOpenCheck": "pending"
+    "manualOpenCheck": "passed: user confirmed the rebuilt menu opens normally"
   },
   "verification": {
     "debugBuild": "passed",
@@ -31,8 +32,7 @@
     "streakLightDarkPreview": "streak-appearances.png"
   },
   "remaining": [
-    "Apply and verify the current-streak migration on the connected Supabase project.",
-    "Confirm top-right menu opens without crashing."
+    "Verify deployed streak functions and permissions, run rollback-only server regressions, and confirm current group streak in the app."
   ],
-  "accessBlocker": "Browser page APIs fail with timeoutMs errors; native page tree empty and screenshots blank. Supabase integration suggested but not yet confirmed connected."
+  "accessBlocker": "Native database editor recovered and preflight matched the original function exactly. Browser tab switching interrupted readback; awaiting a brief uninterrupted verification window."
 }
