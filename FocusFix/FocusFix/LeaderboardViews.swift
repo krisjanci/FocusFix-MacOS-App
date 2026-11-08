@@ -64,7 +64,7 @@ struct LeaderboardRow: View {
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) {
-                Text("\(metric.rank(member))").font(.system(.callout, design: .rounded).weight(.semibold)).monospacedDigit()
+                Text(metric == .work && member.workStreakRank == nil ? "—" : "\(metric.rank(member))").font(.system(.callout, design: .rounded).weight(.semibold)).monospacedDigit()
                 if let place = PodiumPlace(rank: metric.rank(member), score: metric.score(member)) {
                     PodiumMarker(place: place, allowsAnimation: !pinned && allowsAnimation)
                 }
@@ -76,12 +76,33 @@ struct LeaderboardRow: View {
                 if isCurrentUser && !pinned { Text("You").font(.caption2).foregroundStyle(.secondary) }
             }
             Spacer(minLength: 4)
-            Text("\(metric.score(member))").font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
+            if metric == .work {
+                if let count = member.workStreak {
+                    HStack(spacing: 5) {
+                        Image(systemName: "flame.fill")
+                            .overlay(alignment: .bottomTrailing) {
+                                if member.workStreakFrozen == true && count > 0 {
+                                    Image(systemName: "snowflake").font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white).padding(1).background(.blue, in: Circle()).offset(x: 3, y: 2)
+                                }
+                            }
+                        Text("\(count)").monospacedDigit()
+                    }
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                    .foregroundStyle(count == 0 ? Color.secondary : member.workStreakFrozen == true ? .blue : .orange)
+                } else {
+                    Text("—").foregroundStyle(.secondary).help("Current streaks need the group server update. Lifetime points are not a streak.")
+                }
+            } else {
+                Text("\(metric.score(member))").font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
+            }
         }
         .padding(.horizontal, 10).padding(.vertical, 11)
         .background(isCurrentUser ? Color.teal.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Rank \(metric.rank(member)), \(member.name)\(isCurrentUser ? ", you" : ""), \(metric.score(member)) \(metric.title.lowercased()) points")
+        .accessibilityLabel(metric == .work
+            ? "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.workStreak.map { "\($0)-day weekday streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.workStreakFrozen == true ? ", protected by a freeze" : "")"
+            : "Rank \(metric.rank(member)), \(member.name)\(isCurrentUser ? ", you" : ""), \(metric.score(member)) healthy-habit points")
     }
 }
 
@@ -132,6 +153,7 @@ struct GroupLeaderboard: View {
 struct GroupHeading: View {
     let group: SocialGroup
     var compact = false
+    var metric: LeaderboardMetric = .work
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !compact { Text("YOUR GROUP").font(.system(size: 9, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary) }
@@ -140,7 +162,7 @@ struct GroupHeading: View {
                 Label("\(group.members.count) / \(SocialGroup.capacity) people", systemImage: "person.2")
                 if group.members.count >= SocialGroup.capacity { Text("· Full") }
                 Spacer()
-                Text("ALL TIME").font(.system(size: 9, weight: .medium)).tracking(0.7)
+                Text(metric == .work ? "CURRENT STREAK" : "ALL TIME").font(.system(size: 9, weight: .medium)).tracking(0.7)
             }.font(.caption).foregroundStyle(.secondary)
         }
     }
