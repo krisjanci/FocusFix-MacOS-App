@@ -3,7 +3,7 @@ import CoreGraphics
 
 @main struct GroupPresentationTests {
     static func member(_ name: String, work: Int, habits: Int, workRank: Int, habitsRank: Int) -> SocialMember {
-        SocialMember(id: UUID(), name: name, symbol: "leaf.fill", color: "teal", work: work, habits: habits, workRank: workRank, habitsRank: habitsRank)
+        SocialMember(id: UUID(), name: name, symbol: "leaf.fill", color: "teal", work: work, habits: habits, workRank: workRank, habitsRank: habitsRank, workStreak: work, workStreakRank: workRank, workStreakFrozen: false)
     }
     static func main() throws {
         let alex = member("Alex", work: 8, habits: 2, workRank: 1, habitsRank: 3)
@@ -17,6 +17,17 @@ import CoreGraphics
         precondition(PodiumPlace(rank: 2, score: 6) == .second)
         precondition(PodiumPlace(rank: 2, score: 6) == PodiumPlace(rank: LeaderboardMetric.work.rank(jordan), score: jordan.work))
         precondition(PodiumPlace(rank: LeaderboardMetric.habits.rank(alex), score: alex.habits) == .third)
+        // A large historical score must never outrank a current streak after a break.
+        let lost = SocialMember(id: UUID(), name: "Lost", symbol: "leaf", color: "teal", work: 100, habits: 0,
+            workRank: 1, habitsRank: 1, workStreak: 0, workStreakRank: 2, workStreakFrozen: false)
+        let live = SocialMember(id: UUID(), name: "Live", symbol: "leaf", color: "teal", work: 1, habits: 0,
+            workRank: 2, habitsRank: 1, workStreak: 1, workStreakRank: 1, workStreakFrozen: true)
+        precondition(LeaderboardMetric.work.sorted([lost,live]).map(\.name) == ["Live","Lost"])
+        precondition(LeaderboardMetric.work.score(lost) == 0 && LeaderboardMetric.work.rank(live) == 1)
+        let legacy = SocialMember(id: UUID(), name: "Old server", symbol: "leaf", color: "teal", work: 100, habits: 0, workRank: 1, habitsRank: 1)
+        precondition(LeaderboardMetric.work.score(legacy) == 0 && legacy.workStreak == nil)
+        let decoded = try JSONDecoder().decode(SocialMember.self, from: JSONEncoder().encode(live))
+        precondition(decoded.workStreak == 1 && decoded.workStreakFrozen == true)
         let first = SocialGroup(id: UUID(), name: "First", owner: alex.id, code: nil, members: [alex])
         let second = SocialGroup(id: UUID(), name: "Second", owner: sam.id, code: nil, members: [sam])
         var selected = GroupSelection(groupID: second.id, metric: .habits)
