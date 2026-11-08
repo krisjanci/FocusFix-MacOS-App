@@ -59,5 +59,8 @@ begin
  if (member->>'workStreak')::int<>1 or (member->>'workStreakRank')::int<>1 then raise exception 'Current streak not ranked first'; end if;
  if has_function_privilege('authenticated','public.social_group_work_streak(uuid,uuid,timestamptz)','execute')
  or has_function_privilege('authenticated','public.social_state_daily_points(text,jsonb)','execute') then raise exception 'Private helper exposed'; end if;
+ perform set_config('focusfix.current_streak_checks_passed','true',true);
 end $$;
+-- The marker is set only after all assertions. Running this SELECT alone cannot pass.
+select current_setting('focusfix.current_streak_checks_passed',true)='true' as current_streak_regressions_passed;
 rollback;
