@@ -133,27 +133,37 @@ struct WorkStreakBadge: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let status = tracker.dailyProgress.streakStatus(at: context.date, calendar: DailyProgress.calendar())
-            HStack(spacing: 7) {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 23, weight: .semibold))
-                    if status.frozen {
-                        Image(systemName: "snowflake")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(2)
-                            .background(.blue, in: Circle())
-                            .offset(x: 4, y: 2)
-                    }
-                }
-                Text("\(status.count)").font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
-            }
-            .foregroundStyle(status.count == 0 ? Color.secondary : status.frozen ? .blue : .orange)
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background((status.count == 0 ? Color.secondary : status.frozen ? .blue : .orange).opacity(0.08), in: Capsule())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(status.description)
-            .help(status.description)
+            WorkStreakFlame(status: status)
         }
+    }
+}
+
+// Shared value-only appearance for the main header and group member streaks.
+struct WorkStreakFlame: View {
+    let status: WorkStreakStatus
+    var compact = false
+    private var tint: Color { status.count == 0 ? .secondary : status.frozen ? .blue : .orange }
+    var body: some View {
+        HStack(spacing: compact ? 5 : 7) {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: compact ? 18 : 23, weight: .semibold))
+                if status.frozen && status.count > 0 {
+                    Image(systemName: "snowflake")
+                        .font(.system(size: compact ? 9 : 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(2)
+                        .background(.blue, in: Circle())
+                        .offset(x: 4, y: 2)
+                }
+            }
+            Text("\(status.count)").font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, compact ? 0 : 12).padding(.vertical, compact ? 0 : 8)
+        .background(tint.opacity(compact ? 0 : 0.08), in: Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(status.description)
+        .help(status.description)
     }
 }
