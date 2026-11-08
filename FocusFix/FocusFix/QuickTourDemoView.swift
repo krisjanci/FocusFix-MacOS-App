@@ -142,9 +142,9 @@ struct QuickTourDemoView: View {
     private var practiceLeaderboard: some View {
         let visit = tour.visit
         let people = [
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: tour.demoName, symbol: "leaf.fill", color: "teal", work: 8, habits: 7, workRank: 1, habitsRank: 1),
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, name: "Sam", symbol: "book.fill", color: "blue", work: 6, habits: 5, workRank: 2, habitsRank: 2),
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!, name: "Jordan", symbol: "sun.max.fill", color: "orange", work: 4, habits: 3, workRank: 3, habitsRank: 3)
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: tour.demoName, symbol: "leaf.fill", color: "teal", work: 8, habits: 7, workRank: 1, habitsRank: 1, workStreak: 8, workStreakRank: 1, workStreakFrozen: false),
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, name: "Sam", symbol: "book.fill", color: "blue", work: 6, habits: 5, workRank: 2, habitsRank: 2, workStreak: 6, workStreakRank: 2, workStreakFrozen: true),
+            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!, name: "Jordan", symbol: "sun.max.fill", color: "orange", work: 4, habits: 3, workRank: 3, habitsRank: 3, workStreak: 0, workStreakRank: 3, workStreakFrozen: false)
         ]
         let group = SocialGroup(id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!, name: tour.demoGroupIndex == 0 ? "Study circle" : "Weekend crew", owner: people[0].id, code: nil, members: people)
         return VStack(alignment: .leading, spacing: 12) {
