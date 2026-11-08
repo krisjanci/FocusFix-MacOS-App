@@ -51,7 +51,6 @@ struct DailyProgressDisplay: View {
                       systemImage: complete ? "checkmark.circle.fill" : "target")
                     .font(.callout.weight(.medium))
                 Spacer()
-                if weekend { Text("Optional").font(.caption).foregroundStyle(.secondary) }
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -116,13 +115,45 @@ struct ProgressMenuSummary: View {
     @ObservedObject private var social = SocialController.shared
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let calendar = DailyProgress.calendar()
-            let progress = tracker.dailyProgress
-            let day = progress.day(at: context.date, calendar: calendar)
-            let streak = progress.streak(at: context.date, calendar: calendar)
-            Text("Declared work: \(Int(day.workSeconds / 60))/60 min · \(streak)-day weekday streak")
-            Text("Breaks taken today: \(day.completedBreakIDs.count)")
+        // Native menus cannot host TimelineView: its scheduled graph updates can
+        // reenter AppKit menu construction and overflow the stack when opened.
+        // The observed tracker supplies fresh snapshots when progress changes.
+        let date = Date()
+        let calendar = DailyProgress.calendar()
+        let progress = tracker.dailyProgress
+        let day = progress.day(at: date, calendar: calendar)
+        let status = progress.streakStatus(at: date, calendar: calendar)
+        Text("Declared work: \(Int(day.workSeconds / 60))/60 min · \(status.count)-day weekday streak")
+        Text("Breaks taken today: \(day.completedBreakIDs.count)")
+    }
+}
+
+struct WorkStreakBadge: View {
+    @ObservedObject var tracker: ActivityTracker
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let status = tracker.dailyProgress.streakStatus(at: context.date, calendar: DailyProgress.calendar())
+            HStack(spacing: 7) {
+                ZStack(alignment: .bottomTrailing) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 23, weight: .semibold))
+                    if status.frozen {
+                        Image(systemName: "snowflake")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(2)
+                            .background(.blue, in: Circle())
+                            .offset(x: 4, y: 2)
+                    }
+                }
+                Text("\(status.count)").font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
+            }
+            .foregroundStyle(status.count == 0 ? Color.secondary : status.frozen ? .blue : .orange)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background((status.count == 0 ? Color.secondary : status.frozen ? .blue : .orange).opacity(0.08), in: Capsule())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(status.description)
+            .help(status.description)
         }
     }
 }
