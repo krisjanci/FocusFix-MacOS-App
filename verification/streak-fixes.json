@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "4624c34924fc47a4bd50af55122059e7169023d0",
+  "sourceRevision": "a0c72ffc09d0bfab9e4470db0010c2e0e2034740",
   "date": "2026-11-07",
   "mainWindow": {
     "removedTimerExplanations": true,
@@ -14,8 +14,16 @@
     "serverRecomputesInactiveMembers": true,
     "freezeLimit": 3,
     "consecutiveCalendarFreezesAllowed": false,
-    "liveMigrationApplied": false,
-    "liveMigrationStatus": "Request completed with a duplicate preserved-function error; actual server definitions require readback before any further migration action."
+    "liveMigrationApplied": true,
+    "liveMigrationStatus": "Verified live: wrapper/helper source hashes match, original source preserved, public RPC allowed and both helpers private.",
+    "liveRegressionResult": "All assertions completed; transaction-local success marker true; fixtures rolled back.",
+    "appReadback": {
+      "currentUserStreak": 0,
+      "currentUserRank": 1,
+      "twoZeroDayMembersShareRank": true,
+      "greyFlameVisible": true,
+      "healthyHabitsStillAllTime": true
+    }
   },
   "menuCrash": {
     "evidence": "Four November 7 crash reports show repeated SwiftUI MenuBehavior/MainMenuItemHost rendering and stack overflow.",
@@ -29,10 +37,11 @@
     "databaseMigrationsAndRegression": "passed",
     "nodeTests": 7,
     "nodeTestsPassed": true,
-    "streakLightDarkPreview": "streak-appearances.png"
+    "streakLightDarkPreview": "streak-appearances.png",
+    "liveSourceAndPermissionChecks": "six checks passed",
+    "liveDatabaseRegression": "passed",
+    "liveDatabaseScreenshot": "streak-live-regressions.png"
   },
-  "remaining": [
-    "Verify deployed streak functions and permissions, run rollback-only server regressions, and confirm current group streak in the app."
-  ],
-  "accessBlocker": "Native database editor recovered and preflight matched the original function exactly. Browser tab switching interrupted readback; awaiting a brief uninterrupted verification window."
+  "remaining": [],
+  "accessBlocker": null
 }
