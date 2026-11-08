@@ -19,7 +19,7 @@ struct GroupsView: View {
                 ScrollView { accessCard.padding(.top, 10) }
             } else {
                 if let group = social.selectedGroup {
-                    GroupHeading(group: group)
+                    GroupHeading(group: group, metric: social.selection.metric)
                     GroupSelectionControls(social: social)
                     Text(social.selection.metric.explanation).font(.callout).foregroundStyle(.secondary)
                     GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID)
@@ -53,7 +53,7 @@ struct GroupsView: View {
             }
         }
         .popover(isPresented: $scoringPresented) {
-            Text("Each leaderboard awards at most one point per day since joining. Weekends can earn points and remain optional for your weekday work streak. Three freezes refill each month, without rollover or consecutive calendar-date use. Freezes add no points or streak days. Late synced work can return an unnecessary freeze. Scoring timezone: \(social.ledger?.timezone ?? ""). Equal scores share a rank; podium symbols celebrate positive scores only.")
+            Text("Work ranks current weekday streaks since joining: each weekday with 60 minutes of declared work adds one day, and an unprotected missed weekday resets the count to zero. Healthy habits ranks all-time qualifying break days. Weekends remain optional for work streaks. Three freezes refill each month, without rollover or consecutive calendar-date use. Freezes add no points or streak days. Late synced work can return an unnecessary freeze. Scoring timezone: \(social.ledger?.timezone ?? ""). Equal scores share a rank; podium symbols celebrate positive scores only.")
                 .font(.callout).padding(20).frame(width: 320).fixedSize(horizontal: false, vertical: true)
         }
         .task { social.start(); await social.refresh() }
@@ -110,7 +110,7 @@ private struct ManageGroupSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if let group {
-                        GroupHeading(group: group)
+                        GroupHeading(group: group, metric: social.selection.metric)
                         if group.owner == social.userID {
                             if let code = group.code {
                                 Text(code).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
