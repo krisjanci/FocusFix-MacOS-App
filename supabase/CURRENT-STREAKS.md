@@ -29,10 +29,15 @@ Verify locally with `npm --prefix supabase run test:database` and
 synthetic users, missed days, freezes, thawing, weekends, month boundaries,
 inactive-member ranking, helper permissions and the existing group/RLS tests.
 
-Before deployment, inspect the deployed `social_state(text,jsonb)` definition
-against the prior checked-in function. After deployment, verify the capability,
-member fields/ranks and helper permissions with disposable accounts. No live
-migration or live test has been completed by the November 7 change yet.
+The update was verified on the configured FocusFix project on November 7, 2026.
+The preflight matched the original function body exactly. Post-deployment hashes
+matched the new wrapper and helper, and confirmed the preserved original body.
+Authenticated clients can execute only the public wrapper; both helpers remain
+private. The full `work-streaks.sql` transaction passed against the live service,
+including its assertion-dependent success marker, and rolled back its fixtures.
+The running app received a zero-day current group streak with the grey flame;
+two zero-day members shared rank 1. Healthy habits retained its all-time score.
+See `verification/streak-fixes.json` and `verification/streak-live-regressions.png`.
 
 If this migration needs to be reversed, the preserved original function can be
 restored without changing recorded history:
