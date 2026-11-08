@@ -20,6 +20,9 @@ struct SocialMember: Codable, Identifiable {
     let habits: Int
     let workRank: Int
     let habitsRank: Int
+    var workStreak: Int? = nil
+    var workStreakRank: Int? = nil
+    var workStreakFrozen: Bool? = nil
 }
 struct SocialGroup: Codable, Identifiable {
     static let capacity = 50
