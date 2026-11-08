@@ -89,7 +89,7 @@ struct PeoplePanel: View {
                 ScrollView { accessCard.padding(.top, 12) }
             } else {
                 if let group = social.selectedGroup {
-                    GroupHeading(group: group, compact: true)
+                    GroupHeading(group: group, compact: true, metric: social.selection.metric)
                     GroupSelectionControls(social: social)
                     Text(social.selection.metric.explanation).font(.caption).foregroundStyle(.secondary)
                     GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID)
