@@ -30,7 +30,9 @@ test('uses verified user ID; ignores a foreign user ID supplied in the request',
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
     if (url.endsWith('/auth/v1/user')) return Response.json({ id: owner });
+    if (url.endsWith('/rpc/request_development_deletion')) return Response.json('40000000-0000-4000-8000-000000000001');
     if (url.endsWith('/rpc/request_research_deletion')) return Response.json('30000000-0000-4000-8000-000000000001');
+    if (url.endsWith('/object/list/development-recordings')) return Response.json([]);
     if (url.endsWith('/object/list/research-sessions')) {
       const { prefix } = JSON.parse(options.body);
       if (prefix === owner) return Response.json([{ name: 'consent', id: null }]);
@@ -43,6 +45,8 @@ test('uses verified user ID; ignores a foreign user ID supplied in the request',
     method: 'POST', headers: { Authorization: 'Bearer user-test' }, body: JSON.stringify({ user_id: foreign }),
   }));
   assert.equal(result.status, 200);
+  assert.ok(calls.find(({ url }) => url.endsWith('/rpc/request_development_deletion')));
+  assert.ok(calls.find(({ url }) => url.endsWith('/development_deletion_requests?id=eq.40000000-0000-4000-8000-000000000001&owner_reference=eq.' + owner + '&status=eq.pending')));
   const deleted = calls.find(({ url, options }) => url.endsWith('/object/research-sessions') && options.method === 'DELETE');
   assert.deepEqual(JSON.parse(deleted.options.body), { prefixes: [`${owner}/consent/batch.zip`] });
   assert.equal(calls.at(-1).url, `https://example.supabase.co/auth/v1/admin/users/${owner}`);
