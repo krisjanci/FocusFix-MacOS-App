@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @StateObject private var account = AccountController.shared
     // Instantiate the durable queue even when the user never opens Settings this launch.
     @StateObject private var research = ResearchSharingController.shared
+    @StateObject private var development = DevelopmentSharingController.shared
     @State private var launchFinished = false
     @AppStorage("appearance") private var appearance = "system"
     // Translate System/Light/Dark preferences into SwiftUI's appearance setting.
@@ -37,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Window("FocusFix", id: "collector") {
             CollectorRootView(tracker: tracker, launch: launch, account: account, launchFinished: $launchFinished)
                 .preferredColorScheme(colorScheme)
-                .onAppear { research.checkDue(); SocialController.shared.start(); tracker.reconcileProgress() }
+                .onAppear { research.checkDue(); development.checkDue(); SocialController.shared.start(); tracker.reconcileProgress() }
         }.windowResizability(.contentSize)
         .commands { FocusFixCommands() }
         Window("About, privacy & support — FocusFix", id: "about") {
