@@ -6,13 +6,13 @@ import SwiftUI
 struct PrivacyNoticeDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("While recording manually or automatically, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing, user-declared work/non-work/unknown labels and any separately enabled optional study answers. Automatic recording can include non-work computer use.")
+            Text("While recording manually or automatically, FocusFix observes keyboard timing, delete-key events, clicks, scrolling, app-switch events and one-second mouse movement summaries across apps. It also saves break timing and user-declared work/non-work/unknown labels. Automatic recording can include non-work computer use.")
             Text("It does not save typed text, individual letter keys, app names, window titles, URLs, screenshots or exact cursor paths. Detailed activity timing can still be sensitive. Disable recording in Settings before doing anything you don't want included.")
             Text("Sessions stay in FocusFix's private storage on this Mac until you delete them. Use Sessions → Show in Finder to locate them. They are not separately encrypted by FocusFix. Exports and Mac backups can contain copies. Deleting a session moves the local folder to Trash; empty Trash when you want to remove that copy.")
             Text("Input Monitoring permission lets the app observe keyboard and mouse activity across apps without changing or blocking your input. You can stop by disabling recording in Settings or choosing Quit, and revoke access in System Settings. macOS may withhold keyboard events during secure input, such as password entry. Such gaps are not proof of inactivity. During a planned break detailed logging pauses; it resumes when the break timer ends or you return early.")
-            Text(AccountConfiguration.bundled?.researchSharingEnabled == true
-                ? "This build supports optional per-session research sharing with the FocusFix researcher through private Supabase storage after manual researcher approval and separate, versioned consent. Signing in does not enable sharing. Received data can be associated with your account; ZIPs exclude profile names and photos. Review the full study consent in Settings → Privacy & Research before enabling sharing. Turning sharing off cancels pending deliveries but cannot recall copies already received."
-                : "This build cannot enroll in research or upload recordings. Exporting a session is a separate action you control.")
+            Text(AccountConfiguration.bundled?.developmentSharingEnabled == true
+                ? "With separate consent, an approved signed-in account can share new finished recordings with the developer through private Supabase storage to improve FocusFix. Signing in and allowing local recording do not enable sharing. Turn sharing off or request deletion in Settings → Privacy & Data Sharing. Uploaded data can be associated with your account; it is not anonymous."
+                : "This build does not upload detailed recordings. Exporting a recording is a separate action you control.")
             Text("An optional account profile sends your chosen name and avatar to the configured account service when you save it. A local profile stays on this Mac. Neither kind of profile is required to record sessions.")
             Text("Groups are optional and separate from research. Enabling group progress sync sends work-duration and qualifying-break summaries to your account service, with your scoring timezone and streak freeze decisions. Creating or joining a private group shares only your display name, standard avatar and two daily-point totals with its current members. Email addresses, profile photos, recordings and surveys are never shown in groups. Leaving removes your group score; deleting your account removes your social summaries and owned groups.")
             Text("Custom break-activity labels are saved exactly as entered. Avoid including personal or sensitive information in them.")
@@ -29,7 +29,7 @@ struct RecordingNoticeView: View {
         VStack(alignment: .leading, spacing: 20) {
             Label("Your activity, your choice", systemImage: "hand.raised").font(.title2.weight(.semibold))
             ScrollView { PrivacyNoticeDetails() }
-            Text("After closing this notice, Start work begins manual capture. Automatic recording needs a separate explicit choice in Privacy & Research.")
+            Text("After closing this notice, Start work begins manual capture. Automatic recording needs a separate explicit choice in Privacy & Data Sharing.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Not now") { tracker.declineRecordingNotice(); dismiss() }.keyboardShortcut(.cancelAction)
@@ -50,7 +50,7 @@ struct AutomaticRecordingNoticeView: View {
             Label("Automatic recording", systemImage: "record.circle").font(.title2.weight(.semibold))
             Text("If you enable this, FocusFix can record computer use while it is running, including non-work activity. Start work is optional; automatic activity begins Unknown.")
             Text("It records keyboard timing, delete events, clicks, scrolling, app-switch counts and one-second mouse summaries. It does not save typed text, letter identities, app names, URLs, window titles, screenshots or exact cursor paths. Secure Input and other capture gaps remain possible.")
-            Text("The menu bar shows recording status. Disable recording in Settings or choose Quit to stop. Closing a window keeps the menu-bar app running. Login launch, Input Monitoring and research sharing are separate choices. New-format recordings stay local.")
+            Text("The menu bar shows recording status. Disable recording in Settings or choose Quit to stop. Closing a window keeps the menu-bar app running. Login launch, Input Monitoring and optional developer sharing are separate choices.")
             Text("Input Monitoring must already be available before automatic capture can start. You can set it up with Manage Input Monitoring after this choice; opening Settings does not request it.")
                 .font(.callout).foregroundStyle(.secondary)
             HStack {
