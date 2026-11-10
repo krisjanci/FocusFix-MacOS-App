@@ -26,6 +26,8 @@ try {
   for (const file of (await readdir(new URL('../migrations/', import.meta.url))).filter(name => name.endsWith('.sql')).sort()) {
     await db.exec(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
   }
+  await db.exec(await readFile(new URL('development-sharing.sql', import.meta.url), 'utf8'));
+  console.log('Product-development consent, approval, storage isolation and deletion gates passed.');
   await db.exec(await readFile(new URL('consent-access.sql', import.meta.url), 'utf8'));
   await verifySocial(db);
   await db.exec(await readFile(new URL('work-streaks.sql', import.meta.url), 'utf8'));
