@@ -27,7 +27,7 @@ struct SharingView: View {
                     } label: { Label("Test tracking", systemImage: "keyboard") }
                     QuickTourButton(beforeOpen: { dismiss() })
                 }
-                SettingsLink { Label("Privacy & Research settings", systemImage: "hand.raised") }
+                SettingsLink { Label("Privacy & Data Sharing settings", systemImage: "hand.raised") }
                 Text("Your profile is private. Signing in never enables recording or research sharing.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(26)
@@ -37,7 +37,6 @@ struct SharingView: View {
 
 struct PrivacyResearchSettings: View {
     @ObservedObject private var tracker = ActivityTracker.shared
-    @ObservedObject private var surveys = SurveyPreferences.shared
     @ObservedObject private var automatic = AutomaticRecordingPreferences.shared
     @StateObject private var login = LoginLaunch()
     @AppStorage("focusfix.screenUseReminders") private var screenUseReminders = false
@@ -48,7 +47,7 @@ struct PrivacyResearchSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Label("Privacy & Research", systemImage: "hand.raised").font(.title2.weight(.semibold))
+                Label("Privacy & Data Sharing", systemImage: "hand.raised").font(.title2.weight(.semibold))
                 Toggle("Allow activity recording", isOn: Binding(get: { recordingEnabled }, set: { value in
                     if value { recordingConsentPresented = true }
                     else { tracker.disableRecording(); recordingEnabled = false }
@@ -70,16 +69,7 @@ struct PrivacyResearchSettings: View {
                 if let error = login.error { Text(error).font(.caption).foregroundStyle(.red) }
                 DisclosureGroup("What is recorded and where it is stored") { PrivacyNoticeDetails().padding(.top, 8) }
                 Divider()
-                ResearchSharingControls()
-                Divider()
-                Text("Optional study check-ins").font(.headline)
-                Toggle("Optional study check-ins", isOn: Binding(get: { surveys.studyCheckInsEnabled }, set: { surveys.setStudyCheckInsEnabled($0) }))
-                Text("Off by default, including after upgrades. These optional fatigue/productivity ratings are separate from research sharing. Prompts also require a complete reviewed study configuration; none is supplied in this build. Turning this off cancels pending prompts. Missing ratings stay missing.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("Before a session · mental fatigue", isOn: $surveys.beforeSession).disabled(!surveys.studyCheckInsEnabled)
-                Toggle("Before a break · fatigue & productivity", isOn: $surveys.beforeBreak).disabled(!surveys.studyCheckInsEnabled)
-                Toggle("Scheduled study check-ins across activity contexts", isOn: $surveys.duringWork).disabled(!surveys.studyCheckInsEnabled)
-                Text("Reviewed schedules are frozen for a recording. Enabling/changing options applies to the next recording; turning study check-ins off cancels them immediately.").font(.caption).foregroundStyle(.secondary)
+                DevelopmentSharingControls()
                 Divider()
                 QuickTourButton()
                 AdvancedSettingsView(tracker: tracker)
