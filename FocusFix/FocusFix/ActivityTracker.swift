@@ -1236,9 +1236,15 @@ final class ActivityTracker: ObservableObject {
     }
     // Keep destination access alive while the background copy runs.
     func exportAllSavedSessions() async throws -> (folder: URL, count: Int)? {
+        try await exportSavedSessions(nil)
+    }
+
+    // A nil selection means Export All; an explicit selection exports exactly those folders.
+    func exportSavedSessions(_ selected: [SavedSession]?) async throws -> (folder: URL, count: Int)? {
         let panel = NSOpenPanel()
-        panel.title = "Export all saved sessions"
-        panel.message = "Copies all saved sessions into one folder. The current recording is skipped."
+        panel.title = selected == nil ? "Export all saved sessions" : "Export selected sessions"
+        panel.message = selected.map { "Copies \($0.count) selected sessions into one folder." }
+            ?? "Copies all saved sessions into one folder. The current recording is skipped."
         panel.prompt = "Export here"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -1250,7 +1256,10 @@ final class ActivityTracker: ObservableObject {
         let root = try SessionFiles.root()
         let active = isRecording ? sessionFolder : nil
         return try await Task.detached(priority: .userInitiated) {
-            try SessionFiles.exportAll(to: destination, root: root, active: active)
+            if let selected {
+                return try SessionFiles.exportSelected(selected, to: destination, root: root, active: active)
+            }
+            return try SessionFiles.exportAll(to: destination, root: root, active: active)
         }.value
     }
 
