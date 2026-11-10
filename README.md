@@ -87,9 +87,20 @@ scores do not yet reflect them. Existing groups, historical scores and explicit
 healthy-break sync are preserved. A verified correction-compatible server capability
 is required before releasing held work. See [sync dependency](supabase/DECLARED-WORK-SYNC.md).
 
-Use **Export…** or **Export All…** for byte-preserving copies outside storage;
-repeated exports do not overwrite earlier copies. Local deletion moves a recording
-to Trash; exports/backups and research-cloud deletion are separate. Private sandbox
+In Sessions, use Command-click to toggle recordings, Shift-click to select a range,
+or **Select All** (Command-A); **Deselect All** clears the selection. The count and
+**Export Selected…** / **Delete Selected…** actions follow the selection. Arrow keys
+and Shift-arrow selection use the standard Mac list controls. **Show in Finder**
+reveals all selected folders; context/tag editing stays specific to one recording.
+Export/delete are disabled when the selection includes the active recording.
+Deletion confirms the selected count, moves recordings to Trash, and reports any
+partial failure while keeping failed recordings selected.
+
+Use **Export…**, **Export Selected…** or **Export All…** for byte-preserving copies outside storage;
+repeated exports do not overwrite earlier copies. Selected exports contain exactly
+the selected folders in one new folder; a failed copy removes the incomplete batch.
+Local deletion moves a recording to Trash; exports/backups and research-cloud
+deletion are separate. Private sandbox
 storage is normally `~/Library/Containers/io.github.krisjanci.FocusFix/Data/Library/Application Support/FocusFix/Sessions`;
 Debug uses a separate `.debug` identity/container. No automatic legacy migration.
 
@@ -140,8 +151,13 @@ coverage and archive boundaries. [CODE_MAP.md](CODE_MAP.md) maps implementation 
 - `surveys.csv` and `survey_prompts.csv`: original response/prompt meanings and blank
   skipped/cancelled ratings remain. Workload-v1 answers are not renamed productivity.
 - `session.json`: version/capabilities, IDs, UTC anchors, duration, tags/colors and
-  frozen options. Segment duration subtracts `elapsed_origin_seconds` from logical
-  elapsed time; UTC clock changes do not determine duration.
+  frozen options. New recordings also include `started_at_local`, `ended_at_local`
+  (when finished), and `time_zone` in `session.json`. Local ISO timestamps include
+  their UTC offsets and use the segment's frozen recording/scoring time zone,
+  including daylight-saving changes. Existing UTC anchors and elapsed CSV columns
+  are preserved; older recordings are not rewritten. Segment duration subtracts
+  `elapsed_origin_seconds` from logical elapsed time; UTC clock changes do not
+  determine duration.
 - `context_intervals.json`: independent context, source/effective/recorded times,
   logical IDs and revision history. Numeric Unix UTC dates are current; earlier
   local ISO dates/origin-zero snapshots remain readable without rewriting them.
