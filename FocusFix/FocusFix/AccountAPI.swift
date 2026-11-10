@@ -7,8 +7,11 @@ nonisolated struct AccountConfiguration: Equatable {
     let publicKey: String
     let researchSharingEnabled: Bool
     let studyInformationURL: URL?
+    let developmentSharingEnabled: Bool
+    let privacyPolicyURL: URL?
 
-    init?(url: String, publicKey: String, researchSharingEnabled: Bool = false, studyURL: String = "") {
+    init?(url: String, publicKey: String, researchSharingEnabled: Bool = false, studyURL: String = "",
+          developmentSharingEnabled: Bool = false, privacyURL: String = "") {
         guard let origin = URL(string: url), origin.scheme == "https", origin.host != nil,
               origin.user == nil, origin.password == nil, origin.query == nil, origin.fragment == nil,
               origin.path.isEmpty || origin.path == "/",
@@ -27,6 +30,11 @@ nonisolated struct AccountConfiguration: Equatable {
         let study = URL(string: studyURL)
         self.studyInformationURL = study.flatMap { $0.scheme == "https" && $0.host != nil && $0.user == nil && $0.password == nil ? $0 : nil }
         self.researchSharingEnabled = researchSharingEnabled && studyInformationURL != nil
+        let privacy = URL(string: privacyURL)
+        self.privacyPolicyURL = privacy.flatMap {
+            $0.scheme == "https" && $0.host != nil && $0.user == nil && $0.password == nil ? $0 : nil
+        }
+        self.developmentSharingEnabled = developmentSharingEnabled && privacyPolicyURL != nil
     }
 
     static var bundled: AccountConfiguration? {
@@ -34,7 +42,9 @@ nonisolated struct AccountConfiguration: Equatable {
         return AccountConfiguration(url: info["FocusFixAccountURL"] as? String ?? "",
             publicKey: info["FocusFixAccountPublicKey"] as? String ?? "",
             researchSharingEnabled: info["FocusFixResearchSharingEnabled"] as? Bool ?? false,
-            studyURL: info["FocusFixStudyInformationURL"] as? String ?? "")
+            studyURL: info["FocusFixStudyInformationURL"] as? String ?? "",
+            developmentSharingEnabled: info["FocusFixDevelopmentSharingEnabled"] as? Bool ?? false,
+            privacyURL: info["FocusFixPrivacyPolicyURL"] as? String ?? "")
     }
 }
 
@@ -92,6 +102,18 @@ nonisolated struct ResearchServerConsent: Codable {
 }
 nonisolated struct ResearchInterest: Codable {
     let status: String
+}
+nonisolated struct DevelopmentCollectionRow: Codable, Equatable {
+    let enabled: Bool
+    let policy_version: String
+}
+nonisolated struct DevelopmentApprovalRow: Codable, Equatable {
+    let enabled: Bool
+}
+nonisolated struct DevelopmentServerConsent: Codable, Equatable {
+    let consent_id: UUID
+    let policy_version: String
+    let withdrawn_at: String?
 }
 nonisolated struct AccountProfileRow: Codable {
     let user_id: UUID
@@ -232,6 +254,37 @@ nonisolated struct AccountAPI {
     }
     func requestResearchDeletion(session: AccountSession) async throws {
         _ = try await request(path: "functions/v1/delete-research-data", body: Data("{}".utf8), token: session.access_token)
+    }
+    func developmentCollection(session: AccountSession) async throws -> DevelopmentCollectionRow? {
+        let data = try await request(path: "rest/v1/development_collection", method: "GET", token: session.access_token,
+            query: [URLQueryItem(name: "select", value: "enabled,policy_version")])
+        return try JSONDecoder().decode([DevelopmentCollectionRow].self, from: data).first
+    }
+    func developmentApproval(session: AccountSession) async throws -> DevelopmentApprovalRow? {
+        let data = try await request(path: "rest/v1/development_approvals", method: "GET", token: session.access_token,
+            query: [URLQueryItem(name: "select", value: "enabled")])
+        return try JSONDecoder().decode([DevelopmentApprovalRow].self, from: data).first
+    }
+    func developmentConsent(session: AccountSession) async throws -> DevelopmentServerConsent? {
+        let data = try await request(path: "rest/v1/development_consents", method: "GET", token: session.access_token,
+            query: [URLQueryItem(name: "select", value: "consent_id,policy_version,withdrawn_at")])
+        return try JSONDecoder().decode([DevelopmentServerConsent].self, from: data).first
+    }
+    func setDevelopmentConsent(id: UUID, version: String, enabled: Bool, session: AccountSession) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["p_consent_id": id.uuidString.lowercased(),
+            "p_version": version, "p_enabled": enabled])
+        _ = try await request(path: "rest/v1/rpc/set_development_consent", body: body, token: session.access_token)
+    }
+    func requestDevelopmentDeletion(session: AccountSession) async throws {
+        _ = try await request(path: "functions/v1/delete-development-data", body: Data("{}".utf8), token: session.access_token)
+    }
+    func developmentObjectExists(path: String, session: AccountSession) async -> Bool {
+        (try? await request(path: "storage/v1/object/info/development-recordings/\(path)",
+            method: "GET", token: session.access_token)) != nil
+    }
+    func uploadDevelopmentArchive(_ data: Data, path: String, session: AccountSession) async throws {
+        _ = try await request(path: "storage/v1/object/development-recordings/\(path)", body: data,
+            token: session.access_token, headers: ["Content-Type": "application/zip"])
     }
     func researchArchiveReceived(_ id: UUID, session: AccountSession) async throws -> Bool {
         let data = try await request(path: "rest/v1/research_upload_receipts", method: "GET", token: session.access_token,
