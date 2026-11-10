@@ -6,8 +6,8 @@ import AppKit
 
 struct SessionLibraryView: View {
     @ObservedObject var tracker: ActivityTracker
-    @State private var selection: SavedSession.ID?
-    @State private var pendingDeletion: SavedSession?
+    @State private var selection = Set<SavedSession.ID>()
+    @State private var pendingDeletion: [SavedSession] = []
     @State private var confirmDeletion = false
     @State private var notice: String?
     @State private var exportingAll = false
@@ -18,7 +18,11 @@ struct SessionLibraryView: View {
     @ObservedObject var tagLibrary = SessionTagLibrary.shared
 
     // Find the saved session matching the current list selection.
-    private var selected: SavedSession? { tracker.sessions.first { $0.id == selection } }
+    private var selectedSessions: [SavedSession] { tracker.sessions.filter { selection.contains($0.id) } }
+    private var selected: SavedSession? { selectedSessions.count == 1 ? selectedSessions.first : nil }
+    private var canActOnSelection: Bool {
+        !exportingAll && !selectedSessions.isEmpty && !selectedSessions.contains(where: tracker.isActive)
+    }
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     // List local saved sessions with selection and export/delete controls.
@@ -40,25 +44,25 @@ struct SessionLibraryView: View {
             } else if tracker.sessions.isEmpty {
                 EmptyRecordingHistoryView()
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(tracker.sessions) { session in
-                                sessionRow(session)
-                            }
-                        }.padding(.horizontal, 18).padding(.vertical, 10)
+                HStack {
+                    Text("\(selectedSessions.count) selected").monospacedDigit()
+                    Button("Select All") { selection = Set(tracker.sessions.map(\.id)) }
+                        .keyboardShortcut("a", modifiers: .command)
+                    Button("Deselect All") { selection.removeAll() }.disabled(selection.isEmpty)
+                    Spacer()
+                    Text("⌘-click to add · ⇧-click for a range")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(.horizontal, 20).padding(.vertical, 8)
+                List(selection: $selection) {
+                    ForEach(tracker.sessions) { session in
+                        sessionRow(session).tag(session.id)
                     }
-                    .focusable()
-                    .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
-                    .onKeyPress(.downArrow) { moveSelection(1); return .handled }
-                    .onKeyPress(.return) {
-                        guard let selected, !exportingAll else { return .ignored }
-                        tagging = selected
-                        return .handled
-                    }
-                    .onChange(of: selection) { _, id in
-                        if let id { proxy.scrollTo(id, anchor: .center) }
-                    }
+                }
+                .listStyle(.inset)
+                .onKeyPress(.return) {
+                    guard let selected, !exportingAll else { return .ignored }
+                    tagging = selected
+                    return .handled
                 }
             }
             if let selected {
@@ -70,26 +74,29 @@ struct SessionLibraryView: View {
                 Button { tracker.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }
                     .help("Refresh sessions").accessibilityLabel("Refresh sessions")
                 Button("Show in Finder") {
-                    if let selected { NSWorkspace.shared.activateFileViewerSelecting([selected.folder]) }
-                }.disabled(selected == nil)
+                    NSWorkspace.shared.activateFileViewerSelecting(selectedSessions.map(\.folder))
+                }.disabled(selectedSessions.isEmpty)
                 Spacer()
                 Button("Edit context…") { editingContext = selected }
                     .disabled(selected?.recordingContract?.finalized != true || selected.map(tracker.isActive) == true)
-                Button("Delete…", role: .destructive) {
-                    pendingDeletion = selected
+                Button(selectedSessions.count > 1 ? "Delete Selected…" : "Delete…", role: .destructive) {
+                    pendingDeletion = selectedSessions
                     confirmDeletion = true
-                }.disabled(exportingAll || selected == nil || selected.map(tracker.isActive) == true)
+                }.disabled(!canActOnSelection)
                 Button(exportingAll ? "Exporting…" : "Export All…") { exportAll() }
                     .disabled(exportingAll || tracker.libraryError != nil || !tracker.sessions.contains { !tracker.isActive($0) })
                     .help("Export all saved sessions into one folder. The current recording is skipped.")
-                Button("Export…") { exportSelected() }
+                Button(selectedSessions.count > 1 ? "Export Selected…" : "Export…") { exportSelected() }
                     .buttonStyle(.borderedProminent).tint(teal)
-                    .disabled(exportingAll || selected == nil || selected.map(tracker.isActive) == true)
+                    .disabled(!canActOnSelection)
             }.padding(18)
         }
-        .frame(minWidth: 650, minHeight: 400)
+        .frame(minWidth: 800, minHeight: 400)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { tracker.refreshSessions() }
+        .onChange(of: tracker.sessions) { _, sessions in
+            selection.formIntersection(Set(sessions.map(\.id)))
+        }
         .task(id: selected) {
             coverage = nil; coverageError = nil
             guard let selected else { return }
@@ -109,19 +116,13 @@ struct SessionLibraryView: View {
                 try tracker.updateTags(tags, colors: colors, for: session)
             }
         }
-        .confirmationDialog("Move this session to Trash?", isPresented: $confirmDeletion, titleVisibility: .visible) {
-            Button("Move to Trash", role: .destructive) {
-                guard let session = pendingDeletion else { return }
-                do {
-                    try tracker.deleteSession(session)
-                    selection = nil
-                } catch { notice = error.localizedDescription }
-                pendingDeletion = nil
-            }
-            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+        .confirmationDialog("Move \(pendingDeletion.count) selected session\(pendingDeletion.count == 1 ? "" : "s") to Trash?",
+                            isPresented: $confirmDeletion, titleVisibility: .visible) {
+            Button("Move to Trash", role: .destructive) { deleteSelected() }
+            Button("Cancel", role: .cancel) { pendingDeletion = [] }
         } message: {
-            Text("Session: \(pendingDeletion?.startedAt.formatted(date: .abbreviated, time: .standard) ?? "Selected session"). The local recording will be moved to Trash. Exported copies and backups stay unchanged.")
-            Text("Deleting a local session does not delete research data already received. Use Settings → Privacy & Research to request research-data deletion.")
+            Text("The selected local recordings will be moved to Trash. Exported copies and backups stay unchanged.")
+            Text("Deleting local sessions does not delete research data already received. Use Settings → Privacy & Research to request research-data deletion.")
         }
         .alert("FocusFix", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
@@ -139,7 +140,7 @@ struct SessionLibraryView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 SessionTagButton(tags: session.tags,
                     colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors)) {
-                        selection = session.id; tagging = session
+                        selection = [session.id]; tagging = session
                     }.disabled(exportingAll)
             }
             Spacer()
@@ -157,19 +158,10 @@ struct SessionLibraryView: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(selection == session.id ? teal : Color.clear, lineWidth: 1.5)
+                    .stroke(selection.contains(session.id) ? teal : Color.clear, lineWidth: 1.5)
             }
             .contentShape(RoundedRectangle(cornerRadius: 10))
-            .onTapGesture { selection = session.id }
             .id(session.id)
-    }
-
-    // Preserve arrow-key selection while tag chips remain independent controls.
-    private func moveSelection(_ step: Int) {
-        guard !tracker.sessions.isEmpty else { return }
-        let current = tracker.sessions.firstIndex { $0.id == selection }
-        let next = current.map { min(max($0 + step, 0), tracker.sessions.count - 1) } ?? 0
-        selection = tracker.sessions[next].id
     }
 
     // Show live duration for the active session and saved duration for completed sessions.
@@ -191,12 +183,42 @@ struct SessionLibraryView: View {
         default: return "Saved"
         }
     }
-    // Export the selected session through the tracker and report any error.
-    private func exportSelected() {
-        guard let selected else { return }
+    private func deleteSelected() {
+        let sessions = pendingDeletion
+        pendingDeletion = []
+        var deleted = 0
+        var failures: [String] = []
+        // Revalidate all targets before moving any. Each move remains recoverable in Trash.
         do {
-            if let url = try tracker.exportSavedSession(selected) { notice = "Exported to \(url.path)" }
-        } catch { notice = "Export failed: \(error.localizedDescription)" }
+            for session in sessions {
+                try SessionFiles.validate(session.folder, in: SessionFiles.root(),
+                    active: tracker.isRecording ? tracker.sessionFolder : nil)
+            }
+        } catch { notice = "Nothing was deleted: \(error.localizedDescription)"; return }
+        for session in sessions {
+            do {
+                try tracker.deleteSession(session)
+                selection.remove(session.id)
+                deleted += 1
+            } catch { failures.append("\(session.id): \(error.localizedDescription)") }
+        }
+        if !failures.isEmpty {
+            notice = "Moved \(deleted) of \(sessions.count) sessions to Trash. Could not delete:\n" + failures.joined(separator: "\n")
+        }
+    }
+
+    private func exportSelected() {
+        guard canActOnSelection else { return }
+        let sessions = selectedSessions
+        exportingAll = true
+        Task { @MainActor in
+            defer { exportingAll = false }
+            do {
+                if let result = try await tracker.exportSavedSessions(sessions) {
+                    notice = "Exported \(result.count) selected session\(result.count == 1 ? "" : "s") to \(result.folder.path)"
+                }
+            } catch { notice = "Export failed: \(error.localizedDescription)" }
+        }
     }
 
     private func exportAll() {
