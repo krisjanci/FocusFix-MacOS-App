@@ -204,7 +204,7 @@ final class ActivityTracker: ObservableObject {
     func refreshInputPermission() {
         guard needsPermission, InputMonitor.hasPermission else { return }
         needsPermission = false
-        message = "Input Monitoring is enabled. Press Start when you are ready."
+        message = "Input Monitoring is enabled. Press Start work when you are ready."
     }
     // Start immediately; planning and its optional check-in are a separate action.
     func requestStart() {
