@@ -223,7 +223,7 @@ struct ContentView: View {
                 Button {
                     if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else { tracker.requestStart() }
                 } label: {
-                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start",
+                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work",
                           systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
                         .frame(minWidth: 124)
                 }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
