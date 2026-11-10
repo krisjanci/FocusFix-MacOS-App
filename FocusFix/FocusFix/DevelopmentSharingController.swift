@@ -80,6 +80,9 @@ final class DevelopmentSharingController: ObservableObject {
                 self.disable()
             }
             self.previousOwner = owner
+            if owner != nil {
+                Task { await self.refresh(); self.checkDue() }
+            }
         }
         if startTimer {
             let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
