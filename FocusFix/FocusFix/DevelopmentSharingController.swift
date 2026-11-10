@@ -45,6 +45,7 @@ final class DevelopmentSharingController: ObservableObject {
         self.defaults = defaults
         var resolvedRoot: URL?
         var resolvedRecordings: URL?
+        var loadedState = DevelopmentSharingState()
         do {
             let folder = try root ?? FileManager.default.url(for: .applicationSupportDirectory,
                 in: .userDomainMask, appropriateFor: nil, create: true)
@@ -55,15 +56,16 @@ final class DevelopmentSharingController: ObservableObject {
             resolvedRecordings = try recordings ?? SessionFiles.root()
             let file = folder.appendingPathComponent("state.json")
             if FileManager.default.fileExists(atPath: file.path) {
-                state = try JSONDecoder().decode(DevelopmentSharingState.self, from: Data(contentsOf: file))
+                loadedState = try JSONDecoder().decode(DevelopmentSharingState.self, from: Data(contentsOf: file))
             }
             if defaults?.bool(forKey: Self.stopLatch) == true {
-                state.disable()
-                try JSONEncoder().encode(state).write(to: file, options: .atomic)
+                loadedState.disable()
+                try JSONEncoder().encode(loadedState).write(to: file, options: .atomic)
             }
         } catch { notice = "Sharing could not open its saved state. No uploads will start." }
         storage = resolvedRoot
         self.recordings = resolvedRecordings
+        state = loadedState
         observation = account.$session.map { $0?.user.id }.removeDuplicates().sink { [weak self] owner in
             guard let self else { return }
             self.generation = UUID()
