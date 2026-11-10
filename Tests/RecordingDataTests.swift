@@ -191,6 +191,27 @@ struct RecordingDataTests {
         precondition(FileManager.default.fileExists(atPath:
             repeatedBatch.folder.appendingPathComponent(unfinished.exportName()).path))
 
+        // Explicit selections export exactly the chosen subset, preserving original bytes.
+        let selectionDestination = exports.appendingPathComponent("selected-exports")
+        try FileManager.default.createDirectory(at: selectionDestination, withIntermediateDirectories: false)
+        let selectionBatch = try SessionFiles.exportSelected([saved, unfinished], to: selectionDestination,
+            root: root, active: old.folder)
+        precondition(selectionBatch.count == 2)
+        let selectionCopies = try FileManager.default.contentsOfDirectory(atPath: selectionBatch.folder.path)
+        precondition(Set(selectionCopies) == Set([saved.exportName(), unfinished.exportName()]))
+        let selectionMetadata = try Data(contentsOf: selectionBatch.folder.appendingPathComponent(saved.exportName())
+            .appendingPathComponent("session.json"))
+        precondition(selectionMetadata == historicalData)
+        let selectionBefore = try FileManager.default.contentsOfDirectory(atPath: selectionDestination.path).sorted()
+        for invalidSelection in [[], [saved, saved], [saved, old]] {
+            do {
+                _ = try SessionFiles.exportSelected(invalidSelection, to: selectionDestination, root: root, active: old.folder)
+                preconditionFailure("Empty, duplicate or active selections must fail before copying")
+            } catch { }
+        }
+        let selectionAfter = try FileManager.default.contentsOfDirectory(atPath: selectionDestination.path).sorted()
+        precondition(selectionBefore == selectionAfter)
+
         // Identical timestamps must still produce two separate, complete copies.
         let duplicateFolder = root.appendingPathComponent("same-time")
         try FileManager.default.copyItem(at: writer.folder, to: duplicateFolder)
@@ -233,6 +254,26 @@ struct RecordingDataTests {
         let afterFailure = try FileManager.default.contentsOfDirectory(atPath: exports.path).sorted()
         precondition(beforeFailure == afterFailure)
         precondition(FileManager.default.fileExists(atPath: unreadable.path))
-        print("PASS: recording schema and timing, session reload, single and batch exports, duplicate protection, legacy and unfinished sessions, active-session and path guards.")
+        // Local wall time retains its recorded zone and the correct offset across DST.
+        let dstStart = ISO8601DateFormatter().date(from: "2026-11-01T05:59:30Z")!
+        let dstContract = RecordingContract(mode: .manual, startedAt: dstStart, elapsedOrigin: 120,
+            scoringTimeZone: "America/New_York")
+        let dstWriter = try RecordingWriter(root: exports, id: "dst-session", startedAt: dstStart,
+            continuingContract: dstContract)
+        let dstInitial = try JSONSerialization.jsonObject(with: Data(contentsOf:
+            dstWriter.folder.appendingPathComponent("session.json"))) as! [String: Any]
+        precondition(dstInitial["started_at_local"] as? String == "2026-11-01T01:59:30-04:00")
+        precondition(dstInitial["time_zone"] as? String == "America/New_York")
+        precondition(dstInitial["ended_at_local"] == nil)
+        try dstWriter.updateTags(["DST test"], colors: [:])
+        try dstWriter.finish(startedAt: dstStart, duration: 210, reason: "user_stop")
+        let dstFinal = try JSONSerialization.jsonObject(with: Data(contentsOf:
+            dstWriter.folder.appendingPathComponent("session.json"))) as! [String: Any]
+        precondition(dstFinal["started_at_local"] as? String == "2026-11-01T01:59:30-04:00")
+        precondition(dstFinal["ended_at_local"] as? String == "2026-11-01T01:01:00-05:00")
+        precondition(dstFinal["ended_at_utc"] as? String == "2026-11-01T06:01:00Z")
+        precondition(dstFinal["duration_seconds"] as? Double == 90)
+
+        print("PASS: recording schema and timing, session reload, single, selected and all-session exports, duplicate protection, legacy and unfinished sessions, active-session and path guards, local time and DST offsets.")
     }
 }
