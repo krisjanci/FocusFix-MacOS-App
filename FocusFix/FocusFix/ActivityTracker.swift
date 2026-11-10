@@ -192,7 +192,7 @@ final class ActivityTracker: ObservableObject {
         needsPermission = !InputMonitor.requestPermission()
         message = needsPermission
             ? "Turn on FocusFix in Input Monitoring to record activity across apps. If macOS asks, quit and reopen FocusFix."
-            : "Input Monitoring is enabled. Press Start when you are ready."
+            : "Input Monitoring is enabled. Press Start work when you are ready."
         if needsPermission { openInputSettings() }
     }
     private func openInputSettings() {
