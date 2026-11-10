@@ -287,6 +287,11 @@ final class RecordingWriter {
             "keyboard_scope": "key down/up and generic modifier changes; no key identities saved",
             "limitations": "Secure Input can suppress keyboard events. macOS may coalesce movement events. Silence is not proof of a break."
         ]
+        // Freeze local wall time to this segment's zone, even if the system zone changes before Stop.
+        let localTime = ISO8601DateFormatter()
+        localTime.timeZone = TimeZone(identifier: contract.scoringTimeZone)!
+        fields["time_zone"] = contract.scoringTimeZone
+        fields["started_at_local"] = localTime.string(from: startedAt)
         if let studyConfiguration {
             fields["study_check_in_schedule"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(studyConfiguration))
             fields["study_check_in_logging"] = "study_check_ins.jsonl joins immutable prompt IDs to context and preceding recall bounds. Scheduled/requested/opened/answered/skipped/cancelled are distinct. Never use check-in interaction or future data as preceding predictors."
@@ -294,6 +299,7 @@ final class RecordingWriter {
         fields["sharing_policy"] = "Optional account-based research sharing requires researcher approval and server-recorded, versioned consent captured at session start. Opt-out cancels queued deliveries. Local recording does not require an account."
         if let duration {
             fields["duration_seconds"] = duration - contract.elapsedOrigin
+            fields["ended_at_local"] = localTime.string(from: startedAt.addingTimeInterval(duration - contract.elapsedOrigin))
             fields["ended_at_utc"] = ISO8601DateFormatter().string(from: startedAt.addingTimeInterval(duration - contract.elapsedOrigin))
         }
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
