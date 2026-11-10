@@ -96,7 +96,7 @@ struct QuickTourDemoView: View {
             }
             HStack {
                 if tour.phase == .start || tour.saved {
-                    Button("Start") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }
+                    Button("Start work") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }
                         .buttonStyle(.borderedProminent).disabled(tour.phase != .start)
                     practiceButton("Plan session…", phase: .start, action: .start)
                 } else {
@@ -183,7 +183,7 @@ struct QuickTourDemoView: View {
             }
             HStack {
                 Spacer()
-                practiceButton("Start", phase: .confirmStart, action: .confirmStart)
+                practiceButton("Start work", phase: .confirmStart, action: .confirmStart)
                     .buttonStyle(.borderedProminent)
             }
         }.padding(20)
