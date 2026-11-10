@@ -12,7 +12,6 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appearance") private var appearance = "system"
-    @AppStorage("focusfix.research.invitationDeclined") private var invitationDeclined = false
     @State private var sharingPresented = false
     @State private var editingSessionTags = false
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
@@ -152,19 +151,6 @@ struct ContentView: View {
             }
 
             DailyProgressCard(tracker: tracker)
-            if !invitationDeclined, account.researchAvailable, account.session != nil,
-               account.study?.recruitment_enabled == true, account.study?.complete == true,
-               account.researchInterest == nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Would you like to contribute to FocusFix research?").font(.callout.weight(.medium))
-                    Text("Review the study and request to join. Participation is optional; recordings stay local until you are approved and explicitly enable sharing.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        SettingsLink { Text("Review study") }
-                        Button("No thanks") { invitationDeclined = true }
-                    }
-                }
-            }
 
             if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
 
