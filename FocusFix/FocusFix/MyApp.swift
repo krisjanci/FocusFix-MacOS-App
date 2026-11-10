@@ -84,7 +84,7 @@ private struct RecordingMenu: View {
             openWindow(id: "collector")
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start") {
+        Button(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work") {
             if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else {
                 launch.requestStart(start: { tracker.requestStart() }, showWindow: {
                     openWindow(id: "collector")
