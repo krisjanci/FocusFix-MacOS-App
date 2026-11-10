@@ -239,6 +239,18 @@ nonisolated enum SessionFiles {
             throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
                 "There are no saved sessions to export. Stop and save the current recording first."])
         }
+        return try exportSelected(sessions, to: target, root: root, active: active)
+    }
+
+    // Validate the entire explicit selection before copying; never silently skip a selected recording.
+    static func exportSelected(_ sessions: [SavedSession], to destination: URL, root: URL,
+                               active: URL?) throws -> (folder: URL, count: Int) {
+        let target = try exportDestination(destination, root: root)
+        guard !sessions.isEmpty, Set(sessions.map(\.id)).count == sessions.count else {
+            throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
+                "Select one or more distinct saved sessions to export."])
+        }
+        for session in sessions { try validate(session.folder, in: root, active: active) }
         var batch = target.appendingPathComponent("FocusFix Sessions", isDirectory: true)
         var number = 2
         while FileManager.default.fileExists(atPath: batch.path) {
