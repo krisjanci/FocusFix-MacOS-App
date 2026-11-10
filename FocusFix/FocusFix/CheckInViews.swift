@@ -100,10 +100,10 @@ struct SessionCheckInView: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
                 if draft.asksForFatigue {
-                    Button("Skip & start") { start(skippingFatigue: true) }
+                    Button("Skip & start work") { start(skippingFatigue: true) }
                         .disabled(!draft.validPlan)
                 }
-                Button("Start") { start() }
+                Button("Start work") { start() }
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
