@@ -84,6 +84,7 @@ final class ActivityTracker: ObservableObject {
     private var returnWindowStart: Double = 0
     private var suspendedBy: Set<String> = []
     private var researchConsent: ResearchConsent?
+    private var developmentConsent: DevelopmentConsent?
     private var researchCaptureIdentity: ResearchCaptureIdentity? {
         ResearchSharingController.shared.capturedConsent.map { consent in
             ResearchCaptureIdentity(owner: consent.owner, origin: consent.origin, consentID: consent.id,
@@ -409,6 +410,7 @@ final class ActivityTracker: ObservableObject {
             sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
             studyPrompt = nil
             researchConsent = ResearchSharingController.shared.capturedConsent
+            developmentConsent = DevelopmentSharingController.shared.capturedConsent
             capturedResearchIdentity = researchCaptureIdentity
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
                 mode: mode, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
@@ -513,8 +515,10 @@ final class ActivityTracker: ObservableObject {
             }
             if let sessionFolder, reason != "recording_error", reason != "monitor_unavailable" {
                 ResearchSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: researchConsent)
+                DevelopmentSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: developmentConsent)
             }
             researchConsent = nil
+            developmentConsent = nil
             if sessionFolder == nil {
                 message = "Time added to your daily goal. Sessions under 15 minutes aren't saved."
             } else {
@@ -628,12 +632,16 @@ final class ActivityTracker: ObservableObject {
         try applyObservedWork()
         let root = try SessionFiles.root()
         writer = nil
-        _ = try SessionFiles.retainRecording(previous.folder, duration: time - previous.contract.elapsedOrigin, root: root)
+        let retained = try SessionFiles.retainRecording(previous.folder, duration: time - previous.contract.elapsedOrigin, root: root)
+        if let retained {
+            DevelopmentSharingController.shared.finished(folder: retained, startedAt: startedAt, captured: developmentConsent)
+        }
         let nextStart = Date()
         let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
             startedAt: nextStart, elapsedOrigin: time, continuing: context, scoringTimeZone: previous.contract.scoringTimeZone)
         capturedResearchIdentity = researchCaptureIdentity
         researchConsent = ResearchSharingController.shared.capturedConsent
+        developmentConsent = DevelopmentSharingController.shared.capturedConsent
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
             startedAt: nextStart, mode: recordingMode, continuingContract: next, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
@@ -659,7 +667,8 @@ final class ActivityTracker: ObservableObject {
         let time = now
         guard time - lastSamplingTick <= 5 else { stop(reason: "capture_gap", observedEnd: lastObservedTime); return }
         do {
-            if activeAccountKey != captureAccountKey || researchCaptureIdentity != capturedResearchIdentity {
+            if activeAccountKey != captureAccountKey || researchCaptureIdentity != capturedResearchIdentity ||
+                DevelopmentSharingController.shared.capturedConsent != developmentConsent {
                 try rotateRecording(at: min(time, lastObservedTime), reason: "consent_or_account_boundary")
                 resetMouse(at: time, phase: activityPhase) // The transition gap is unobserved.
             }
