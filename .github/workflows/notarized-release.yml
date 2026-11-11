@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v6
         with:
-          ref: release-staging
+          ref: release-assets-${{ github.ref_name }}
           path: release-staging
           persist-credentials: false
       - name: Verify exact release files and Apple notarization
