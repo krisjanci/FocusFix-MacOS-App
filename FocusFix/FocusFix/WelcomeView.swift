@@ -74,7 +74,7 @@ struct WelcomeView: View {
                     Button("Use as guest") { launch.useGuest() }
                         .buttonStyle(.bordered).controlSize(.large)
                         .keyboardShortcut(.cancelAction)
-                    Text(launch.isPreview ? "Use as guest returns to your app without changing your saved choice." : "Manual recording, breaks and progress work without an account. Automatic recording requires a separate choice in Privacy & Research. Guest mode is remembered; you can sign in later from Profile.")
+                    Text(launch.isPreview ? "Use as guest returns to your app without changing your saved choice." : "Manual recording, breaks and progress work without an account. Automatic recording requires a separate choice in Privacy & Data Sharing. Guest mode is remembered; you can sign in later from Profile.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(30).frame(maxWidth: .infinity, alignment: .leading)
