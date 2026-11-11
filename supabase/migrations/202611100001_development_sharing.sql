@@ -20,6 +20,7 @@ create policy development_collection_read on public.development_collection
 create table public.development_approvals (
   user_id uuid primary key references auth.users(id) on delete cascade,
   enabled boolean not null default false,
+  max_archives integer not null default 10 check (max_archives between 1 and 100),
   updated_at timestamptz not null default now()
 );
 alter table public.development_approvals enable row level security;
@@ -148,6 +149,9 @@ returns boolean language sql stable security definer set search_path = '' as $$
       where c.user_id = auth.uid() and c.withdrawn_at is null
         and c.consent_id::text = split_part(object_name, '/', 2)
         and c.policy_version = s.policy_version and s.enabled and a.enabled
+        and (select count(*) from storage.objects o
+             where o.bucket_id = 'development-recordings'
+               and o.name like auth.uid()::text || '/%') < a.max_archives
     )
     and not exists (select 1 from public.development_deletion_requests
                     where owner_reference = auth.uid() and status <> 'completed');
@@ -155,7 +159,8 @@ $$;
 create policy own_development_recording_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'development-recordings' and public.can_upload_development(name));
 create policy own_development_recording_read on storage.objects for select to authenticated
-  using (bucket_id = 'development-recordings' and public.can_upload_development(name));
+  using (bucket_id = 'development-recordings'
+    and split_part(name, '/', 1) = (select auth.uid())::text);
 
 revoke all on function public.set_development_consent(uuid, text, boolean) from public, anon;
 revoke all on function public.request_development_deletion() from public, anon;
