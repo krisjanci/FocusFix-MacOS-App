@@ -2,6 +2,7 @@
 // Animates the logo into the main screen. This is visual only, not a loading task or recording timer.
 
 import SwiftUI
+import Darwin
 
 // A short introduction, not a loading task. It never starts or pauses recording.
 struct LaunchScreen: View {
@@ -148,8 +149,8 @@ private struct LaunchRingSegment: Shape {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         var path = Path()
         let start = Angle.degrees(Double(quarter * 90) + 4)
-        path.move(to: CGPoint(x: center.x + radius * cos(start.radians),
-                              y: center.y + radius * sin(start.radians)))
+        path.move(to: CGPoint(x: center.x + radius * Darwin.cos(start.radians),
+                              y: center.y + radius * Darwin.sin(start.radians)))
         path.addArc(center: center, radius: radius, startAngle: start,
             endAngle: .degrees(Double(quarter * 90) + 86), clockwise: false)
         return path
