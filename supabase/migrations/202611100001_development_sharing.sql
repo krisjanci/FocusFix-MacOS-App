@@ -137,24 +137,29 @@ end;
 $$;
 
 create function public.can_upload_development(object_name text)
-returns boolean language sql stable security definer set search_path = '' as $$
-  select auth.uid() is not null
-    and array_length(string_to_array(object_name, '/'), 1) = 3
-    and split_part(object_name, '/', 1) = auth.uid()::text
-    and split_part(object_name, '/', 3) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.zip$'
-    and exists (
-      select 1 from public.development_consents c
-      join public.development_approvals a on a.user_id = c.user_id
-      join public.development_collection s on s.singleton
-      where c.user_id = auth.uid() and c.withdrawn_at is null
-        and c.consent_id::text = split_part(object_name, '/', 2)
-        and c.policy_version = s.policy_version and s.enabled and a.enabled
-        and (select count(*) from storage.objects o
-             where o.bucket_id = 'development-recordings'
-               and o.name like auth.uid()::text || '/%') < a.max_archives
-    )
-    and not exists (select 1 from public.development_deletion_requests
-                    where owner_reference = auth.uid() and status <> 'completed');
+returns boolean language plpgsql volatile security definer set search_path = '' as $$
+declare caller uuid := auth.uid();
+begin
+  if caller is null or array_length(string_to_array(object_name, '/'), 1) <> 3
+     or split_part(object_name, '/', 1) <> caller::text
+     or split_part(object_name, '/', 3) !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.zip$' then
+    return false;
+  end if;
+  -- Serialize uploads with each other and with withdrawal/deletion for this account.
+  perform 1 from auth.users where id = caller for update;
+  return exists (
+    select 1 from public.development_consents c
+    join public.development_approvals a on a.user_id = c.user_id
+    join public.development_collection s on s.singleton
+    where c.user_id = caller and c.withdrawn_at is null
+      and c.consent_id::text = split_part(object_name, '/', 2)
+      and c.policy_version = s.policy_version and s.enabled and a.enabled
+      and (select count(*) from storage.objects o
+           where o.bucket_id = 'development-recordings'
+             and o.name like caller::text || '/%') < a.max_archives
+  ) and not exists (select 1 from public.development_deletion_requests
+                    where owner_reference = caller and status <> 'completed');
+end;
 $$;
 create policy own_development_recording_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'development-recordings' and public.can_upload_development(name));
