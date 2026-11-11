@@ -1,0 +1,78 @@
+name: Publish macOS test build
+
+on:
+  push:
+    tags:
+      - 'test-*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-publish:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run app tests
+        run: bash scripts/test.sh
+      - name: Run service tests
+        run: |
+          npm --prefix supabase test
+          npm install --prefix supabase --ignore-scripts --no-package-lock
+          npm --prefix supabase run test:database
+      - name: Build universal preview
+        run: |
+          xcodebuild -project FocusFix/FocusFix.xcodeproj -scheme FocusFix \
+            -configuration Release -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/FocusFixDerived" \
+            CODE_SIGNING_ALLOWED=NO FOCUSFIX_SOURCE_REVISION="$GITHUB_SHA" \
+            ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
+      - name: Ad hoc sign and inspect preview
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          ditto "$RUNNER_TEMP/FocusFixDerived/Build/Products/Release/FocusFix.app" \
+            "$RUNNER_TEMP/release/FocusFix.app"
+          codesign --force --deep --sign - --options runtime \
+            --entitlements FocusFix/Configuration/Release.entitlements \
+            "$RUNNER_TEMP/release/FocusFix.app"
+          codesign --verify --deep --strict "$RUNNER_TEMP/release/FocusFix.app"
+          python3 scripts/check-release-content.py "$RUNNER_TEMP/release/FocusFix.app" \
+            --require-revision --submission-ready
+      - name: Package app and matching source
+        run: |
+          cd "$RUNNER_TEMP/release"
+          ditto -c -k --sequesterRsrc --keepParent FocusFix.app FocusFix-macOS.zip
+          git -C "$GITHUB_WORKSPACE" archive --format=zip --prefix=FocusFix-source/ \
+            --output="$RUNNER_TEMP/release/FocusFix-source.zip" "$GITHUB_SHA"
+          cp "$GITHUB_WORKSPACE/LICENSE" LICENSE.txt
+          shasum -a 256 FocusFix-macOS.zip FocusFix-source.zip LICENSE.txt > SHA256SUMS.txt
+          unzip -tq FocusFix-macOS.zip
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## FocusFix test build
+
+          This build is for testing on another Mac while Apple Developer signing is being set up. It is ad hoc signed and **not notarized by Apple**. It is not a finished public release. macOS 14 or later is required.
+
+          Detailed recording uploads to the developer are disabled in this build because the sharing service has not been deployed. Local recording, sessions, breaks, accounts, and the practice tour can be tested.
+
+          Download `FocusFix-macOS.zip`, unzip it, and move FocusFix.app to Applications. macOS may block the first launch. If you trust this exact download, try opening it, then use System Settings → Privacy & Security → Open Anyway. Follow [Apple's instructions](https://support.apple.com/102445). Grant Input Monitoring only if you want to test recording. You can compare the ZIP against `SHA256SUMS.txt`.
+
+          The matching source and GPL-3.0 license are attached. Do not post recordings or credentials in public issues.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/release/FocusFix-macOS.zip" \
+            "$RUNNER_TEMP/release/FocusFix-source.zip" \
+            "$RUNNER_TEMP/release/LICENSE.txt" \
+            "$RUNNER_TEMP/release/SHA256SUMS.txt" \
+            --verify-tag --latest \
+            --title "FocusFix test build ($GITHUB_REF_NAME)" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
