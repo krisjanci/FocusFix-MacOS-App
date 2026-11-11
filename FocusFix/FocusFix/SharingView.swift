@@ -28,7 +28,7 @@ struct SharingView: View {
                     QuickTourButton(beforeOpen: { dismiss() })
                 }
                 SettingsLink { Label("Privacy & Data Sharing settings", systemImage: "hand.raised") }
-                Text("Your profile is private. Signing in never enables recording or research sharing.")
+                Text("Your profile is private. Signing in never enables recording or development sharing.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(26)
         }.frame(width: 510, height: 540)
