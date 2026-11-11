@@ -122,7 +122,7 @@ struct SessionLibraryView: View {
             Button("Cancel", role: .cancel) { pendingDeletion = [] }
         } message: {
             Text("The selected local recordings will be moved to Trash. Exported copies and backups stay unchanged.")
-            Text("Deleting local sessions does not delete research data already received. Use Settings → Privacy & Research to request research-data deletion.")
+            Text("Deleting local sessions does not delete recordings already shared with the developer. Use Settings → Privacy & Data Sharing to request deletion of shared data.")
         }
         .alert("FocusFix", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
