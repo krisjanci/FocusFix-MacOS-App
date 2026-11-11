@@ -36,7 +36,7 @@ struct AccountControls: View {
             Button("Delete account", role: .destructive) { Task { await account.deleteAccount() } }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This permanently deletes your online account, profile and research ZIPs still held in this service. Copies already downloaded by the researcher and recordings on this Mac are not deleted.")
+            Text("This deletes your online account, profile, and hosted recordings shared with the developer. Downloaded copies require separate cleanup. Recordings on this Mac are not deleted.")
         }
     }
 }
