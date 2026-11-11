@@ -20,3 +20,13 @@ node_modules/
 .env*
 *.zip
 enrollment*.sql
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.cert
+*.sqlite
+*.sqlite3
