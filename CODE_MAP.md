@@ -53,13 +53,14 @@ All Swift paths below are inside `FocusFix/FocusFix/`.
 - `checkDue`: research delivery retries and pending withdrawal synchronization.
 - `FocusFixAccountURL`: Supabase service configuration.
 - `FocusFixResearchSharingEnabled`: study feature gate, separate from signing in.
+- `FocusFixDevelopmentSharingEnabled`: product-development sharing gate; server approval and user consent are also required.
 - `ResearchArchive`: per-session ZIP allowlist and size limits.
 
 When changing a limit, check the app, Supabase policies/functions, tests and
 user-facing explanation together. A matching number in just one file isn't enough.
 
 For cloud setup, use [research operations](supabase/RESEARCH-OPERATIONS.md).
-For the retired uploader, see [Cloudflare removal notes](CLOUDFLARE-REMOVAL.md).
+Historical Cloudflare removal notes are in the local `CS 600/FocusFix-App-Archive-2026-11-10` folder.
 
 
 Current verification/release boundaries: [REDESIGN-READINESS.md](REDESIGN-READINESS.md)
