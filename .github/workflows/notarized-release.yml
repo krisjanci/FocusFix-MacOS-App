@@ -1,0 +1,57 @@
+name: Publish notarized macOS build
+
+on:
+  push:
+    tags:
+      - 'notarized-*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: release-staging
+          path: release-staging
+          persist-credentials: false
+      - name: Verify exact release files and Apple notarization
+        run: |
+          set -euo pipefail
+          cd release-staging
+          shasum -a 256 -c SHA256SUMS.txt
+          unzip -tq FocusFix-macOS.zip
+          mkdir -p "$RUNNER_TEMP/notarized-app"
+          ditto -x -k FocusFix-macOS.zip "$RUNNER_TEMP/notarized-app"
+          bash "$GITHUB_WORKSPACE/scripts/verify-release.sh" \
+            "$RUNNER_TEMP/notarized-app/FocusFix.app" website
+          test "$(cat SOURCE-REVISION.txt)" = \
+            "$(defaults read "$RUNNER_TEMP/notarized-app/FocusFix.app/Contents/Info" FocusFixSourceRevision)"
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## FocusFix for macOS
+
+          This website build is signed with a Developer ID certificate and notarized by Apple. macOS 14 or later is required.
+
+          Download `FocusFix-macOS.zip`, unzip it, and move FocusFix.app to Applications. On first launch, approve only the macOS permissions you want to use. Input Monitoring is required for automatic activity recording.
+
+          Recordings remain on your Mac. Sharing detailed recordings with the developer is currently unavailable while the optional sharing service is being prepared.
+
+          The matching source code, GPL-3.0 license, source revision, and SHA-256 checksums are attached.
+          NOTES
+          cd release-staging
+          gh release create "$GITHUB_REF_NAME" \
+            FocusFix-macOS.zip FocusFix-source.zip LICENSE.txt \
+            SOURCE-REVISION.txt SHA256SUMS.txt \
+            --verify-tag --latest \
+            --title "FocusFix for macOS ($GITHUB_REF_NAME)" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
