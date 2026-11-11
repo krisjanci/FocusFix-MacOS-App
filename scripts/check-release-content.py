@@ -3,6 +3,7 @@
 import argparse
 import plistlib
 import subprocess
+import re
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -13,6 +14,8 @@ def check(app: Path, require_revision: bool = False, submission_ready: bool = Fa
             raise ValueError(message)
 
     info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    require(not any(re.search(r'sb_secret_|service[_-]?role|-----BEGIN .*PRIVATE KEY', str(value), re.I)
+                    for value in info.values()), 'Private credential found in app configuration')
     require(info.get('CFBundleIdentifier') == 'io.github.krisjanci.FocusFix', 'Not the production app identifier')
     require(info.get('FocusFixBuildChannel') == 'release', 'Not a Release build')
     require(info.get('LSMinimumSystemVersion') == '14.0', 'Unexpected minimum macOS version; review compatibility')
@@ -38,6 +41,13 @@ def check(app: Path, require_revision: bool = False, submission_ready: bool = Fa
     if info.get('FocusFixResearchSharingEnabled'):
         required |= {'NSPrivacyCollectedDataTypeOtherUsageData', 'NSPrivacyCollectedDataTypeOtherUserContent', 'NSPrivacyCollectedDataTypeHealth'}
         require(str(info.get('FocusFixStudyInformationURL', '')).startswith('https://'), 'Missing study information URL')
+    if info.get('FocusFixDevelopmentSharingEnabled'):
+        required |= {'NSPrivacyCollectedDataTypeOtherUsageData', 'NSPrivacyCollectedDataTypeOtherUserContent'}
+        policy = urlparse(info.get('FocusFixPrivacyPolicyURL', ''))
+        require(policy.scheme == 'https' and policy.hostname, 'Development sharing needs a privacy URL')
+        for item in ('NSPrivacyCollectedDataTypeOtherUsageData', 'NSPrivacyCollectedDataTypeOtherUserContent'):
+            require('NSPrivacyCollectedDataTypePurposeAnalytics' in declared[item]['NSPrivacyCollectedDataTypePurposes'],
+                    f'Missing product-improvement purpose for {item}')
     require(required <= declared.keys(), 'Privacy manifest omits configured off-device collection')
     require(all(v.get('NSPrivacyCollectedDataTypeTracking') is False for v in declared.values()), 'Unexpected tracking declaration')
     reasons = {v['NSPrivacyAccessedAPIType']: v['NSPrivacyAccessedAPITypeReasons'] for v in privacy['NSPrivacyAccessedAPITypes']}
