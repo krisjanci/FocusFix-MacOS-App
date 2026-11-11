@@ -88,7 +88,7 @@ struct RecordingDataTests {
         precondition(info["tags"] as? [String] == ["Focused work", "Creative work"])
         precondition(info["tag_colors"] as? [String: String] == liveColors)
         precondition(info["participant_id"] == nil && info["sharing_consent_id"] == nil)
-        precondition((info["sharing_policy"] as? String)?.contains("server-recorded, versioned consent") == true)
+        precondition((info["sharing_policy"] as? String)?.contains("separate user consent for new recordings") == true)
         precondition(info["token"] == nil && info["credential"] == nil)
         near(info["duration_seconds"] as! Double, 1.4)
         precondition(info["ended_at_utc"] as? String == "1970-01-01T00:00:01Z")
