@@ -142,10 +142,10 @@ declare caller uuid := auth.uid();
 begin
   if caller is null or array_length(string_to_array(object_name, '/'), 1) <> 3
      or split_part(object_name, '/', 1) <> caller::text
-     or split_part(object_name, '/', 3) !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.zip$' then
+     or not (split_part(object_name, '/', 3) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.]zip$') then
     return false;
   end if;
-  -- Serialize uploads with each other and with withdrawal/deletion for this account.
+  -- Serializes quota checks with uploads and withdrawal for this account.
   perform 1 from auth.users where id = caller for update;
   return exists (
     select 1 from public.development_consents c
