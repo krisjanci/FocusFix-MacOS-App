@@ -14,10 +14,18 @@ if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!*.xcuserstat
     echo "Archive blocked: commit the intended source changes when authorized before making a distributable archive." >&2
     exit 1
 fi
+signing_identity=$(/usr/bin/security find-identity -v -p codesigning |
+    /usr/bin/sed -nE "s/.*\"(Developer ID Application: [^\"]+ \($team_id\))\".*/\1/p" |
+    /usr/bin/head -n 1)
+if [[ -z "$signing_identity" ]]; then
+    echo "Archive blocked: install a valid Developer ID Application identity for team $team_id." >&2
+    exit 1
+fi
 revision=$(git rev-parse HEAD)
 xcodebuild -project FocusFix/FocusFix.xcodeproj -scheme FocusFix -configuration Release \
     -destination 'generic/platform=macOS' -archivePath "$archive_path" \
     DEVELOPMENT_TEAM="$team_id" FOCUSFIX_SOURCE_REVISION="$revision" \
-    ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO archive
+    ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
+    CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$signing_identity" archive
 python3 scripts/check-release-content.py "$archive_path/Products/Applications/FocusFix.app" --require-revision
 echo "Local archive created. Export through Xcode Organizer using the chosen distribution method."
