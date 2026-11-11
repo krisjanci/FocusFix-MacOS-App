@@ -86,7 +86,10 @@ final class DevelopmentSharingController: ObservableObject {
         }
         if startTimer {
             let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.checkDue() }
+                MainActor.assumeIsolated {
+                    guard let self, self.account.session != nil, !self.busy else { return }
+                    Task { await self.refresh(); self.checkDue() }
+                }
             }
             self.timer = timer
             RunLoop.main.add(timer, forMode: .common)
