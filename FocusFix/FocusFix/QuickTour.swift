@@ -6,7 +6,7 @@ import CoreGraphics
 enum QuickTourPhase: String, CaseIterable {
     case start, plan, duration, confirmStart, work, takeBreak, startBreak, returned
     case progress, save, sessions, savedSession, profile, editName, name
-    case people, groups, chooseGroup, rankings, podium, freezes
+    case privacy, sharing
 
     var index: Int {
         switch self {
@@ -17,45 +17,38 @@ enum QuickTourPhase: String, CaseIterable {
         case .progress: return 4
         case .save, .sessions, .savedSession: return 5
         case .profile, .editName, .name: return 6
-        case .people: return 7
-        case .groups, .chooseGroup: return 8
-        case .rankings: return 9
-        case .podium: return 10
-        case .freezes: return 11
+        case .privacy: return 7
+        case .sharing: return 8
         }
     }
     var caption: String {
         switch self {
-        case .start: return "Start immediately, or choose Plan session."
+        case .start: return "Try Start work or Plan session."
         case .plan: return "Choose Add work target to plan."
         case .duration: return "Choose 30, 60, or 90 minutes."
         case .confirmStart: return "Click Start when ready."
-        case .work: return "Declared work grows separately from recorded time."
+        case .work: return "Recorded time and work labels are different."
         case .takeBreak: return "Click Take a break to recharge."
         case .startBreak: return "Click Start break."
         case .returned: return "Back? Click I’m back."
-        case .progress: return "Aim for one hour each day."
+        case .progress: return "Your daily goal counts declared work."
         case .save: return "Click End work to finish."
         case .sessions: return "Find your work in Sessions."
-        case .savedSession: return "Your work is saved here."
-        case .profile: return "Click Profile to make it yours."
+        case .savedSession: return "Review, correct, export, or delete sessions."
+        case .profile: return "A profile is optional. Guest use stays local."
         case .editName: return "Click your name to change it."
         case .name: return "Try a name, then click Next."
-        case .people: return "Click Groups to expand People."
-        case .groups: return "Create or join a private group."
-        case .chooseGroup: return "Choose another group."
-        case .rankings: return "Switch to Healthy habits."
-        case .podium: return "Top ranks celebrate qualifying days."
-        case .freezes: return "Three monthly freezes protect your weekday streak."
+        case .privacy: return "Recording and online sharing have separate controls."
+        case .sharing: return "Sharing needs approval and your explicit consent."
         }
     }
-    var offersNext: Bool { self == .work || self == .progress || self == .savedSession || self == .name || self == .podium }
-    var offersDone: Bool { self == .freezes }
+    var offersNext: Bool { self == .work || self == .progress || self == .savedSession || self == .name || self == .privacy }
+    var offersDone: Bool { self == .sharing }
 }
 
 enum QuickTourAction: Equatable {
     case start, quickStart, plan, minutes(Int), confirmStart, takeBreak, startBreak, returned
-    case save, sessions, profile, editName, people, createGroup, joinGroup, group(Int), metric(LeaderboardMetric), next, done
+    case save, sessions, profile, editName, next, done
 }
 
 @MainActor
@@ -84,9 +77,7 @@ final class QuickTourController: ObservableObject {
     @Published private(set) var breaks = 0
     @Published private(set) var saved = false
     @Published private(set) var demoName = "Alex"
-    @Published private(set) var demoGroupIndex = 0
-    @Published private(set) var demoMetric: LeaderboardMetric = .work
-    static let stepCount = 12
+    static let stepCount = 9
 
     var index: Int { phase.index }
     var isFirst: Bool { index == 0 }
@@ -96,7 +87,7 @@ final class QuickTourController: ObservableObject {
     func finish() { isPresented = false; reset(to: .start) }
     func back() {
         guard isPresented, !isFirst else { return }
-        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .people, .groups, .rankings, .podium, .freezes]
+        let starts: [QuickTourPhase] = [.start, .plan, .work, .takeBreak, .progress, .save, .profile, .privacy, .sharing]
         reset(to: starts[index - 1])
     }
 
@@ -120,13 +111,9 @@ final class QuickTourController: ObservableObject {
         case (.savedSession, .next): phase = .profile
         case (.profile, .profile): phase = .editName
         case (.editName, .editName): phase = .name
-        case (.name, .next): phase = .people
-        case (.people, .people): phase = .groups
-        case (.groups, .createGroup), (.groups, .joinGroup): phase = .chooseGroup
-        case (.chooseGroup, .group(1)): demoGroupIndex = 1; phase = .rankings
-        case (.rankings, .metric(.habits)): demoMetric = .habits; phase = .podium
-        case (.podium, .next): phase = .freezes
-        case (.freezes, .done): finish()
+        case (.name, .next): phase = .privacy
+        case (.privacy, .next): phase = .sharing
+        case (.sharing, .done): finish()
         default: break
         }
     }
@@ -145,12 +132,10 @@ final class QuickTourController: ObservableObject {
     private func reset(to value: QuickTourPhase) {
         demoAutomatic = false; demoContext = .unknown
         visit = UUID(); phase = value; minutes = 60; demoName = "Alex"
-        demoGroupIndex = value.index >= 9 ? 1 : 0
-        demoMetric = value.index >= 10 ? .habits : .work
         elapsed = value.index > 2 ? 5 : 0
         breaks = value.index > 3 ? 1 : 0
         dailyMinutes = value.index > 4 ? 60 : 32
-        saved = value.index == 6
+        saved = value.index >= 6
     }
 }
 
