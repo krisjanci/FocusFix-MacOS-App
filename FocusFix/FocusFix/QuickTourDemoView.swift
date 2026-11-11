@@ -17,7 +17,7 @@ struct QuickTourDemoView: View {
             case .returned: resting
             case .savedSession: library
             case .editName, .name: profile
-            case .groups, .chooseGroup, .rankings, .podium, .freezes: socialPractice
+            case .privacy, .sharing: privacyPractice
             default: dashboard
             }
         }
@@ -47,7 +47,7 @@ struct QuickTourDemoView: View {
         case .returned: return "resting"
         case .savedSession: return "library"
         case .editName, .name: return "profile"
-        case .groups, .chooseGroup, .rankings, .podium, .freezes: return "social"
+        case .privacy, .sharing: return "privacy"
         default: return "dashboard"
         }
     }
@@ -105,8 +105,6 @@ struct QuickTourDemoView: View {
                 practiceButton("Sessions", symbol: "folder", phase: .sessions, action: .sessions)
                 Spacer(minLength: 0)
             }.controlSize(.large)
-            practiceButton("Groups", symbol: "person.2", phase: .people, action: .people)
-                .frame(maxWidth: .infinity, alignment: .leading)
             if tour.saved {
                 Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(teal)
                     .scaleEffect(reduceMotion || feedbackReady ? 1 : 0.8)
@@ -115,52 +113,26 @@ struct QuickTourDemoView: View {
         }
     }
 
-    private var socialPractice: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Label("Practice group", systemImage: "person.2").font(.title2.weight(.semibold))
-            if tour.phase == .groups {
-                Text("Create a group or enter a shared invite code. Only members see your name, standard avatar and scores.")
-                HStack {
-                    practiceButton("Create group", symbol: "plus", phase: .groups, action: .createGroup, isTarget: false)
-                    Spacer()
-                    practiceButton("Join with code", phase: .groups, action: .joinGroup, isTarget: false, defaultAction: false)
-                }
-                    .padding(14).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                    .practiceTarget(.groups)
-                Text("Practice code: ALEX-DEMO").font(.caption.monospaced()).foregroundStyle(.secondary)
-            } else if tour.phase == .chooseGroup || tour.phase == .rankings || tour.phase == .podium {
-                practiceLeaderboard
-            } else {
-                Label("2 / 3 freezes remaining", systemImage: "snowflake").font(.headline).foregroundStyle(teal)
-                Text("Monday: goal met → Tuesday: frozen → Wednesday: goal met")
-                Text("A freeze preserves your streak without adding a day or points. Three tokens refill each month, without rollover. They cannot cover consecutive calendar dates. Weekends remain optional.")
-            }
-        }.fixedSize(horizontal: false, vertical: true).padding(16)
-            .practiceTarget(tour.phase == .freezes ? .freezes : nil)
-    }
-
-    private var practiceLeaderboard: some View {
-        let visit = tour.visit
-        let people = [
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: tour.demoName, symbol: "leaf.fill", color: "teal", work: 8, habits: 7, workRank: 1, habitsRank: 1, workStreak: 8, workStreakRank: 1, workStreakFrozen: false),
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, name: "Sam", symbol: "book.fill", color: "blue", work: 6, habits: 5, workRank: 2, habitsRank: 2, workStreak: 6, workStreakRank: 2, workStreakFrozen: true),
-            SocialMember(id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!, name: "Jordan", symbol: "sun.max.fill", color: "orange", work: 4, habits: 3, workRank: 3, habitsRank: 3, workStreak: 0, workStreakRank: 3, workStreakFrozen: false)
-        ]
-        let group = SocialGroup(id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!, name: tour.demoGroupIndex == 0 ? "Study circle" : "Weekend crew", owner: people[0].id, code: nil, members: people)
-        return VStack(alignment: .leading, spacing: 12) {
-            GroupHeading(group: group)
-            Picker("Practice group", selection: Binding(get: { tour.demoGroupIndex }, set: { tour.perform(.group($0), phase: .chooseGroup, visit: visit) })) {
-                Text("Study circle").tag(0); Text("Weekend crew").tag(1)
-            }.disabled(tour.phase != .chooseGroup).practiceTarget(.chooseGroup)
-            Picker("Practice leaderboard", selection: Binding(get: { tour.demoMetric }, set: { tour.perform(.metric($0), phase: .rankings, visit: visit) })) {
-                ForEach(LeaderboardMetric.allCases) { Text($0.title).tag($0) }
-            }.pickerStyle(.segmented).disabled(tour.phase != .rankings).practiceTarget(.rankings)
-            Text(tour.demoMetric.explanation).font(.caption).foregroundStyle(.secondary)
-            GroupLeaderboard(group: group, metric: tour.demoMetric, currentUser: people[0].id, allowsAnimation: !reduceMotion)
-                .frame(height: 290).practiceTarget(.podium)
-            Text("One daily point. Scores start at joining. Equal scores share a rank.")
+    private var privacyPractice: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Privacy & Data Sharing", systemImage: "hand.raised")
+                .font(.title2.weight(.semibold))
+            Text("Practice only — these switches do not change your settings.")
                 .font(.caption).foregroundStyle(.secondary)
-        }
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Record on this Mac", systemImage: "record.circle")
+                    .font(.headline)
+                Text("Recording requires your choice and macOS Input Monitoring access. Automatic mode can include non-work time. Pause or Quit stops capture.")
+                Label("Share with the developer", systemImage: "lock.shield")
+                    .font(.headline).padding(.top, 8)
+                Text("Optional sharing requires a signed-in, approved account and a separate consent. Only new completed recordings are eligible. Turn it off or request deletion in Settings.")
+                Text("Read the privacy page before you agree to share.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+            .practiceTarget(tour.phase == .privacy ? .privacy : .sharing)
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var planning: some View {
