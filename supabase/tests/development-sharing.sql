@@ -37,6 +37,17 @@ do $$ begin
 end $$;
 insert into storage.objects(bucket_id, name) values ('development-recordings',
   '11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.zip');
+reset role;
+update public.development_approvals set max_archives = 1
+where user_id = '11111111-1111-4111-8111-111111111111';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+do $$ begin
+  if public.can_upload_development('11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/cccccccc-cccc-4ccc-8ccc-cccccccccccc.zip')
+  then raise exception 'Archive quota did not stop uploads'; end if;
+  if not exists (select 1 from storage.objects where bucket_id = 'development-recordings')
+  then raise exception 'Owner could not see an existing archive at quota'; end if;
+end $$;
 select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
 do $$ begin
   if exists (select 1 from public.development_approvals)
