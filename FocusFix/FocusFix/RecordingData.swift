@@ -296,7 +296,7 @@ final class RecordingWriter {
             fields["study_check_in_schedule"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(studyConfiguration))
             fields["study_check_in_logging"] = "study_check_ins.jsonl joins immutable prompt IDs to context and preceding recall bounds. Scheduled/requested/opened/answered/skipped/cancelled are distinct. Never use check-in interaction or future data as preceding predictors."
         }
-        fields["sharing_policy"] = "Optional account-based research sharing requires researcher approval and server-recorded, versioned consent captured at session start. Opt-out cancels queued deliveries. Local recording does not require an account."
+        fields["sharing_policy"] = "Local recording does not require an account. Optional product-development sharing needs developer approval and separate user consent for new recordings. Research sharing remains disabled."
         if let duration {
             fields["duration_seconds"] = duration - contract.elapsedOrigin
             fields["ended_at_local"] = localTime.string(from: startedAt.addingTimeInterval(duration - contract.elapsedOrigin))
