@@ -342,7 +342,7 @@ final class ActivityTracker: ObservableObject {
         RecordingNotice().decline()
         captureState = .disabled
         captureReason = "recording_disabled"
-        message = "Recording is off. Enable it in Settings → Privacy & Research when you are ready."
+        message = "Recording is off. Enable it in Settings → Privacy & Data Sharing when you are ready."
     }
     func declineRecordingNotice() {
         disableRecording()
