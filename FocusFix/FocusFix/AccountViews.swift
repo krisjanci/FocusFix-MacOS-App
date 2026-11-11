@@ -21,7 +21,7 @@ struct AccountControls: View {
                     Button("Sign out") { Task { await account.signOut() } }
                     Button("Delete account…", role: .destructive) { confirmDeletion = true }
                 }.disabled(account.busy)
-                Text("Account profiles sync privately. Creating an account does not enable research sharing or publish your activity.")
+                Text("Account profiles sync privately. Creating an account does not enable recording sharing or publish your activity.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 AccountSignInForm(account: account)
