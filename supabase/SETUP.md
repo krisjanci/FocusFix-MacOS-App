@@ -101,7 +101,7 @@ In `FocusFix/Configuration/Info.plist`, set:
 Both build configurations allow outgoing HTTPS and use only the account-based
 Supabase delivery path. The Cloudflare uploader has been removed from the source;
 old development credentials and queue files are left untouched and never resumed.
-Signing in does not opt into research sharing. See [removal notes](../CLOUDFLARE-REMOVAL.md).
+Signing in does not opt into research or product-development sharing. Historical Cloudflare removal notes are stored outside the public repository in the local `CS 600/FocusFix-App-Archive-2026-11-10` folder.
 
 Build and open the profile screen. Create an account, enter the emailed code,
 then create an account profile. Existing local names/photos are NOT automatically
