@@ -20,9 +20,7 @@ resets the count to zero. Read-time calculation includes inactive members and
 late-arriving summaries, so no member login or scheduled reset job is required.
 
 The main-window flame shows personal local progress; a group's streak covers
-eligible work since joining that group. The existing restriction on new-schema
-work uploads remains in force; see `DECLARED-WORK-SYNC.md`. This migration does
-not enable replacement uploads or send held recordings to the old increment RPC.
+eligible work since joining that group. The capability-gated replacement protocol is described in `DECLARED-WORK-SYNC.md`; replacement summaries never use the old increment RPC.
 
 Verify locally with `npm --prefix supabase run test:database` and
 `bash scripts/test.sh`. The database runner exercises the new migration with
