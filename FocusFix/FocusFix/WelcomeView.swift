@@ -4,7 +4,7 @@ import AppKit
 struct WelcomeView: View {
     @ObservedObject var launch: LaunchCoordinator
     @ObservedObject var account: AccountController
-    private let accountBlue = Color(red: 0.04, green: 0.39, blue: 0.91)
+    private let accountTint = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
         ScrollView {
@@ -86,7 +86,7 @@ struct WelcomeView: View {
                 .padding(24)
         }
         .frame(width: 490, height: 700)
-        .background(Color(nsColor: .windowBackgroundColor)).tint(accountBlue)
+        .background(Color(nsColor: .windowBackgroundColor)).tint(accountTint)
     }
 }
 
