@@ -40,5 +40,7 @@ try {
   console.log('49/50/51-person group boundaries passed, including the creator.');
   await db.exec(await readFile(new URL('social-live.sql', import.meta.url), 'utf8'));
   console.log('Rollback-only live verification script passed locally.');
+  await db.exec(await readFile(new URL('declared-work-live.sql', import.meta.url), 'utf8'));
+  console.log('Declared-work replacement and optional group-photo checks passed.');
   console.log('PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.');
 } finally { await db.close(); }
