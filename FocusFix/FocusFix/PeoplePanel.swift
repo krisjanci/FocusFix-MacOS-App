@@ -85,6 +85,10 @@ struct PeoplePanel: View {
                 Button(action: close) { Image(systemName: "sidebar.right") }
                     .buttonStyle(.plain).help("Collapse People").accessibilityLabel("Collapse People")
             }
+            if let notice = social.invitationNotice {
+                Text(notice).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if !social.invitations.isEmpty {
                 Button { openWindow(id: "groups") } label: {
                     Label("\(social.invitations.count) group invitation\(social.invitations.count == 1 ? "" : "s")", systemImage: "envelope.badge")
