@@ -32,6 +32,8 @@ try {
   await db.exec(await readFile(new URL('consent-access.sql', import.meta.url), 'utf8'));
   await verifySocial(db);
   await verifyInvitations(db);
+  await db.exec(await readFile(new URL('group-invitations-live.sql', import.meta.url), 'utf8'));
+  console.log('Rollback-only invitation, admin and habit verification passed locally.');
   await db.exec(await readFile(new URL('work-streaks.sql', import.meta.url), 'utf8'));
   console.log('Current work streaks: decay, freezes, thaw, weekends, month boundary, inactive member ranks and private helpers passed.');
   await db.exec(await readFile(new URL('group-capacity.sql', import.meta.url), 'utf8'));
