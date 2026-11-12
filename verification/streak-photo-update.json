@@ -1,12 +1,17 @@
 {
-  "verified_at_utc": "2026-11-12T14:24:26.280352+00:00",
+  "verified_at_utc": "2026-11-12T14:33:51.200474+00:00",
   "iteration": 3,
   "checks": {
     "desktop_tests": "All 33 groups passed; expanded coordinator tests separately passed, including capability negotiation, offline retry, in-flight correction and correction-to-zero after acknowledgement.",
     "debug_build": "passed including account-scope recovery",
     "database": "all isolated PostgreSQL regression suites passed, including declared-work-live.sql",
     "live_database": "0002 and 0003 applied transactionally. Rollback-only declared work, correction, retry, ownership, join-boundary and opted-in photo checks passed. Function hashes match checked-in source after whitespace normalization for Monaco auto-indentation.",
-    "native_render": "Positive burning appearance, frozen and zero flames and active/inactive progress colors inspected using synthetic data."
+    "native_render": "Positive burning appearance, frozen and zero flames and active/inactive progress colors inspected using synthetic data.",
+    "live_member_invitation_regressions": "passed including actual sender, membership authorization, admin restrictions and habit streaks; fixtures rolled back",
+    "live_work_rpc_api": "New RPC discoverable through live REST API; anonymous execution denied",
+    "javascript_tests": "10 passed",
+    "signed_universal_archive": "Final archive passed; source 5b55fd33bd203273bcbec017790c4f95e17d6163",
+    "signed_export": "Final notarized build 4 verified from actual public latest-download ZIP"
   },
   "behavior": {
     "group_sync": "Observed, owned work intervals use revisioned replacements. Previously held finalized owned recordings upgrade from local coverage; sign-in changes trigger recovery. Legacy work and breaks are preserved.",
@@ -15,10 +20,32 @@
     "login": "FocusFix teal tint replaces account blue."
   },
   "rollout_approved": true,
-  "remaining": [
-    "Notarize final signed universal build 4",
-    "Publish exact matching app and source",
-    "Verify actual latest-download package"
-  ],
-  "goal_complete": false
+  "remaining": [],
+  "goal_complete": true,
+  "release": {
+    "tag": "notarized-2026-11-12-build4",
+    "url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/tag/notarized-2026-11-12-build4",
+    "source_revision": "5b55fd33bd203273bcbec017790c4f95e17d6163",
+    "app_sha256": "55dfa5150bfb88e482839e2aef56164a866f7ee99682e7cbc1468756a8bde17b",
+    "source_sha256": "4548bed0b43a85585b073122c3cfa641321e720d2c8735abe56b80b65ba4fc07",
+    "build": 4,
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "notarized": true,
+    "actual_latest_download_verified": true,
+    "public_download_signature_and_gatekeeper": "passed",
+    "tests_run": "https://github.com/krisjanci/FocusFix-MacOS-App/actions/runs/43237133814",
+    "tests_result": "success",
+    "publication_run": "https://github.com/krisjanci/FocusFix-MacOS-App/actions/runs/43238153514",
+    "publication_result": "success"
+  },
+  "release_source_revision": "5b55fd33bd203273bcbec017790c4f95e17d6163",
+  "iteration_file_commits": {
+    "1": 17,
+    "2": 3,
+    "3": 24,
+    "4": 2
+  }
 }
