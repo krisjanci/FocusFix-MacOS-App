@@ -4,20 +4,17 @@ import AppKit
 struct WelcomeView: View {
     @ObservedObject var launch: LaunchCoordinator
     @ObservedObject var account: AccountController
-    private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
+    private let accountBlue = Color(red: 0.04, green: 0.39, blue: 0.91)
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 12) {
                     Image(nsImage: NSApplication.shared.applicationIconImage)
-                        .resizable().scaledToFit().frame(width: 64, height: 64).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Welcome to FocusFix").font(.system(size: 25, weight: .semibold, design: .rounded))
-                        Text("Make room for focus and a good break.").font(.callout).foregroundStyle(.secondary)
-                    }
-                }
-                QuickTourButton()
+                        .resizable().scaledToFit().frame(width: 56, height: 56).accessibilityHidden(true)
+                    Text("FocusFix").font(.system(size: 32, weight: .semibold))
+                    Text("A little focus. A better balance.").font(.callout).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity).padding(.bottom, 8)
                 if launch.isPreview {
                     Label("Welcome screen preview", systemImage: "eye").font(.headline)
                     Text("Try the forms without changing your account or history. Sign-in, registration, password recovery and saved-account access are disabled. Nothing is sent or saved.")
@@ -30,10 +27,12 @@ struct WelcomeView: View {
                         .font(.callout).foregroundStyle(.secondary)
                 case .createAccount, .login:
                     HStack {
-                        Text(launch.page == .createAccount ? "Create your account" : "Log in").font(.title2.weight(.semibold))
+                        Text(launch.page == .createAccount ? "Create your account" : "Log in to FocusFix").font(.title2.weight(.semibold))
                         Spacer()
                         Button("Back") { launch.showWelcome() }.disabled(account.busy)
                     }
+                    Text(launch.page == .createAccount ? "Build your routine and stay connected with your groups." : "Welcome back. Your focus journey continues here.")
+                        .font(.callout).foregroundStyle(.secondary)
                     AccountSignInForm(account: account, create: launch.page == .createAccount, isPreview: launch.isPreview,
                         onModeChange: { launch.showAccount(create: $0) })
                 case .profileSetup:
@@ -47,15 +46,15 @@ struct WelcomeView: View {
                     ProfileEditor(onSaved: { launch.finishProfileSetup() })
                     Button("Skip for now") { launch.finishProfileSetup() }.controlSize(.large)
                 case .welcome, .app:
-                    Text("Your space to work and recharge.").font(.title2.weight(.medium))
+                    Text("Your space to focus.").font(.title2.weight(.semibold))
                     Text("Create an account for a personal profile, or get started locally as a guest.")
                         .foregroundStyle(.secondary)
                     VStack(spacing: 12) {
-                        Button { launch.showAccount(create: true) } label: {
-                            Text("Create account").frame(maxWidth: .infinity)
-                        }.buttonStyle(.borderedProminent)
                         Button { launch.showAccount(create: false) } label: {
                             Text("Log in").frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent)
+                        Button { launch.showAccount(create: true) } label: {
+                            Text("Create new account").frame(maxWidth: .infinity)
                         }.buttonStyle(.bordered)
                     }.controlSize(.large).disabled(!account.configured && !launch.isPreview)
                     if !launch.isPreview && account.configured && account.remembersSignIn {
@@ -71,16 +70,23 @@ struct WelcomeView: View {
                 }
                 if launch.page != .profileSetup {
                     Divider()
-                    Button("Use as guest") { launch.useGuest() }
+                    HStack {
+                        Button("Continue as guest") { launch.useGuest() }
+                        Spacer()
+                        QuickTourButton()
+                    }
                         .buttonStyle(.bordered).controlSize(.large)
                         .keyboardShortcut(.cancelAction)
                     Text(launch.isPreview ? "Use as guest returns to your app without changing your saved choice." : "Manual recording, breaks and progress work without an account. Automatic recording requires a separate choice in Privacy & Data Sharing. Guest mode is remembered; you can sign in later from Profile.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(30).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Color.primary.opacity(0.06)))
+                .padding(24)
         }
-        .frame(width: 490, height: 650)
-        .background(Color(nsColor: .windowBackgroundColor)).tint(teal)
+        .frame(width: 490, height: 700)
+        .background(Color(nsColor: .windowBackgroundColor)).tint(accountBlue)
     }
 }
 
@@ -143,9 +149,14 @@ struct CollectorRootView: View {
             if launchFinished { launch.begin() }
         }
         .onChange(of: launchFinished) { _, finished in if finished { launch.begin() } }
-        .task(id: launchFinished && launch.page == .app && !tour.isPresented && canShowTour) {
-            if launchFinished && launch.page == .app && !tour.isPresented && canShowTour && RecordingNotice().needsFirstLaunchChoice {
-                tracker.recordingNoticePresented = true
+        .task(id: "\(launchFinished)-\(launch.page)-\(tour.isPresented)-\(canShowTour)-\(account.needsFirstAccountTour)") {
+            if launchFinished && launch.page == .app && !tour.isPresented && canShowTour {
+                if account.needsFirstAccountTour {
+                    tour.restart()
+                    account.didPresentFirstAccountTour()
+                } else if RecordingNotice().needsFirstLaunchChoice {
+                    tracker.recordingNoticePresented = true
+                }
             }
         }
         .onDisappear { finishIntro() }
