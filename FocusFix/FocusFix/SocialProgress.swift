@@ -20,6 +20,9 @@ struct SocialMember: Codable, Identifiable {
     let habits: Int
     let workRank: Int
     let habitsRank: Int
+    var habitsStreak: Int? = nil
+    var habitsStreakRank: Int? = nil
+    var habitsStreakFrozen: Bool? = nil
     var workStreak: Int? = nil
     var workStreakRank: Int? = nil
     var workStreakFrozen: Bool? = nil
@@ -31,11 +34,19 @@ struct SocialGroup: Codable, Identifiable {
     let owner: UUID
     let code: String?
     let members: [SocialMember]
+    var description: String? = nil
+}
+struct GroupInvitation: Codable, Identifiable {
+    let id: UUID
+    let groupID: UUID
+    let groupName: String
+    let inviterName: String
 }
 struct SocialState: Codable {
     let timezone: String
     let progress: DailyProgress
     let groups: [SocialGroup]
+    var invitations: [GroupInvitation]? = nil
 }
 
 struct DeclaredWorkPending: Codable, Equatable {
