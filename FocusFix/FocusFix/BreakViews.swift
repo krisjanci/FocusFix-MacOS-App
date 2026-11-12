@@ -138,9 +138,9 @@ struct BreakControls: View {
             } else {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(tracker.latestBreak == nil ? "Since session start" : "Since last break")
+                        Text("Total recording")
                             .font(.caption).foregroundStyle(.secondary)
-                        Text(durationText(tracker.secondsSinceBreak)).monospacedDigit()
+                        Text(tracker.formattedTime).monospacedDigit()
                     }
                     Spacer()
                     Button("Take a break") { tracker.chooseBreak() }
