@@ -54,8 +54,8 @@ struct DailyProgressDisplay: View {
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(teal.opacity(0.12))
-                    Capsule().fill(teal)
+                    Capsule().fill((active || complete ? teal : .gray).opacity(0.12))
+                    Capsule().fill(active || complete ? teal : Color(red: 0.42, green: 0.55, blue: 0.53))
                         .overlay {
                             if active && !complete && !reduceMotion && fillFraction > 0 {
                                 TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
@@ -74,7 +74,7 @@ struct DailyProgressDisplay: View {
                         .clipShape(Capsule())
                         .animation(active && !reduceMotion ? .linear(duration: 1) : nil, value: fillFraction)
                 }
-            }.frame(height: 4)
+            }.frame(height: 7)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Daily work goal")
                 .accessibilityValue("\(workMinutes) of 60 minutes")
