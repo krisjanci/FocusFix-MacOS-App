@@ -1,0 +1,24 @@
+{
+  "verified_at_utc": "2026-11-12T14:24:26.280352+00:00",
+  "iteration": 3,
+  "checks": {
+    "desktop_tests": "All 33 groups passed; expanded coordinator tests separately passed, including capability negotiation, offline retry, in-flight correction and correction-to-zero after acknowledgement.",
+    "debug_build": "passed including account-scope recovery",
+    "database": "all isolated PostgreSQL regression suites passed, including declared-work-live.sql",
+    "live_database": "0002 and 0003 applied transactionally. Rollback-only declared work, correction, retry, ownership, join-boundary and opted-in photo checks passed. Function hashes match checked-in source after whitespace normalization for Monaco auto-indentation.",
+    "native_render": "Positive burning appearance, frozen and zero flames and active/inactive progress colors inspected using synthetic data."
+  },
+  "behavior": {
+    "group_sync": "Observed, owned work intervals use revisioned replacements. Previously held finalized owned recordings upgrade from local coverage; sign-in changes trigger recovery. Legacy work and breaks are preserved.",
+    "photos": "Own account photo shown immediately in own row. Only separately opted-in 64px thumbnails are returned to other current members. Original private photos stay private.",
+    "flame": "20fps gentle flicker only visible in active key window; static for Reduce Motion, frozen or zero.",
+    "login": "FocusFix teal tint replaces account blue."
+  },
+  "rollout_approved": true,
+  "remaining": [
+    "Notarize final signed universal build 4",
+    "Publish exact matching app and source",
+    "Verify actual latest-download package"
+  ],
+  "goal_complete": false
+}
