@@ -83,7 +83,13 @@ struct LeaderboardRow: View {
                     Text("—").foregroundStyle(.secondary).help("Current streaks need the group server update. Lifetime points are not a streak.")
                 }
             } else {
-                Text("\(metric.score(member))").font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
+                if let count = member.habitsStreak {
+                    HStack(spacing: 5) {
+                        Image(systemName: member.habitsStreakFrozen == true && count > 0 ? "snowflake" : "leaf.fill")
+                            .foregroundStyle(member.habitsStreakFrozen == true ? Color.blue : count > 0 ? Color.teal : Color.secondary)
+                        Text("\(count)").font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
+                    }
+                } else { Text("—").foregroundStyle(.secondary).help("Healthy-habit streaks need the group server update.") }
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 11)
@@ -91,7 +97,7 @@ struct LeaderboardRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metric == .work
             ? "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.workStreak.map { "\($0)-day weekday streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.workStreakFrozen == true ? ", protected by a freeze" : "")"
-            : "Rank \(metric.rank(member)), \(member.name)\(isCurrentUser ? ", you" : ""), \(metric.score(member)) healthy-habit points")
+            : "Rank \(metric.rank(member)), \(member.name)\(isCurrentUser ? ", you" : ""), \(metric.score(member)) day healthy-habit streak")
     }
 }
 
