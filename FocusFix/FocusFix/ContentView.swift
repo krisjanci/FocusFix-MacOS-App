@@ -121,7 +121,8 @@ struct ContentView: View {
                     Text(tracker.breakPhase == .resting ? "Activity logging paused" : "Tracking resumed · waiting for your return")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    SessionClockFace(time: tracker.formattedTime)
+                    SessionClockFace(time: durationText(floor(tracker.declaredWorkSeconds)))
+                        .help("Time recorded while you declared work; other activity and breaks are excluded.")
                 }
                 if tracker.isRecording, tracker.sessionWorkPlan.targetMinutes != nil {
                     Text(tracker.sessionWorkPlan.summary)
