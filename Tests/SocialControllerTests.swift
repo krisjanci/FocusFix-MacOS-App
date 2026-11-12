@@ -25,6 +25,9 @@ import Combine
                     expires_at: Date().timeIntervalSince1970 + 3600, expires_in: 3600,
                     user: AccountUser(id: active, email: nil)))
             } else if request.url!.path.contains("account_profiles") { data = Data("[]".utf8) }
+            else if request.url!.path.contains("group_invitations") || request.url!.path.contains("decline_group_invitation") {
+                data = Data("[]".utf8)
+            }
             else if request.url!.path.contains("social_state") {
                 if offline { throw URLError(.notConnectedToInternet) }
                 let object = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
