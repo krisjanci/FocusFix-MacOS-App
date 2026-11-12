@@ -60,11 +60,13 @@ struct AccountSignInForm: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Email", text: $email).textFieldStyle(.roundedBorder)
+        VStack(alignment: .leading, spacing: 16) {
+            TextField("Email address", text: $email).textFieldStyle(.roundedBorder)
+                .textContentType(.username).controlSize(.large)
                 .accessibilityLabel("Email address")
             if !account.recovering {
-                SecureField("Password", text: $password).textFieldStyle(.roundedBorder)
+                SecureField(creating ? "Password (at least 8 characters)" : "Password", text: $password).textFieldStyle(.roundedBorder)
+                    .textContentType(creating ? .newPassword : .password).controlSize(.large)
             }
             Toggle("Keep me signed in", isOn: $remember)
             Text("Saved sign-in uses macOS Keychain and restores automatically next time. macOS may ask for Keychain access.")
@@ -81,20 +83,29 @@ struct AccountSignInForm: View {
                     }
                 }.disabled(isPreview || code.isEmpty)
             }
-            HStack {
-                Button(creating ? "Create account" : "Log in") {
+            VStack(spacing: 14) {
+                Button {
                     Task {
                         await account.authenticate(email: email, password: password, create: creating, remember: remember)
                         password = ""
                     }
-                }.buttonStyle(.borderedProminent).disabled(isPreview || email.isEmpty || password.isEmpty)
-                Button(creating ? "Use existing account" : "Create an account") {
+                } label: {
+                    Text(creating ? "Create account" : "Log in").fontWeight(.semibold).frame(maxWidth: .infinity)
+                }.buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(isPreview || email.isEmpty || password.isEmpty)
+                Divider()
+                Button {
                     creating.toggle()
                     onModeChange(creating)
-                }
+                } label: {
+                    Text(creating ? "Log in instead" : "Create new account").frame(maxWidth: .infinity)
+                }.buttonStyle(.bordered).controlSize(.large)
             }
             HStack {
-                Button("Continue with saved account") { Task { await account.restore(remember: remember) } }.disabled(isPreview)
+                if account.remembersSignIn {
+                    Button("Use saved account") { Task { await account.restore(remember: remember) } }.disabled(isPreview)
+                    Spacer()
+                }
                 Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(isPreview || email.isEmpty)
             }
             if account.busy { ProgressView().controlSize(.small) }
