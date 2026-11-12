@@ -20,6 +20,11 @@ import Combine
         var block = false
         var continuation: CheckedContinuation<Void, Never>?
         var bodies: [[String: Any]] = []
+        var workBodies: [[DeclaredWorkPending]] = []
+        var workVersion: Int? = nil
+        var workOffline = false
+        var blockWork = false
+        var workContinuation: CheckedContinuation<Void, Never>?
         let config = AccountConfiguration(url: "https://example.supabase.co", publicKey: "sb_publishable_test")!
         let transport: AccountAPI.Transport = { request in
             var data = Data("{}".utf8)
@@ -37,6 +42,15 @@ import Combine
                 }
                 data = try JSONEncoder().encode(remoteInvitations)
             }
+            else if request.url!.path.contains("sync_declared_work") {
+                if workOffline { throw URLError(.notConnectedToInternet) }
+                let object = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+                precondition(object["p_timezone"] as? String == "UTC")
+                let segments = try JSONDecoder().decode([DeclaredWorkPending].self, from: JSONSerialization.data(withJSONObject: object["p_segments"]!))
+                workBodies.append(segments)
+                if blockWork { await withCheckedContinuation { workContinuation = $0 } }
+                data = try JSONEncoder().encode(DeclaredWorkResponse(version: 1, acknowledged: segments.map { .init(segmentID: $0.segmentID, revision: $0.revision!) }))
+            }
             else if request.url!.path.contains("social_state") {
                 if offline { throw URLError(.notConnectedToInternet) }
                 let object = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
@@ -49,7 +63,7 @@ import Combine
                 if block { await withCheckedContinuation { continuation = $0 } }
                 var progress = DailyProgress()
                 progress.reconcile(at: Date(), calendar: DailyProgress.calendar(timeZone: TimeZone(secondsFromGMT: 0)!))
-                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: remoteGroups, invitations: remoteInvitations))
+                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: remoteGroups, invitations: remoteInvitations, declaredWorkSyncVersion: workVersion))
             }
             return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
@@ -143,6 +157,41 @@ import Combine
         await afterDeletion.enable()
         precondition(afterDeletion.enabled && afterDeletion.invitationNotice == nil)
         inboxOffline = false
+        // Version negotiation keeps replacements away from the legacy increment RPC.
+        let segment = UUID(), start = Date().timeIntervalSince1970 - 3600
+        func stage(_ seconds: Double) {
+            afterDeletion.stageDeclaredWork(segmentID: segment, days: seconds == 0 ? [:] : ["2026-11-12": seconds],
+                capturedOwner: owner, capturedOrigin: config.origin.absoluteString,
+                startedAt: start, observedThrough: start + 3600,
+                intervals: seconds == 0 ? [] : [.init(start: start, end: start + seconds)])
+        }
+        stage(3600)
+        await afterDeletion.refresh()
+        precondition(workBodies.isEmpty && afterDeletion.declaredWorkSyncHeld)
+        workVersion = 1; workOffline = true
+        // The user action succeeds once, even if the separate work request fails.
+        let edited = await afterDeletion.refresh(action: "edit", fields: ["group": firstGroup.id.uuidString])
+        precondition(edited)
+        precondition(afterDeletion.ledger?.declaredWorkPending?.count == 1 && afterDeletion.pendingConfirmation)
+        workOffline = false; blockWork = true
+        let syncTask = Task { await afterDeletion.refresh() }
+        while workContinuation == nil { await Task.yield() }
+        stage(1800)
+        workContinuation?.resume(); workContinuation = nil
+        _ = await syncTask.value
+        blockWork = false
+        precondition(afterDeletion.ledger?.declaredWorkPending?[segment.uuidString]?.revision == 2)
+        await afterDeletion.refresh()
+        precondition(afterDeletion.ledger?.declaredWorkPending?.isEmpty == true)
+        precondition((bodies.last!["p_action"] as? String) == "sync")
+        // Correcting already-acknowledged work to zero must still enqueue a replacement.
+        stage(0)
+        precondition(afterDeletion.ledger?.declaredWorkPending?[segment.uuidString]?.revision == 3)
+        await afterDeletion.refresh()
+        precondition(afterDeletion.ledger?.declaredWorkPending?.isEmpty == true)
+        let count = workBodies.count
+        stage(0); await afterDeletion.refresh()
+        precondition(workBodies.count == count)
         // A successful inbox response must never clear a corrupt-ledger warning:
         // otherwise Enable could overwrite the unreadable original with a new ledger.
         let identity = "\(config.origin.absoluteString)|\(owner)"
