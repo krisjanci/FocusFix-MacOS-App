@@ -17,7 +17,7 @@ struct DailyProgressCard: View {
                 breakCount: day.completedBreakIDs.count, weekend: weekend, complete: complete,
                 recharged: tracker.rechargeDate.map {
                     calendar.isDate($0, inSameDayAs: context.date) && context.date.timeIntervalSince($0) < 20
-                } ?? false, notice: tracker.progressNotice ?? (social.declaredWorkSyncHeld ? "Declared work stays local; group work sync needs a compatible server update." : nil), workSeconds: day.workSeconds,
+                } ?? false, notice: tracker.progressNotice ?? (social.declaredWorkSyncHeld ? "Work progress is waiting to sync." : nil), workSeconds: day.workSeconds,
                 freezes: progress.tokensRemaining(at: context.date, calendar: calendar), pending: social.pendingConfirmation,
                 active: tracker.isRecording && tracker.userContext == .work && tracker.breakPhase == .work)
                 .onChange(of: DailyProgress.key(for: context.date, calendar: calendar)) { _, _ in
@@ -147,8 +147,11 @@ struct WorkStreakFlame: View {
     var body: some View {
         HStack(spacing: compact ? 5 : 7) {
             ZStack(alignment: .bottomTrailing) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: compact ? 18 : 23, weight: .semibold))
+                if status.count > 0 && !status.frozen {
+                    BurningStreakFlame(size: compact ? 18 : 23)
+                } else {
+                    Image(systemName: "flame.fill").font(.system(size: compact ? 18 : 23, weight: .semibold))
+                }
                 if status.frozen && status.count > 0 {
                     Image(systemName: "snowflake")
                         .font(.system(size: compact ? 9 : 11, weight: .bold))
@@ -166,5 +169,34 @@ struct WorkStreakFlame: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(status.description)
         .help(status.description)
+    }
+}
+
+// A gentle flicker runs only while the flame is visible in the active window.
+private struct BurningStreakFlame: View {
+    let size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.controlActiveState) private var activeState
+    @State private var visible = false
+    private var animated: Bool { visible && !reduceMotion && scenePhase == .active && activeState == .key }
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !animated)) { context in
+            let time = animated ? context.date.timeIntervalSinceReferenceDate : 0
+            let flicker = sin(time * 7) * 0.5 + sin(time * 11) * 0.5
+            ZStack(alignment: .bottom) {
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(LinearGradient(colors: [.yellow, .orange, .red.opacity(0.9)], startPoint: .bottom, endPoint: .top))
+                    .shadow(color: .orange.opacity(0.18 + (flicker + 1) * 0.10), radius: 3)
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(.yellow.opacity(0.8))
+                    .scaleEffect(x: 0.42, y: 0.52, anchor: .bottom)
+            }
+            .font(.system(size: size, weight: .semibold))
+            .scaleEffect(x: 1 + flicker * 0.035, y: 1 + sin(time * 8) * 0.06, anchor: .bottom)
+            .rotationEffect(.degrees(sin(time * 6) * 1.8), anchor: .bottom)
+        }
+        .onAppear { visible = true }.onDisappear { visible = false }
+        .accessibilityHidden(true)
     }
 }
