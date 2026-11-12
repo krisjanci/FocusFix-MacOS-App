@@ -7,49 +7,50 @@ struct GroupsView: View {
     @State private var sheet: GroupSheet?
     @State private var scoringPresented = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Groups").font(.title2.weight(.semibold))
-                Spacer()
-                if social.busy { ProgressView().controlSize(.small).accessibilityLabel("Syncing groups") }
-                Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
-                    .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy || social.userID == nil)
-            }
-            if let notice = social.invitationNotice {
-                Text(notice).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !social.invitations.isEmpty { InvitationInbox(social: social).frame(maxHeight: 230) }
-            if [.signedOut, .disabled, .unavailable].contains(social.accessState) {
-                ScrollView { accessCard.padding(.top, 10) }
-            } else {
-                if let group = social.selectedGroup {
-                    GroupHeading(group: group, metric: social.selection.metric)
-                    GroupSelectionControls(social: social)
-                    Text(social.selection.metric.explanation).font(.callout).foregroundStyle(.secondary)
-                    GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID)
-                        .frame(minHeight: 180, maxHeight: .infinity)
-                } else {
-                    if social.accessState == .loading { accessCard }
-                    else {
-                        Label(social.syncFailed ? "Connect to load your groups" : "Your first group", systemImage: "person.2").font(.headline)
-                        Text("Create a private group or enter an invite code. Up to 50 people can build steady habits together.")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-                if social.accessState != .loading { accessCard }
-                Divider()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button("Create or join") { sheet = .add }
-                    if let group = social.selectedGroup { Button("Manage group") { sheet = .manage(group.id) } }
+                    Text("Groups").font(.title2.weight(.semibold))
                     Spacer()
-                    Button { scoringPresented = true } label: { Image(systemName: "info.circle") }
-                        .accessibilityLabel("Scoring and streak freeze rules").help("Scoring and streak freeze rules")
-                }.disabled(social.busy)
+                    if social.busy { ProgressView().controlSize(.small).accessibilityLabel("Syncing groups") }
+                    Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
+                        .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy || social.userID == nil)
+                }
+                if let notice = social.invitationNotice {
+                    Text(notice).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !social.invitations.isEmpty { InvitationInbox(social: social) }
+                if [.signedOut, .disabled, .unavailable].contains(social.accessState) {
+                    accessCard.padding(.top, 10)
+                } else {
+                    if let group = social.selectedGroup {
+                        GroupHeading(group: group, metric: social.selection.metric)
+                        GroupSelectionControls(social: social)
+                        Text(social.selection.metric.explanation).font(.callout).foregroundStyle(.secondary)
+                        GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                    } else {
+                        if social.accessState == .loading { accessCard }
+                        else {
+                            Label(social.syncFailed ? "Connect to load your groups" : "Your first group", systemImage: "person.2").font(.headline)
+                            Text("Create a private group or enter an invite code. Up to 50 people can build steady habits together.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    if social.accessState != .loading { accessCard }
+                    Divider()
+                    HStack {
+                        Button("Create or join") { sheet = .add }
+                        if let group = social.selectedGroup { Button("Manage group") { sheet = .manage(group.id) } }
+                        Spacer()
+                        Button { scoringPresented = true } label: { Image(systemName: "info.circle") }
+                            .accessibilityLabel("Scoring and streak freeze rules").help("Scoring and streak freeze rules")
+                    }.disabled(social.busy)
+                }
             }
-        }
-        .padding(24).frame(minWidth: 380, minHeight: 480).tint(.teal)
+            .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+        }.frame(minWidth: 380, minHeight: 400).tint(.teal)
         .sheet(isPresented: $profilePresented) { SharingView() }
         .sheet(item: $sheet) { value in
             switch value {
@@ -131,18 +132,20 @@ private struct ManageGroupSheet: View {
                             TextField("Description (optional)", text: $details, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
                             Button("Save details") {
                                 Task { await social.refresh(action: "edit", fields: ["group": groupID.uuidString, "name": name, "description": details]) }
-                            }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || details.count > 300)
-                            Divider()
-                            Text("Invite someone").font(.headline)
-                            Text("Enter the email they use for FocusFix. They can accept or decline in their app.").font(.caption).foregroundStyle(.secondary)
-                            TextField("Account email", text: $email).textFieldStyle(.roundedBorder)
-                                .onChange(of: email) { _, _ in inviteSent = false }
-                            Button("Send invitation") {
-                                Task {
-                                    if await social.refresh(action: "invite", fields: ["group": groupID.uuidString, "email": email]) { inviteSent = true }
-                                }
-                            }.buttonStyle(.borderedProminent).disabled(!email.contains("@") || email.count > 254 || group.members.count >= SocialGroup.capacity)
-                            if inviteSent { Text("If this account can receive an invitation, it will appear in their FocusFix inbox.").font(.caption).foregroundStyle(.secondary) }
+                            }.disabled(social.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || details.count > 300)
+                        }
+                        Divider()
+                        Text("Invite someone").font(.headline)
+                        Text("Enter the email they use for FocusFix. They can accept or decline in their app.").font(.caption).foregroundStyle(.secondary)
+                        TextField("Account email", text: $email).textFieldStyle(.roundedBorder)
+                            .onChange(of: email) { _, _ in inviteSent = false }
+                        Button("Send invitation") {
+                            Task {
+                                if await social.refresh(action: "invite", fields: ["group": groupID.uuidString, "email": email]) { inviteSent = true }
+                            }
+                        }.buttonStyle(.borderedProminent).disabled(social.busy || !email.contains("@") || email.count > 254 || group.members.count >= SocialGroup.capacity)
+                        if inviteSent { Text("If this account can receive an invitation, it will appear in their FocusFix inbox.").font(.caption).foregroundStyle(.secondary) }
+                        if group.owner == social.userID {
                             Text("Or share an invite code").font(.caption.weight(.medium))
                             if let code = group.code {
                                 Text(code).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
@@ -151,7 +154,7 @@ private struct ManageGroupSheet: View {
                                 }
                             }
                             if group.members.count >= SocialGroup.capacity { Text("This group is full. Remove a member before someone else can join.").font(.caption).foregroundStyle(.secondary) }
-                            Button("Reset invite code") { confirm("Reset invite code?", "Previously shared codes will stop working.", action: "reset", group: group) }
+                            Button("Reset invite code") { confirm("Reset invite code?", "Previously shared codes will stop working.", action: "reset", group: group) }.disabled(social.busy)
                             Divider()
                             ForEach(group.members.filter { $0.id != social.userID }) { member in
                                 HStack {
@@ -164,17 +167,17 @@ private struct ManageGroupSheet: View {
                                         confirmation = GroupConfirmation(title: "Remove \(member.name)?", message: "Rejoining starts a new group score.", action: "remove", fields: ["group": group.id.uuidString, "member": member.id.uuidString])
                                         }
                                     } label: { Image(systemName: "ellipsis") }
-                                    .accessibilityLabel("Manage \(member.name)")
+                                    .accessibilityLabel("Manage \(member.name)").disabled(social.busy)
                                 }
                             }
                             Divider()
-                            Button("Delete group", role: .destructive) { confirm("Delete this group?", "This removes the group and its scores for everyone.", action: "delete", group: group) }
+                            Button("Delete group", role: .destructive) { confirm("Delete this group?", "This removes the group and its scores for everyone.", action: "delete", group: group) }.disabled(social.busy)
                         } else {
-                            Button("Leave group", role: .destructive) { confirm("Leave this group?", "Your score will be removed. Rejoining starts a new score.", action: "leave", group: group) }
+                            Button("Leave group", role: .destructive) { confirm("Leave this group?", "Your score will be removed. Rejoining starts a new score.", action: "leave", group: group) }.disabled(social.busy)
                         }
                     } else { Text("You are no longer a member of this group.").foregroundStyle(.secondary) }
                     if let notice = social.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                }.frame(maxWidth: .infinity, alignment: .leading).disabled(social.busy)
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }.padding(24).frame(width: 440, height: 480).tint(.teal)
         .onAppear { name = group?.name ?? ""; details = group?.description ?? "" }
@@ -199,27 +202,26 @@ private struct GroupConfirmation: Identifiable {
     let fields: [String: String]
 }
 
-private struct InvitationInbox: View {
+struct InvitationInbox: View {
     @ObservedObject var social: SocialController
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Invitations", systemImage: "envelope.badge").font(.headline)
-                ForEach(social.invitations) { invitation in
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(invitation.groupName).font(.headline)
-                        Text("\(invitation.inviterName) invited you to join.").font(.callout).foregroundStyle(.secondary)
-                        if !social.enabled {
-                            Text("Accepting enables group progress sync. Members see your name, avatar and streaks; recordings stay private.").font(.caption).foregroundStyle(.secondary)
-                        }
-                        HStack {
-                            Button("Accept") { Task { await social.respond(to: invitation, accept: true) } }.buttonStyle(.borderedProminent)
-                            Button("Decline") { Task { await social.respond(to: invitation, accept: false) } }.buttonStyle(.bordered)
-                        }.disabled(social.busy)
-                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Invitations", systemImage: "envelope.badge").font(.headline)
+            ForEach(social.invitations) { invitation in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(invitation.groupName).font(.headline)
+                    Text("\(invitation.inviterName) invited you to join.").font(.callout).foregroundStyle(.secondary)
+                    if !social.enabled {
+                        Text("Accepting enables group progress sync. Members see your name, avatar and streaks; recordings stay private.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Button("Accept") { Task { await social.respond(to: invitation, accept: true) } }.buttonStyle(.borderedProminent)
+                        Button("Decline") { Task { await social.respond(to: invitation, accept: false) } }.buttonStyle(.bordered)
+                    }.disabled(social.busy)
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
