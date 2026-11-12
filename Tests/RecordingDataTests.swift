@@ -217,7 +217,9 @@ struct RecordingDataTests {
         try FileManager.default.copyItem(at: writer.folder, to: duplicateFolder)
         let collisionBatch = try SessionFiles.exportAll(to: exports, root: root, active: nil)
         precondition(collisionBatch.count == 4)
-        let collisionCopy = collisionBatch.folder.appendingPathComponent(saved.exportName() + " (2)")
+        let collisionDay = SessionDay.groups([saved])[0].folderName
+        let collisionCopy = collisionBatch.folder.appendingPathComponent(collisionDay)
+            .appendingPathComponent(saved.exportName() + " (2)")
         let collisionMetadata = try Data(contentsOf: collisionCopy.appendingPathComponent("session.json"))
         precondition(collisionMetadata == historicalData)
 
