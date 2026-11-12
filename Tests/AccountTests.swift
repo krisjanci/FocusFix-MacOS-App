@@ -57,6 +57,12 @@ struct AccountTests {
         precondition(controller.session?.user.id == owner && controller.profile == remote && controller.profileLoaded)
         precondition(stored != nil)
         precondition(controller.needsFirstAccountTour)
+        let reopened = AccountController(configuration: config, transport: transport,
+            readCredential: { stored }, writeCredential: { stored = $0 }, defaults: preferences)
+        await reopened.restore()
+        precondition(reopened.needsFirstAccountTour) // Profile setup may span app launches.
+        reopened.didPresentFirstAccountTour()
+        precondition(!controller.needsFirstAccountTour)
         controller.didPresentFirstAccountTour()
         precondition(!controller.needsFirstAccountTour)
         let saved = await controller.saveProfile(UserProfile(name: "Updated name"))
