@@ -16,6 +16,7 @@ import Combine
         var remoteInvitations = [invitation]
         var active = owner
         var offline = false
+        var inboxOffline = false
         var block = false
         var continuation: CheckedContinuation<Void, Never>?
         var bodies: [[String: Any]] = []
@@ -28,6 +29,7 @@ import Combine
                     user: AccountUser(id: active, email: nil)))
             } else if request.url!.path.contains("account_profiles") { data = Data("[]".utf8) }
             else if request.url!.path.contains("group_invitations") || request.url!.path.contains("decline_group_invitation") {
+                if inboxOffline { throw URLError(.notConnectedToInternet) }
                 if request.url!.path.contains("decline_group_invitation") {
                     let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
                     precondition(payload["p_invitation"] == invitation.id.uuidString)
@@ -133,6 +135,29 @@ import Combine
         let afterDeletion = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
         await afterDeletion.refresh()
         precondition(!afterDeletion.enabled)
+        // An inbox outage must not misreport a local storage error or block opt-in.
+        inboxOffline = true
+        await afterDeletion.refresh()
+        precondition(afterDeletion.notice == nil && afterDeletion.invitationNotice != nil)
+        precondition(afterDeletion.accessState == .disabled)
+        await afterDeletion.enable()
+        precondition(afterDeletion.enabled && afterDeletion.invitationNotice == nil)
+        inboxOffline = false
+        // A successful inbox response must never clear a corrupt-ledger warning:
+        // otherwise Enable could overwrite the unreadable original with a new ledger.
+        let identity = "\(config.origin.absoluteString)|\(owner)"
+        let fileName = Data(identity.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
+        let ledgerFile = root.appendingPathComponent("FocusFix/Social/\(fileName).json")
+        let original = Data("unreadable synthetic ledger".utf8)
+        try original.write(to: ledgerFile)
+        let corrupt = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
+        await corrupt.refresh()
+        precondition(corrupt.accessState == .unavailable && corrupt.notice != nil)
+        precondition(corrupt.invitationNotice == nil)
+        await corrupt.enable()
+        precondition(!corrupt.enabled)
+        let preserved = try Data(contentsOf: ledgerFile)
+        precondition(preserved == original)
         print("Social opt-in, durable offline outbox, account isolation, stale responses and retry acknowledgement passed")
     }
 }
