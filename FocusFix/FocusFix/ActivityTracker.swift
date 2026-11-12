@@ -51,6 +51,7 @@ final class ActivityTracker: ObservableObject {
     private var progressClock = ProgressClock()
     private var pendingWorkSlices: [CoverageSlice] = []
     private var segmentWorkDays: [String: Double] = [:]
+    private var segmentWorkIntervals: [DeclaredWorkInterval] = []
     private var segmentWorkOwner: DeclaredWorkOwner?
     private var captureAccountKey: String?
     private var activeAccountKey: String? {
@@ -404,7 +405,7 @@ final class ActivityTracker: ObservableObject {
         do {
             let root = try SessionFiles.root()
             startedAt = Date()
-            pendingWorkSlices = []; segmentWorkDays = [:]
+            pendingWorkSlices = []; segmentWorkDays = [:]; segmentWorkIntervals = []
             captureAccountKey = activeAccountKey
             segmentWorkOwner = SocialController.shared.declaredWorkScope.map { DeclaredWorkOwner(ownerID: $0.owner, origin: $0.origin) }
             sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
@@ -646,7 +647,7 @@ final class ActivityTracker: ObservableObject {
             startedAt: nextStart, mode: recordingMode, continuingContract: next, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors)
         writer = replacement; sessionFolder = replacement.folder
-        segmentWorkDays = [:]; pendingWorkSlices = []
+        segmentWorkDays = [:]; pendingWorkSlices = []; segmentWorkIntervals = []
         captureAccountKey = activeAccountKey
         segmentWorkOwner = SocialController.shared.declaredWorkScope.map { DeclaredWorkOwner(ownerID: $0.owner, origin: $0.origin) }
         if let activeBreak = breakPolicy.activeBreak {
@@ -1118,17 +1119,15 @@ final class ActivityTracker: ObservableObject {
         }
     }
 
+    private var reconciledSocialScope: String?
     func reconcileProgress() {
+        let scope = SocialController.shared.declaredWorkScope.map { "\($0.origin)|\($0.owner)" }
+        if scope != reconciledSocialScope {
+            reconciledSocialScope = scope
+            reconcileSavedProgress()
+        }
         // Restore the current owner's latest replacement totals after account switches;
         // corrections made while signed out never transfer to the next account.
-        if let scope = SocialController.shared.declaredWorkScope {
-            for (segment, owner) in dailyProgress.declaredOwners where owner.ownerID == scope.owner && owner.origin == scope.origin {
-                if let id = UUID(uuidString: segment), let days = dailyProgress.declaredSegments[segment] {
-                    SocialController.shared.stageDeclaredWork(segmentID: id, days: days,
-                        capturedOwner: owner.ownerID, capturedOrigin: owner.origin)
-                }
-            }
-        }
         let previous = dailyProgress
         dailyProgress.reconcile(at: Date(), calendar: DailyProgress.calendar())
         progressDirty = progressDirty || previous != dailyProgress
@@ -1144,6 +1143,7 @@ final class ActivityTracker: ObservableObject {
         let slices = pendingWorkSlices
         pendingWorkSlices = []
         let calendar = DailyProgress.calendar(timeZone: TimeZone(identifier: contract.scoringTimeZone) ?? .current)
+        segmentWorkIntervals = DeclaredWorkInterval.merged(segmentWorkIntervals + DeclaredWorkInterval.observed(slices, startedAt: startedAt, origin: contract.elapsedOrigin))
         let allocation = DailyProgress.declaredAllocation(slices: slices, startedAt: startedAt, origin: contract.elapsedOrigin, calendar: calendar)
         for (day, seconds) in allocation { segmentWorkDays[day, default: 0] += seconds }
         try dailyProgress.replaceDeclaredWork(segmentID: contract.segmentID.uuidString, days: segmentWorkDays,
@@ -1152,7 +1152,10 @@ final class ActivityTracker: ObservableObject {
         declaredWorkSeconds += seconds; sessionWorkPlan.credit(seconds)
         progressDirty = true
         SocialController.shared.stageDeclaredWork(segmentID: contract.segmentID, days: segmentWorkDays,
-            capturedOwner: segmentWorkOwner?.ownerID, capturedOrigin: segmentWorkOwner?.origin)
+            capturedOwner: segmentWorkOwner?.ownerID, capturedOrigin: segmentWorkOwner?.origin,
+            startedAt: startedAt.timeIntervalSince1970,
+            observedThrough: startedAt.timeIntervalSince1970 + contract.observedThrough - contract.elapsedOrigin,
+            intervals: segmentWorkIntervals)
     }
     private func reconcileSavedProgress() {
         progressReconciliation?.cancel()
@@ -1160,6 +1163,9 @@ final class ActivityTracker: ObservableObject {
             guard let contract = session.recordingContract, contract.finalized else { return false }
             return dailyProgress.declaredSegments[contract.segmentID.uuidString] == nil
                 || dailyProgress.declaredRevisions[contract.segmentID.uuidString] != contract.revisions.count
+                || (dailyProgress.declaredOwners[contract.segmentID.uuidString]?.ownerID == SocialController.shared.userID
+                    && SocialController.shared.needsDeclaredWorkDetails(contract.segmentID,
+                        days: dailyProgress.declaredSegments[contract.segmentID.uuidString] ?? [:]))
         }
         progressReconciliation = Task { [weak self] in
             for session in candidates {
@@ -1172,7 +1178,10 @@ final class ActivityTracker: ObservableObject {
                     try self.dailyProgress.replaceDeclaredWork(segmentID: contract.segmentID.uuidString, days: allocation, revision: contract.revisions.count)
                     let owner = self.dailyProgress.declaredOwners[contract.segmentID.uuidString]
                     SocialController.shared.stageDeclaredWork(segmentID: contract.segmentID, days: allocation,
-                        capturedOwner: owner?.ownerID, capturedOrigin: owner?.origin)
+                        capturedOwner: owner?.ownerID, capturedOrigin: owner?.origin,
+                        startedAt: session.startedAt.timeIntervalSince1970,
+                        observedThrough: session.startedAt.timeIntervalSince1970 + contract.observedThrough - contract.elapsedOrigin,
+                        intervals: DeclaredWorkInterval.observed(coverage.workSlices, startedAt: session.startedAt, origin: contract.elapsedOrigin))
                     self.progressDirty = true; self.reconcileProgress()
                 } catch { self.progressNotice = "Declared-work coverage could not be reconciled. Existing progress was kept; refresh to retry." }
             }
