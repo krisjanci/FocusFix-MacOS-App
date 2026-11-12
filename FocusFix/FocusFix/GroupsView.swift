@@ -15,6 +15,10 @@ struct GroupsView: View {
                 Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
                     .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy || social.userID == nil)
             }
+            if let notice = social.invitationNotice {
+                Text(notice).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if !social.invitations.isEmpty { InvitationInbox(social: social).frame(maxHeight: 230) }
             if [.signedOut, .disabled, .unavailable].contains(social.accessState) {
                 ScrollView { accessCard.padding(.top, 10) }
