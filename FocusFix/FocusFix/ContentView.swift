@@ -57,6 +57,7 @@ struct ContentView: View {
         .sheet(isPresented: $peopleSheet) {
             PeoplePanel(social: social, close: { peopleSheet = false }).frame(width: 380, height: 580)
         }
+        .task { social.start() }
         .onChange(of: tour.isPresented) { _, shown in
             if shown { peopleExpanded = false; peopleSheet = false }
         }
@@ -225,7 +226,13 @@ struct ContentView: View {
             }
             HStack {
                 Button(action: togglePeople) {
-                    Label(peopleExpanded ? "Hide people" : "Groups", systemImage: "person.2")
+                    HStack(spacing: 6) {
+                        Label(peopleExpanded ? "Hide people" : "Groups", systemImage: "person.2")
+                        if !social.invitations.isEmpty {
+                            Circle().fill(.red).frame(width: 7, height: 7)
+                                .accessibilityLabel("\(social.invitations.count) pending invitations")
+                        }
+                    }
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityLabel(peopleExpanded ? "Collapse People panel" : "Expand group People panel")
                     .help("Show people in your selected group")
