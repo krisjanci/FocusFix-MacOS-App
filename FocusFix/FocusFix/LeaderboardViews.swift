@@ -64,7 +64,7 @@ struct LeaderboardRow: View {
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) {
-                Text(metric == .work && member.workStreakRank == nil ? "—" : "\(metric.rank(member))").font(.system(.callout, design: .rounded).weight(.semibold)).monospacedDigit()
+                Text((metric == .work ? member.workStreakRank == nil : member.habitsStreakRank == nil) ? "—" : "\(metric.rank(member))").font(.system(.callout, design: .rounded).weight(.semibold)).monospacedDigit()
                 if let place = PodiumPlace(rank: metric.rank(member), score: metric.score(member)) {
                     PodiumMarker(place: place, allowsAnimation: !pinned && allowsAnimation)
                 }
@@ -97,7 +97,7 @@ struct LeaderboardRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metric == .work
             ? "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.workStreak.map { "\($0)-day weekday streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.workStreakFrozen == true ? ", protected by a freeze" : "")"
-            : "Rank \(metric.rank(member)), \(member.name)\(isCurrentUser ? ", you" : ""), \(metric.score(member)) day healthy-habit streak")
+            : "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.habitsStreak.map { "\($0)-day healthy-habit streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.habitsStreakFrozen == true ? ", protected by a freeze" : "")")
     }
 }
 
