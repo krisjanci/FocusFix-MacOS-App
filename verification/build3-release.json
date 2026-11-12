@@ -1,0 +1,19 @@
+{
+  "download_url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/latest/download/FocusFix-macOS.zip",
+  "resolved_url": "https://release-assets.githubusercontent.com/github-production-release-asset/1387991972/6ca7f99d-ef20-4048-acd4-3f164238156c",
+  "sha256": "c73d7192df4320bfa92c7e29a1921b0600adeac22095d5b2d420c1ff38522b95",
+  "size": 3647659,
+  "build": "3",
+  "source_revision": "5f4786233fe821eed324623450c3326722990613",
+  "signature_notarization_and_gatekeeper": "passed",
+  "verified_at_utc": "2026-11-12T02:46:55.587957+00:00",
+  "tag": "notarized-2026-11-11-build3",
+  "release_url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/tag/notarized-2026-11-11-build3",
+  "release_workflow_run": 43143194896,
+  "release_workflow_result": "success",
+  "apple_notarization_upload_explicitly_approved": true,
+  "public_release_explicitly_approved": true,
+  "public_download_checks_passed": true,
+  "ci_test_run": 43143194886,
+  "ci_test_result": "success"
+}
