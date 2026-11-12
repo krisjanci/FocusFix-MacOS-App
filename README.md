@@ -7,7 +7,7 @@ FocusFix is a personal macOS app for recording computer activity, marking work t
 1. Open FocusFix and choose whether to enable recording. Grant macOS Input Monitoring access if you want activity capture.
 2. Select **Start work** for a manual session, or **Plan session…** to set a target first.
 3. Use **Take a break** and **I’m back** for explicit breaks. **End work** saves a manual session.
-4. Open **Sessions** to review, correct work labels, export, or delete local recordings.
+4. Open **Sessions** to review, correct work labels, export, or delete local recordings. Days with multiple recordings appear as expandable folders. Batch exports use the same day folders; days with one recording stay as single entries.
 5. Open **Quick tour** for a nine-step practice flow. The tour uses demo data and changes no settings or recordings.
 
 Automatic recording is optional in **Settings → Privacy & Data Sharing** and has its own acknowledgement. It may include non-work computer use, begins with an **Unknown** label, and continues while the menu-bar app runs. **Pause recording** or **Quit** stops capture. Closing a window alone may leave it running. The visible status shows whether recording is active. Five minutes of continuous idle time, sleep/lock, or loss of Input Monitoring permission also stop capture.
