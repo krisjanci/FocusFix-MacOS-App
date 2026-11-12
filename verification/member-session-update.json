@@ -1,5 +1,5 @@
 {
-  "verified_at_utc": "2026-11-12T04:14:00.572095+00:00",
+  "verified_at_utc": "2026-11-12T14:33:51.133303+00:00",
   "implementation_revision": "3938da6384240ea076f01f30cdaead7020edea76",
   "iteration": 2,
   "file_commits_this_iteration": 3,
@@ -19,21 +19,43 @@
     "native_layout": "verification/member-invites-layout.png; compact 359-point People and 400-point Groups inspected",
     "exports": "Multiple/single-day structure, manual/automatic recordings, collision suffixes, active-session exclusion, metadata preservation and failure cleanup passed",
     "distinct_sender_profiles": "passed; member invitations show Member sender rather than Admin sender",
-    "signed_universal_archive": "passed: FocusFix-Updates-Build4.xcarchive",
-    "signed_export": "passed: build 4, production identifier, expected source revision and Developer ID signature"
+    "signed_universal_archive": "Final archive passed; source 5b55fd33bd203273bcbec017790c4f95e17d6163",
+    "signed_export": "Final notarized build 4 verified from actual public latest-download ZIP",
+    "live_member_invitation_regressions": "passed including actual sender, membership authorization, admin restrictions and habit streaks; fixtures rolled back",
+    "live_work_rpc_api": "New RPC discoverable through live REST API; anonymous execution denied",
+    "javascript_tests": "10 passed"
   },
-  "remaining": [
-    "Finish notarization and publish expanded build 4, then verify actual latest website download"
-  ],
-  "goal_complete": false,
+  "remaining": [],
+  "goal_complete": true,
   "iteration_file_commits": {
     "1": 17,
-    "2": 3
+    "2": 3,
+    "3": 24,
+    "4": 2
   },
-  "release_source_revision": "e3b777f473478c822d73e7c01e2ff5528708ce5f",
+  "release_source_revision": "5b55fd33bd203273bcbec017790c4f95e17d6163",
   "rollout_approved": true,
   "live_migrations": [
     "202611120002_member_group_invitations.sql",
     "202611120003_declared_work_and_group_photos.sql"
-  ]
+  ],
+  "release": {
+    "tag": "notarized-2026-11-12-build4",
+    "url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/tag/notarized-2026-11-12-build4",
+    "source_revision": "5b55fd33bd203273bcbec017790c4f95e17d6163",
+    "app_sha256": "55dfa5150bfb88e482839e2aef56164a866f7ee99682e7cbc1468756a8bde17b",
+    "source_sha256": "4548bed0b43a85585b073122c3cfa641321e720d2c8735abe56b80b65ba4fc07",
+    "build": 4,
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "notarized": true,
+    "actual_latest_download_verified": true,
+    "public_download_signature_and_gatekeeper": "passed",
+    "tests_run": "https://github.com/krisjanci/FocusFix-MacOS-App/actions/runs/43237133814",
+    "tests_result": "success",
+    "publication_run": "https://github.com/krisjanci/FocusFix-MacOS-App/actions/runs/43238153514",
+    "publication_result": "success"
+  }
 }
