@@ -7,6 +7,7 @@ import AppKit
 struct SessionLibraryView: View {
     @ObservedObject var tracker: ActivityTracker
     @State private var selection = Set<SavedSession.ID>()
+    @State private var expandedDays = Set<String>()
     @State private var pendingDeletion: [SavedSession] = []
     @State private var confirmDeletion = false
     @State private var notice: String?
@@ -46,7 +47,7 @@ struct SessionLibraryView: View {
             } else {
                 HStack {
                     Text("\(selectedSessions.count) selected").monospacedDigit()
-                    Button("Select All") { selection = Set(tracker.sessions.map(\.id)) }
+                    Button("Select All") { selection = Set(tracker.sessions.map(\.id)); expandedDays.formUnion(SessionDay.groups(tracker.sessions).map(\.id)) }
                         .keyboardShortcut("a", modifiers: .command)
                     Button("Deselect All") { selection.removeAll() }.disabled(selection.isEmpty)
                     Spacer()
@@ -54,8 +55,20 @@ struct SessionLibraryView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding(.horizontal, 20).padding(.vertical, 8)
                 List(selection: $selection) {
-                    ForEach(tracker.sessions) { session in
-                        sessionRow(session).tag(session.id)
+                    ForEach(SessionDay.groups(tracker.sessions)) { day in
+                        if day.sessions.count > 1 {
+                            DisclosureGroup(isExpanded: Binding(
+                                get: { expandedDays.contains(day.id) },
+                                set: { if $0 { expandedDays.insert(day.id) } else { expandedDays.remove(day.id) } }
+                            )) {
+                                ForEach(day.sessions) { session in sessionRow(session).tag(session.id) }
+                            } label: {
+                                Label("\(day.date.formatted(date: .abbreviated, time: .omitted)) · \(day.sessions.count) recordings", systemImage: "folder")
+                                    .font(.headline).padding(.vertical, 8)
+                            }
+                        } else if let session = day.sessions.first {
+                            sessionRow(session).tag(session.id)
+                        }
                     }
                 }
                 .listStyle(.inset)
