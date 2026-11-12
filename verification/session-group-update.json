@@ -1,8 +1,8 @@
 {
-  "verified_at_utc": "2026-11-12T01:38:34.765477+00:00",
+  "verified_at_utc": "2026-11-12T02:48:24.821919+00:00",
   "implementation_revision": "01f464f363c7f0c3333b151b19ac79c8d4639ad5",
-  "iterations_completed": 3,
-  "file_commits_before_report": 36,
+  "iterations_completed": 4,
+  "file_commits_before_report": 41,
   "changes": {
     "local_recordings": "Removed manual-session deletion below 15 minutes; finite nonnegative completed recordings are retained in Application Support. Invalid durations preserve original files for recovery.",
     "login": "Centered identity, account card, blue primary actions, full-width form actions, existing recovery and Keychain options retained.",
@@ -31,17 +31,61 @@
     "saved_recordings_after_library_reload": 6,
     "saved_recordings_exported": 6,
     "latest_social_controller_regressions": "passed: inbox failure does not block enabling groups; successful inbox refresh preserves unreadable-ledger warning and original bytes",
-    "latest_debug_build": "passed after iteration 3"
+    "latest_debug_build": "passed after iteration 3",
+    "signed_universal_release_archive": "passed",
+    "developer_id_signature": "passed",
+    "apple_notarization": "passed; ticket validated",
+    "gatekeeper": "accepted: Notarized Developer ID",
+    "live_groups": "passed: rollback-only invitation, admin and healthy-habit checks",
+    "public_website_download": "build 3; exact expected ZIP checksum; source revision and notarization verified after download",
+    "github_release_workflow": "success: 43143194896",
+    "github_test_workflow": "success: 43143194886"
   },
-  "remaining": [
-    "Explicit approval to apply production Supabase migration is pending. Automatic approval review rejected the deployment action; it has not been applied.",
-    "Signed universal Release archive session 48141 is still live, waiting on macOS Keychain. Its source revision is 97449083bec9ff2a1b5d40480d730696993f5b04, before iteration 3. After it finishes, build a new archive containing the latest commits; do not distribute the older archive.",
-    "Notarization, distribution and verification on another Mac have not been performed for build 3.",
-    "Existing app downloads still contain the old code; already-deleted short recordings cannot be recovered by this fix."
-  ],
+  "remaining": [],
   "production_migration": "supabase/migrations/202611120001_group_invitations_and_admin.sql",
   "prepared_dashboard": "https://supabase.com/dashboard/project/ltgyhstpbiocuxvyjpcb/sql/ebce65c1-266d-4aa6-86c4-8706e5a9fb7b",
-  "archive_path": "/Users/krisjanci/Desktop/CS 600/FocusFix-Updates-Build3.xcarchive",
-  "goal_complete": false,
-  "production_deployment_approval": "Requested; no explicit user approval received."
+  "archive_path": "/Users/krisjanci/Desktop/CS 600/FocusFix-Updates-Build3-Final.xcarchive",
+  "goal_complete": true,
+  "production_deployment_approval": "Explicitly approved and applied; live checks passed.",
+  "release_asset_file_commits": 5,
+  "release_source_revision": "5f4786233fe821eed324623450c3326722990613",
+  "release_url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/tag/notarized-2026-11-11-build3",
+  "completion_audit": [
+    {
+      "requirement": "Save session data on each laptop",
+      "evidence": "Every finite nonnegative completed recording is retained; six short and long synthetic recordings survive disk reload and export. The corrected signed build is now the public download."
+    },
+    {
+      "requirement": "Professional login inspired by Meta",
+      "evidence": "Centered identity and card, full-width actions and blue account tint; native rendering saved in account-progress-update.png and compiled in release."
+    },
+    {
+      "requirement": "Thicker progress bar with inactive grey tint",
+      "evidence": "ProgressViews uses height 7, active versus muted fill and a reduced-motion-aware color transition; active/paused native rendering inspected."
+    },
+    {
+      "requirement": "Automatically play tutorial for new accounts",
+      "evidence": "Account tests verify new-account request and persistence through account restoration; CollectorRootView starts QuickTour when profile setup and blocking dialogs finish. Launch and tour tests pass."
+    },
+    {
+      "requirement": "Invitations visible in app with Accept/Decline and badge",
+      "evidence": "Live isolated inbox delivery, deduplication, decline and acceptance checks pass. SocialController refreshes and publishes invitations; Groups and People surfaces and the main Groups notification dot observe that list."
+    },
+    {
+      "requirement": "Admin edit, removal and transfer",
+      "evidence": "Live RPC checks prove successful editing, transfer, new-admin removal and rejection of former-admin/non-admin actions. Manage group controls use those actions."
+    },
+    {
+      "requirement": "Healthy habits reset streak; main flame remains work",
+      "evidence": "Live missed-day reset and local freeze/weekday mechanics verified. Healthy rankings use habitsStreak; WorkStreakBadge still reads declared-work daily progress."
+    },
+    {
+      "requirement": "Commit each file and each iteration",
+      "evidence": "Every task commit changes one file; four implementation/verification iterations committed separately, plus five single-file release asset commits."
+    }
+  ],
+  "limits": [
+    "No two-physical-Mac interactive test was performed.",
+    "Already-deleted recordings from older versions cannot be restored by this update."
+  ]
 }
