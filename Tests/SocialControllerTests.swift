@@ -12,6 +12,8 @@ import Combine
         let firstGroup = SocialGroup(id: UUID(), name: "Study circle", owner: owner, code: nil, members: [])
         let secondGroup = SocialGroup(id: UUID(), name: "Weekend crew", owner: owner, code: nil, members: [])
         var remoteGroups: [SocialGroup] = []
+        let invitation = GroupInvitation(id: UUID(), groupID: firstGroup.id, groupName: firstGroup.name, inviterName: "Admin")
+        var remoteInvitations = [invitation]
         var active = owner
         var offline = false
         var block = false
@@ -26,16 +28,26 @@ import Combine
                     user: AccountUser(id: active, email: nil)))
             } else if request.url!.path.contains("account_profiles") { data = Data("[]".utf8) }
             else if request.url!.path.contains("group_invitations") || request.url!.path.contains("decline_group_invitation") {
-                data = Data("[]".utf8)
+                if request.url!.path.contains("decline_group_invitation") {
+                    let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
+                    precondition(payload["p_invitation"] == invitation.id.uuidString)
+                    remoteInvitations = []
+                }
+                data = try JSONEncoder().encode(remoteInvitations)
             }
             else if request.url!.path.contains("social_state") {
                 if offline { throw URLError(.notConnectedToInternet) }
                 let object = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
                 bodies.append(object)
+                if object["p_action"] as? String == "accept" {
+                    let fields = object["p_payload"] as! [String: Any]
+                    precondition(fields["invitation"] as? String == invitation.id.uuidString)
+                    remoteInvitations = []; remoteGroups = [firstGroup]
+                }
                 if block { await withCheckedContinuation { continuation = $0 } }
                 var progress = DailyProgress()
                 progress.reconcile(at: Date(), calendar: DailyProgress.calendar(timeZone: TimeZone(secondsFromGMT: 0)!))
-                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: remoteGroups))
+                data = try JSONEncoder().encode(SocialState(timezone: "UTC", progress: progress, groups: remoteGroups, invitations: remoteInvitations))
             }
             return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
@@ -47,10 +59,17 @@ import Combine
         await account.authenticate(email: "test@example.invalid", password: "test-password", create: false)
         await social.refresh()
         precondition(!social.enabled && bodies.isEmpty) // No implicit opt-in or guest history.
-        precondition(social.accessState == .disabled)
+        precondition(social.accessState == .disabled && social.invitations.count == 1)
+        await social.respond(to: invitation, accept: false)
+        precondition(!social.enabled && social.invitations.isEmpty && bodies.isEmpty)
+        remoteInvitations = [invitation]
+        await social.refresh()
+        precondition(social.invitations.count == 1)
         await social.enable()
         precondition(social.enabled && bodies.count == 1 && social.ledger?.timezone == "UTC")
         precondition(social.accessState == .enabled)
+        await social.respond(to: invitation, accept: true)
+        precondition(social.invitations.isEmpty && social.groups.first?.id == invitation.groupID)
         remoteGroups = [firstGroup,secondGroup]
         await social.refresh()
         social.selectGroup(secondGroup.id); social.selectMetric(.habits)
@@ -88,7 +107,7 @@ import Combine
         precondition(restored.ledger!.pending[0].id == submittedID)
         precondition(restored.ledger!.pending[0].seconds == 60)
         await account.signOut()
-        precondition(restored.groups.isEmpty && restored.selection == GroupSelection())
+        precondition(restored.groups.isEmpty && restored.invitations.isEmpty && restored.selection == GroupSelection())
         remoteGroups = []
         active = other
         await account.authenticate(email: "other@example.invalid", password: "test-password", create: false)
