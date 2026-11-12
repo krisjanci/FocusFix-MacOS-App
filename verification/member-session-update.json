@@ -1,0 +1,27 @@
+{
+  "verified_at_utc": "2026-11-12T04:10:06.919847+00:00",
+  "implementation_revision": "3938da6384240ea076f01f30cdaead7020edea76",
+  "iteration": 1,
+  "file_commits_this_iteration": 17,
+  "requirements": {
+    "member_invites": "Every current member can send email invitations; edit, remove, reset and transfer remain admin-only. Inbox displays the actual inviting member.",
+    "editing_focus": "Removed form-wide busy disabling. Save and other mutation buttons disable during sync; native rendering confirms all three editable text fields remain enabled.",
+    "compact_invitations": "People and Groups use one page scroll with intrinsic-height invitations and no conflicting fixed leaderboard height.",
+    "your_rank": "Removed the duplicate pinned Your Rank row in the shared leaderboard.",
+    "timers": "Large SESSION TIME binds declaredWorkSeconds; smaller timer above Start/End work binds total recording elapsed time.",
+    "day_folders": "Days with multiple recordings form expandable folders in Sessions and dated directories in batch exports. Single-recording days stay as single entries. Original local recordings are not moved."
+  },
+  "checks": {
+    "desktop_tests": "All 33 groups passed across the full run and rerun of affected export tests plus remaining groups.",
+    "database_tests": "passed including non-admin member invite delivery, actual sender, outsider denial and restricted admin mutations",
+    "debug_build": "passed",
+    "native_form_during_sync": "3 editable native fields remained enabled",
+    "native_layout": "verification/member-invites-layout.png; compact 359-point People and 400-point Groups inspected",
+    "exports": "Multiple/single-day structure, manual/automatic recordings, collision suffixes, active-session exclusion, metadata preservation and failure cleanup passed"
+  },
+  "remaining": [
+    "Signed build 4 archive, Apple notarization and publication",
+    "Production member-invitation migration and live regression verification"
+  ],
+  "goal_complete": false
+}
