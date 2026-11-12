@@ -59,21 +59,20 @@ struct LeaderboardRow: View {
     let member: SocialMember
     let metric: LeaderboardMetric
     let isCurrentUser: Bool
-    var pinned = false
     var allowsAnimation = true
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) {
                 Text((metric == .work ? member.workStreakRank == nil : member.habitsStreakRank == nil) ? "—" : "\(metric.rank(member))").font(.system(.callout, design: .rounded).weight(.semibold)).monospacedDigit()
                 if let place = PodiumPlace(rank: metric.rank(member), score: metric.score(member)) {
-                    PodiumMarker(place: place, allowsAnimation: !pinned && allowsAnimation)
+                    PodiumMarker(place: place, allowsAnimation: allowsAnimation)
                 }
             }.frame(width: 46, alignment: .leading)
             ProfileAvatar(profile: UserProfile(name: member.name, symbol: member.symbol, color: member.color), size: 29)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(member.name).font(.callout.weight(isCurrentUser ? .semibold : .regular)).lineLimit(2)
-                if isCurrentUser && !pinned { Text("You").font(.caption2).foregroundStyle(.secondary) }
+                if isCurrentUser { Text("You").font(.caption2).foregroundStyle(.secondary) }
             }
             Spacer(minLength: 4)
             if metric == .work {
@@ -122,6 +121,7 @@ struct GroupLeaderboard: View {
     let metric: LeaderboardMetric
     let currentUser: UUID?
     var allowsAnimation = true
+    var scrolls = true
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -130,19 +130,18 @@ struct GroupLeaderboard: View {
                 Text(metric.scoreTitle)
             }.font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
                 .padding(.horizontal, 10).padding(.vertical, 10)
-            ScrollView {
-                LeaderboardTable(members: group.members, metric: metric, currentUser: currentUser, allowsAnimation: allowsAnimation)
-                    .padding(.bottom, 8)
-            }.accessibilityLabel("\(group.name), \(metric.title) leaderboard, \(group.members.count) people")
-            if let person = group.members.first(where: { $0.id == currentUser }) {
-                Divider()
-                Text("YOUR RANK").font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
-                    .padding(.top, 12).padding(.leading, 10)
-                LeaderboardRow(member: person, metric: metric, isCurrentUser: true, pinned: true)
-                    .padding(.top, 3)
-            }
+            if scrolls {
+                ScrollView { table }
+                    .accessibilityLabel("\(group.name), \(metric.title) leaderboard, \(group.members.count) people")
+            } else { table }
+
         }
     }
+    private var table: some View {
+        LeaderboardTable(members: group.members, metric: metric, currentUser: currentUser, allowsAnimation: allowsAnimation)
+            .padding(.bottom, 8)
+    }
+
 }
 
 struct GroupHeading: View {
@@ -157,7 +156,7 @@ struct GroupHeading: View {
                 Label("\(group.members.count) / \(SocialGroup.capacity) people", systemImage: "person.2")
                 if group.members.count >= SocialGroup.capacity { Text("· Full") }
                 Spacer()
-                Text(metric == .work ? "CURRENT STREAK" : "ALL TIME").font(.system(size: 9, weight: .medium)).tracking(0.7)
+                Text("CURRENT STREAK").font(.system(size: 9, weight: .medium)).tracking(0.7)
             }.font(.caption).foregroundStyle(.secondary)
         }
     }
