@@ -31,7 +31,7 @@ struct SessionLibraryView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your recordings").font(.title2.weight(.semibold))
-                    Text("Files are recording segments, not work periods. Automatic intervals are retained, including short ones. Only declared work with observed coverage counts toward work progress.").font(.callout).foregroundStyle(.secondary)
+                    Text("Files are recording segments, not work periods. Manual and automatic recordings are saved on this Mac, including short ones. Only declared work with observed coverage counts toward work progress.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text("\(tracker.sessions.count)").font(.title2.monospacedDigit()).foregroundStyle(teal)
