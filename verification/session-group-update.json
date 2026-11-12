@@ -1,0 +1,44 @@
+{
+  "verified_at_utc": "2026-11-12T01:35:18.854307+00:00",
+  "implementation_revision": "97449083bec9ff2a1b5d40480d730696993f5b04",
+  "iterations_completed": 2,
+  "file_commits_before_report": 31,
+  "changes": {
+    "local_recordings": "Removed manual-session deletion below 15 minutes; finite nonnegative completed recordings are retained in Application Support. Invalid durations preserve original files for recovery.",
+    "login": "Centered identity, account card, blue primary actions, full-width form actions, existing recovery and Keychain options retained.",
+    "daily_progress": "7-point bar (previously 4); muted inactive tint, normal active tint, reduced-motion-aware transition.",
+    "onboarding": "New-account tutorial request is persisted per account and service; starts when setup is finished and blocking dialogs close, including after relaunch.",
+    "invitations": "Account-private inbox, recipient-only accept/decline, 30-second polling and Groups notification dot. Decline does not enable progress sharing.",
+    "administration": "Owner acts as admin; editable name and description, member removal and transfer to an existing member enforced by server.",
+    "healthy_habits": "Current weekday streaks use break qualification and the existing work-streak freeze/reset policy; main flame remains work only."
+  },
+  "checks": {
+    "desktop_test_groups": 33,
+    "desktop_tests": "passed",
+    "service_tests": 10,
+    "service_tests_passed": 10,
+    "database_tests": "passed, including migration, invitation isolation, deduplication, responses, role transfer, removal, habit reset and existing work/capacity regressions",
+    "debug_build": "passed",
+    "native_login_and_progress_render": "verification/account-progress-update.png",
+    "short_recording_durations_verified_seconds": [
+      0,
+      60,
+      899.999,
+      900,
+      1200,
+      540.001
+    ],
+    "saved_recordings_after_library_reload": 6,
+    "saved_recordings_exported": 6
+  },
+  "remaining": [
+    "Explicit approval to apply production Supabase migration is pending. Automatic approval review rejected the deployment action; it has not been applied.",
+    "Signed universal Release archive is running and waiting on the macOS Keychain prompt (xcodebuild session 48141). Do not restart while it remains live.",
+    "Notarization, distribution and verification on another Mac have not been performed for build 3.",
+    "Existing app downloads still contain the old code; already-deleted short recordings cannot be recovered by this fix."
+  ],
+  "production_migration": "supabase/migrations/202611120001_group_invitations_and_admin.sql",
+  "prepared_dashboard": "https://supabase.com/dashboard/project/ltgyhstpbiocuxvyjpcb/sql/ebce65c1-266d-4aa6-86c4-8706e5a9fb7b",
+  "archive_path": "/Users/krisjanci/Desktop/CS 600/FocusFix-Updates-Build3.xcarchive",
+  "goal_complete": false
+}
