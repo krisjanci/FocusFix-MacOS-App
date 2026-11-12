@@ -26,6 +26,7 @@ struct SocialMember: Codable, Identifiable {
     var workStreak: Int? = nil
     var workStreakRank: Int? = nil
     var workStreakFrozen: Bool? = nil
+    var photo: Data? = nil
 }
 struct SocialGroup: Codable, Identifiable {
     static let capacity = 50
@@ -47,14 +48,40 @@ struct SocialState: Codable {
     let progress: DailyProgress
     let groups: [SocialGroup]
     var invitations: [GroupInvitation]? = nil
+    var declaredWorkSyncVersion: Int? = nil
 }
 
+struct DeclaredWorkInterval: Codable, Equatable {
+    var start: Double
+    var end: Double
+    static func merged(_ values: [DeclaredWorkInterval]) -> [DeclaredWorkInterval] {
+        var result: [DeclaredWorkInterval] = []
+        for value in values.sorted(by: { $0.start < $1.start }) {
+            guard value.start.isFinite, value.end.isFinite, value.end > value.start else { continue }
+            if let last = result.last, value.start <= last.end + 0.000001 {
+                result[result.count - 1].end = max(last.end, value.end)
+            } else { result.append(value) }
+        }
+        return result
+    }
+    static func observed(_ slices: [CoverageSlice], startedAt: Date, origin: Double) -> [DeclaredWorkInterval] {
+        merged(slices.map { DeclaredWorkInterval(start: startedAt.timeIntervalSince1970 + $0.start - origin,
+            end: startedAt.timeIntervalSince1970 + $0.end - origin) })
+    }
+}
+struct DeclaredWorkAcknowledgement: Codable { let segmentID: UUID; let revision: Int }
+struct DeclaredWorkResponse: Codable { let version: Int; let acknowledged: [DeclaredWorkAcknowledgement] }
 struct DeclaredWorkPending: Codable, Equatable {
     let ownerID: UUID
     let origin: String
     let segmentID: UUID
     let contractVersion: Int
     let days: [String: Double]
+    var startedAt: Double? = nil
+    var observedThrough: Double? = nil
+    var intervals: [DeclaredWorkInterval]? = nil
+    var revision: Int? = nil
+    var ready: Bool { startedAt != nil && observedThrough != nil && intervals != nil && (revision ?? 0) > 0 }
 }
 
 struct SocialLedger: Codable {
@@ -65,12 +92,33 @@ struct SocialLedger: Codable {
     var submitted: Set<UUID> = []
     // These replacement totals must never be sent to the increment-only legacy RPC.
     var declaredWorkPending: [String: DeclaredWorkPending]? = nil
+    var declaredWorkSnapshots: [String: DeclaredWorkPending]? = nil
     mutating func stageDeclaredWork(_ value: DeclaredWorkPending, owner: UUID, origin: String) -> Bool {
         guard value.ownerID == owner, value.origin == origin, value.contractVersion == 2,
               value.days.values.allSatisfy({ $0.isFinite && $0 >= 0 }) else { return false }
+        let key = value.segmentID.uuidString
+        let previous = declaredWorkSnapshots?[key] ?? declaredWorkPending?[key]
+        // Legacy day-only replays cannot overwrite detailed, correction-safe summaries.
+        if value.intervals == nil && previous?.intervals != nil { return false }
+        if previous?.days == value.days && previous?.intervals == value.intervals && previous?.startedAt == value.startedAt { return false }
+        var staged = value
+        if let start = value.startedAt, let end = value.observedThrough, let intervals = value.intervals {
+            guard start.isFinite, end.isFinite, end >= start,
+                  intervals.allSatisfy({ $0.start >= start && $0.end <= end && $0.end > $0.start }) else { return false }
+            staged.revision = (previous?.revision ?? 0) + 1
+            if declaredWorkSnapshots == nil { declaredWorkSnapshots = [:] }
+            declaredWorkSnapshots?[key] = staged
+        }
         if declaredWorkPending == nil { declaredWorkPending = [:] }
-        declaredWorkPending?[value.segmentID.uuidString] = value
+        declaredWorkPending?[key] = staged
         return true
+    }
+    mutating func acknowledgeDeclaredWork(_ acknowledgements: [DeclaredWorkAcknowledgement], sent: [DeclaredWorkPending]) {
+        for ack in acknowledgements {
+            guard let original = sent.first(where: { $0.segmentID == ack.segmentID && $0.revision == ack.revision }),
+                  declaredWorkPending?[ack.segmentID.uuidString] == original else { continue }
+            declaredWorkPending?.removeValue(forKey: ack.segmentID.uuidString)
+        }
     }
 
     mutating func append(_ event: SocialEvent) {
