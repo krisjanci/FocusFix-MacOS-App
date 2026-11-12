@@ -1,8 +1,8 @@
 {
-  "verified_at_utc": "2026-11-12T04:10:06.919847+00:00",
+  "verified_at_utc": "2026-11-12T04:14:00.572095+00:00",
   "implementation_revision": "3938da6384240ea076f01f30cdaead7020edea76",
-  "iteration": 1,
-  "file_commits_this_iteration": 17,
+  "iteration": 2,
+  "file_commits_this_iteration": 3,
   "requirements": {
     "member_invites": "Every current member can send email invitations; edit, remove, reset and transfer remain admin-only. Inbox displays the actual inviting member.",
     "editing_focus": "Removed form-wide busy disabling. Save and other mutation buttons disable during sync; native rendering confirms all three editable text fields remain enabled.",
@@ -17,11 +17,19 @@
     "debug_build": "passed",
     "native_form_during_sync": "3 editable native fields remained enabled",
     "native_layout": "verification/member-invites-layout.png; compact 359-point People and 400-point Groups inspected",
-    "exports": "Multiple/single-day structure, manual/automatic recordings, collision suffixes, active-session exclusion, metadata preservation and failure cleanup passed"
+    "exports": "Multiple/single-day structure, manual/automatic recordings, collision suffixes, active-session exclusion, metadata preservation and failure cleanup passed",
+    "distinct_sender_profiles": "passed; member invitations show Member sender rather than Admin sender",
+    "signed_universal_archive": "passed: FocusFix-Updates-Build4.xcarchive",
+    "signed_export": "passed: build 4, production identifier, expected source revision and Developer ID signature"
   },
   "remaining": [
-    "Signed build 4 archive, Apple notarization and publication",
-    "Production member-invitation migration and live regression verification"
+    "Explicit approval pending for the combined build 4 rollout: production migration, Apple notarization upload and latest GitHub publication",
+    "After approval: apply migration and run rollback-only live regressions, notarize, package, publish and verify actual website download"
   ],
-  "goal_complete": false
+  "goal_complete": false,
+  "iteration_file_commits": {
+    "1": 17,
+    "2": 3
+  },
+  "release_source_revision": "e3b777f473478c822d73e7c01e2ff5528708ce5f"
 }
