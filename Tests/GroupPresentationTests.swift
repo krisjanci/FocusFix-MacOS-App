@@ -3,7 +3,7 @@ import CoreGraphics
 
 @main struct GroupPresentationTests {
     static func member(_ name: String, work: Int, habits: Int, workRank: Int, habitsRank: Int) -> SocialMember {
-        SocialMember(id: UUID(), name: name, symbol: "leaf.fill", color: "teal", work: work, habits: habits, workRank: workRank, habitsRank: habitsRank, workStreak: work, workStreakRank: workRank, workStreakFrozen: false)
+        SocialMember(id: UUID(), name: name, symbol: "leaf.fill", color: "teal", work: work, habits: habits, workRank: workRank, habitsRank: habitsRank, habitsStreak: habits, habitsStreakRank: habitsRank, workStreak: work, workStreakRank: workRank, workStreakFrozen: false)
     }
     static func main() throws {
         let alex = member("Alex", work: 8, habits: 2, workRank: 1, habitsRank: 3)
@@ -28,6 +28,11 @@ import CoreGraphics
         precondition(LeaderboardMetric.work.score(legacy) == 0 && legacy.workStreak == nil)
         let decoded = try JSONDecoder().decode(SocialMember.self, from: JSONEncoder().encode(live))
         precondition(decoded.workStreak == 1 && decoded.workStreakFrozen == true)
+        let lostHabit = SocialMember(id: UUID(), name: "Lost habit", symbol: "leaf", color: "teal", work: 0, habits: 100,
+            workRank: 1, habitsRank: 1, habitsStreak: 0, habitsStreakRank: 2)
+        precondition(LeaderboardMetric.habits.score(lostHabit) == 0)
+        precondition(LeaderboardMetric.habits.sorted([lostHabit, sam]).first?.id == sam.id)
+        precondition(LeaderboardMetric.habits.score(legacy) == 0)
         let first = SocialGroup(id: UUID(), name: "First", owner: alex.id, code: nil, members: [alex])
         let second = SocialGroup(id: UUID(), name: "Second", owner: sam.id, code: nil, members: [sam])
         var selected = GroupSelection(groupID: second.id, metric: .habits)
