@@ -6,12 +6,12 @@ enum LeaderboardMetric: String, Codable, CaseIterable, Identifiable {
     case work, habits
     var id: String { rawValue }
     var title: String { self == .work ? "Work streak" : "Healthy habits" }
-    var scoreTitle: String { self == .work ? "DAY STREAK" : "HEALTHY DAYS" }
+    var scoreTitle: String { self == .work ? "DAY STREAK" : "DAY STREAK" }
     var explanation: String {
-        self == .work ? "Current weekday streaks since joining: 60 minutes of declared work earns a day. An unprotected missed weekday resets the streak to 0." : "A completed 1-minute break earns one daily point."
+        self == .work ? "Current weekday streaks since joining: 60 minutes of declared work earns a day. An unprotected missed weekday resets the streak to 0." : "Current weekday streaks since joining: a completed 1-minute break earns a day. An unprotected missed weekday resets the streak to 0."
     }
-    func score(_ member: SocialMember) -> Int { self == .work ? (member.workStreak ?? 0) : member.habits }
-    func rank(_ member: SocialMember) -> Int { self == .work ? (member.workStreakRank ?? 0) : member.habitsRank }
+    func score(_ member: SocialMember) -> Int { self == .work ? (member.workStreak ?? 0) : (member.habitsStreak ?? 0) }
+    func rank(_ member: SocialMember) -> Int { self == .work ? (member.workStreakRank ?? 0) : (member.habitsStreakRank ?? 0) }
     func sorted(_ members: [SocialMember]) -> [SocialMember] {
         members.sorted {
             if score($0) != score($1) { return score($0) > score($1) }
