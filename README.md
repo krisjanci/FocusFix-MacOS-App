@@ -31,3 +31,5 @@ A public download is not posted yet. A release still needs the database migratio
 ## Source and support
 
 Source is licensed under [GPL-3.0-only](LICENSE). [Open a GitHub issue](https://github.com/krisjanci/FocusFix-MacOS-App/issues) for general support. Issues are public; do not post recordings, credentials, or personal information. Technical recording details are in [RECORDING-CONTRACT.md](RECORDING-CONTRACT.md).
+
+Group work streaks sync observed declared-work intervals with retry-safe replacements, including corrected sessions. Positive, unfrozen streaks have a gentle burning animation that respects Reduce Motion. Account buttons use FocusFix teal. Your own account photo appears in your group row; enable **Show my photo to members of my groups** in your profile and save to share a small thumbnail with others. Existing private photos stay private.
