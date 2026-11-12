@@ -23,13 +23,17 @@
     "signed_export": "passed: build 4, production identifier, expected source revision and Developer ID signature"
   },
   "remaining": [
-    "Explicit approval pending for the combined build 4 rollout: production migration, Apple notarization upload and latest GitHub publication",
-    "After approval: apply migration and run rollback-only live regressions, notarize, package, publish and verify actual website download"
+    "Finish notarization and publish expanded build 4, then verify actual latest website download"
   ],
   "goal_complete": false,
   "iteration_file_commits": {
     "1": 17,
     "2": 3
   },
-  "release_source_revision": "e3b777f473478c822d73e7c01e2ff5528708ce5f"
+  "release_source_revision": "e3b777f473478c822d73e7c01e2ff5528708ce5f",
+  "rollout_approved": true,
+  "live_migrations": [
+    "202611120002_member_group_invitations.sql",
+    "202611120003_declared_work_and_group_photos.sql"
+  ]
 }
