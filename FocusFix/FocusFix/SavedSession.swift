@@ -76,6 +76,28 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     }
 }
 
+// The same day grouping drives the library and exports without moving local originals.
+nonisolated struct SessionDay: Identifiable {
+    let id: String
+    let date: Date
+    let sessions: [SavedSession]
+    var folderName: String { "FocusFix Day [\(id)]" }
+
+    static func groups(_ sessions: [SavedSession], calendar: Calendar = .current) -> [SessionDay] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        let buckets = Dictionary(grouping: sessions) { calendar.startOfDay(for: $0.startedAt) }
+        return buckets.keys.sorted(by: >).map { day in
+            SessionDay(id: formatter.string(from: day), date: day, sessions: buckets[day]!.sorted {
+                $0.startedAt == $1.startedAt ? $0.id < $1.id : $0.startedAt > $1.startedAt
+            })
+        }
+    }
+}
+
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
     static let minimumDuration: Double = 0
@@ -257,8 +279,15 @@ nonisolated enum SessionFiles {
         }
         try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: false)
         do {
-            for session in sessions {
-                _ = try export(session, to: batch, root: root, active: active)
+            for day in SessionDay.groups(sessions) {
+                let destination: URL
+                if day.sessions.count > 1 {
+                    destination = batch.appendingPathComponent(day.folderName, isDirectory: true)
+                    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+                } else { destination = batch }
+                for session in day.sessions {
+                    _ = try export(session, to: destination, root: root, active: active)
+                }
             }
         } catch {
             try? FileManager.default.removeItem(at: batch)
