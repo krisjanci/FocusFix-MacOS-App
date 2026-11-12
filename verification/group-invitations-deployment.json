@@ -1,0 +1,51 @@
+{
+  "verified_at_utc": "2026-11-12T02:46:55.586756+00:00",
+  "project_ref": "ltgyhstpbiocuxvyjpcb",
+  "migration": "202611120001_group_invitations_and_admin.sql",
+  "migration_sha256": "bf09b84699dfa132be6a34c2b345cd5ecb5646a891920cccc94f0a071f3cd3d7",
+  "production_deployment_explicitly_approved": true,
+  "transaction_completed": true,
+  "four_deployed_function_bodies_match_source": true,
+  "inbox_rls_enabled": true,
+  "direct_authenticated_inbox_reads_denied": true,
+  "authenticated_inbox_rpc_enabled": true,
+  "anonymous_rpc_checks": [
+    {
+      "function": "group_invitations",
+      "status": 401,
+      "code": "42501",
+      "anonymous_access_denied": true
+    },
+    {
+      "function": "decline_group_invitation",
+      "status": 401,
+      "code": "42501",
+      "anonymous_access_denied": true
+    },
+    {
+      "function": "social_state",
+      "status": 401,
+      "code": "42501",
+      "anonymous_access_denied": true
+    }
+  ],
+  "live_behavior_script": "supabase/tests/group-invitations-live.sql",
+  "live_behavior_script_sha256": "019daf97f462a25b21cd2b07c03e84e56113c5d29cad98b05e78395944f11168",
+  "live_behavior_result": {
+    "invitation_admin_and_habit_checks_passed": true
+  },
+  "live_checks": [
+    "Private inbox delivery and duplicate invitation coalescing",
+    "Reading and declining without enabling progress sharing",
+    "Wrong recipient cannot read, decline or accept another invitation",
+    "Accept creates group membership",
+    "Non-admin cannot edit details",
+    "Admin can edit description and transfer ownership",
+    "Former admin loses invite-code access and removal permission",
+    "New admin can remove a member",
+    "Unprotected missed healthy-habit days reset the streak"
+  ],
+  "synthetic_fixtures_rolled_back": true,
+  "real_user_invitations_sent": false,
+  "limits": "Live checks used rolled-back synthetic users and PostgreSQL RPCs; two physical Macs were not used."
+}
