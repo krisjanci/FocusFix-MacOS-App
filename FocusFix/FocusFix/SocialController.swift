@@ -9,6 +9,7 @@ final class SocialController: ObservableObject {
     @Published private(set) var invitations: [GroupInvitation] = []
     @Published private(set) var busy = false
     @Published private(set) var notice: String?
+    @Published private(set) var invitationNotice: String?
     @Published private(set) var pendingConfirmation = false
     @Published private(set) var selection = GroupSelection()
     @Published private(set) var hasLoadedGroups = false
@@ -72,7 +73,7 @@ final class SocialController: ObservableObject {
     }
     private func clearAccountState() {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
-        ledger = nil; groups = []; invitations = []; selection = GroupSelection(); notice = nil
+        ledger = nil; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
     }
     func retry() async {
@@ -203,6 +204,7 @@ final class SocialController: ObservableObject {
             ledger?.accept(state, sent: Set(batch.map(\.id)))
             ledger?.progress.reconcile(at: Date(), calendar: calendar)
             invitations = state.invitations ?? []
+            invitationNotice = state.invitations == nil ? "Invitations are temporarily unavailable. Refresh to retry." : nil
             groups = state.groups; hasLoadedGroups = true; syncFailed = false
             selection.reconcile(groups: groups); saveSelection()
             notice = nil
@@ -230,10 +232,12 @@ final class SocialController: ObservableObject {
                 body: body, token: session.access_token)
             guard generation == token, account.session?.user.id == session.user.id else { return false }
             invitations = try JSONDecoder().decode([GroupInvitation].self, from: data)
-            notice = nil
+            invitationNotice = nil
             return true
         } catch {
-            if generation == token { notice = "Invitations could not load. Please refresh to retry." }
+            if generation == token {
+                invitationNotice = id == nil ? "Invitations could not load. Please refresh to retry." : "Your response could not be saved. Please try again."
+            }
             return false
         }
     }
