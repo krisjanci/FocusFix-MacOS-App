@@ -34,6 +34,13 @@ begin
  inbox:=public.group_invitations(); iid:=(inbox->0->>'id')::uuid;
  state:=public.social_state('accept',jsonb_build_object('timezone','UTC','invitation',iid));
  if state ? 'error' or jsonb_array_length(state->'groups'->0->'members')<>2 then raise exception 'Accept failed'; end if;
+ perform public.social_state('invite',jsonb_build_object('timezone','UTC','group',gid,'email',c::text || '@example.invalid'));
+ perform set_config('request.jwt.claim.sub',c::text,true);
+ inbox:=public.group_invitations();
+ if jsonb_array_length(inbox)<>1 or inbox->0->>'inviterName'<>'Group member' then
+  raise exception 'Member invitation delivery or sender failed'; end if;
+ perform public.decline_group_invitation((inbox->0->>'id')::uuid);
+ perform set_config('request.jwt.claim.sub',b::text,true);
  begin
   perform public.social_state('edit',jsonb_build_object('timezone','UTC','group',gid,'name','Unauthorized edit'));
  exception when raise_exception then denied:=true;
