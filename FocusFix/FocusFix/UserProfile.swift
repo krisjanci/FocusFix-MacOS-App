@@ -9,12 +9,14 @@ nonisolated struct UserProfile: Codable, Equatable {
     var symbol: String
     var color: String
     var photo: Data?
+    var groupPhoto: Data? = nil
 
-    init(name: String = "", symbol: String = "person.fill", color: String = "teal", photo: Data? = nil) {
+    init(name: String = "", symbol: String = "person.fill", color: String = "teal", photo: Data? = nil, groupPhoto: Data? = nil) {
         self.name = name
         self.symbol = symbol
         self.color = color
         self.photo = photo
+        self.groupPhoto = groupPhoto
     }
 
     func validated() throws -> UserProfile {
@@ -22,10 +24,11 @@ nonisolated struct UserProfile: Codable, Equatable {
         guard !name.isEmpty, name.count <= 40,
               !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               Self.symbols.contains(symbol), Self.colors.contains(color),
-              photo.map({ !$0.isEmpty && $0.count <= 1_048_576 }) ?? true else {
+              photo.map({ !$0.isEmpty && $0.count <= 1_048_576 }) ?? true,
+              groupPhoto.map({ photo != nil && !$0.isEmpty && $0.count <= 32_768 }) ?? true else {
             throw ProfileError.invalid
         }
-        return UserProfile(name: name, symbol: symbol, color: color, photo: photo)
+        return UserProfile(name: name, symbol: symbol, color: color, photo: photo, groupPhoto: groupPhoto)
     }
 }
 
