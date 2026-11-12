@@ -35,6 +35,29 @@ import Foundation
         let offline = try JSONDecoder().decode(SocialLedger.self, from: JSONEncoder().encode(ledger))
         precondition(offline.declaredWorkPending?.count == 1 && offline.declaredWorkPending?[segment.uuidString] == correction)
         precondition(offline.pending.isEmpty)
+        let start = date.timeIntervalSince1970
+        let intervals = DeclaredWorkInterval.observed(slices, startedAt: date, origin: 0)
+        precondition(intervals == [.init(start: start, end: start + 60)])
+        var detailed = pending
+        detailed.startedAt = start; detailed.observedThrough = start + 60; detailed.intervals = intervals
+        precondition(ledger.stageDeclaredWork(detailed, owner: owner, origin: pending.origin))
+        let sent = ledger.declaredWorkPending![segment.uuidString]!
+        precondition(sent.revision == 1 && sent.ready)
+        precondition(!ledger.stageDeclaredWork(detailed, owner: owner, origin: pending.origin))
+        detailed = DeclaredWorkPending(ownerID: owner, origin: pending.origin, segmentID: segment, contractVersion: 2, days: [:], startedAt: start, observedThrough: start + 60, intervals: [])
+        precondition(ledger.stageDeclaredWork(detailed, owner: owner, origin: pending.origin))
+        let newer = ledger.declaredWorkPending![segment.uuidString]!
+        precondition(newer.revision == 2)
+        ledger.acknowledgeDeclaredWork([.init(segmentID: segment, revision: 1)], sent: [sent])
+        precondition(ledger.declaredWorkPending![segment.uuidString] == newer)
+        ledger.acknowledgeDeclaredWork([.init(segmentID: segment, revision: 2)], sent: [newer])
+        precondition(ledger.declaredWorkPending!.isEmpty)
+        precondition(!ledger.stageDeclaredWork(detailed, owner: owner, origin: pending.origin))
+        let recovered = try JSONDecoder().decode(SocialLedger.self, from: JSONEncoder().encode(ledger))
+        precondition(recovered.declaredWorkSnapshots![segment.uuidString] == newer)
+        precondition(!ledger.stageDeclaredWork(pending, owner: owner, origin: pending.origin))
+        detailed.intervals = [.init(start: start - 1, end: start + 60)]
+        precondition(!ledger.stageDeclaredWork(detailed, owner: owner, origin: pending.origin))
         print("PASS: observed-work allocation, midnight, correction decreases/idempotence, protected legacy points, explicit-break rules, offline pending replacements and account isolation")
     }
 }
