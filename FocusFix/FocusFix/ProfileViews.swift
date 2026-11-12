@@ -87,10 +87,22 @@ struct ProfileEditor: View {
             }
             if editing {
                 HStack {
-                    if draft.photo != nil { Button("Remove photo") { draft.photo = nil } }
+                    if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil } }
                 }
                 Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your private account profile. Choose a photo under 10 MB.")
                     .font(.caption).foregroundStyle(.secondary)
+                if account.session != nil, draft.photo != nil {
+                    Toggle("Show my photo to members of my groups", isOn: Binding(
+                        get: { draft.groupPhoto != nil },
+                        set: { share in
+                            if share, let photo = draft.photo {
+                                do { draft.groupPhoto = try ProfileController.groupPhoto(from: photo) }
+                                catch { photoError = "This photo could not be prepared for groups." }
+                            } else { draft.groupPhoto = nil }
+                        }))
+                    Text("Your photo always appears for you. This shares a small thumbnail with your current group members; turn it off and save to stop sharing it.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let error = photoError { Text(error).font(.caption).foregroundStyle(.red) }
                 HStack {
                     Button("Save profile") {
@@ -130,7 +142,9 @@ struct ProfileEditor: View {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
+            let sharing = draft.groupPhoto != nil
             draft.photo = try ProfileController.photo(from: url)
+            draft.groupPhoto = sharing ? try draft.photo.map { try ProfileController.groupPhoto(from: $0) } : nil
             photoError = nil
         } catch { photoError = "This photo could not be opened. Choose a PNG, JPEG, HEIC or TIFF under 10 MB." }
     }
