@@ -56,6 +56,9 @@ struct AccountTests {
         await controller.verify(email: "test@example.invalid", code: "123456", newPassword: "")
         precondition(controller.session?.user.id == owner && controller.profile == remote && controller.profileLoaded)
         precondition(stored != nil)
+        precondition(controller.needsFirstAccountTour)
+        controller.didPresentFirstAccountTour()
+        precondition(!controller.needsFirstAccountTour)
         let saved = await controller.saveProfile(UserProfile(name: "Updated name"))
         precondition(saved)
         let profileBody = try JSONDecoder().decode(AccountProfileRow.self, from: requests.last!.httpBody!)
@@ -65,6 +68,7 @@ struct AccountTests {
         failProfile = true
         await controller.authenticate(email: "test@example.invalid", password: "test-password", create: false)
         precondition(controller.session != nil && !controller.profileLoaded)
+        precondition(!controller.needsFirstAccountTour)
         let beforeFailedSave = requests.count
         let blocked = await controller.saveProfile(remote)
         precondition(!blocked && requests.count == beforeFailedSave)
