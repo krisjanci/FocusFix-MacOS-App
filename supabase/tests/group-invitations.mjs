@@ -57,6 +57,16 @@ export async function verifyInvitations(db) {
     assert.deepEqual(state.invitations,[]);
     assert((await rpc('accept',{invitation:invitations[0].id})).error); // Retry never duplicates membership.
     assert.equal(state.groups[0].code,null);
+    // A current member can invite, without gaining group-management permissions.
+    await rpc('invite',{group:group.id,email:`${outsider}@example.invalid`});
+    await as(outsider);
+    const memberInvite = (await inbox())[0];
+    assert.equal(memberInvite.groupID,group.id);
+    assert.equal(memberInvite.inviterName,'Group member');
+    await db.query('select public.decline_group_invitation($1)',[memberInvite.id]);
+    await as(recipient);
+    await denied('edit',{group:group.id,name:'Member edit'});
+    await denied('transfer',{group:group.id,member:admin});
     await as(admin);
     state=await rpc('edit',{group:group.id,name:'Updated group',description:'A shared routine'});
     assert.equal(state.groups[0].description,'A shared routine');
