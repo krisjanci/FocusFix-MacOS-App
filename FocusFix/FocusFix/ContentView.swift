@@ -57,7 +57,6 @@ struct ContentView: View {
         .sheet(isPresented: $peopleSheet) {
             PeoplePanel(social: social, close: { peopleSheet = false }).frame(width: 380, height: 580)
         }
-        .task { social.start() }
         .onChange(of: tour.isPresented) { _, shown in
             if shown { peopleExpanded = false; peopleSheet = false }
         }
@@ -234,7 +233,7 @@ struct ContentView: View {
                         }
                     }
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel(peopleExpanded ? "Collapse People panel" : "Expand group People panel")
+                    .accessibilityLabel((peopleExpanded ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
                     .help("Show people in your selected group")
                 Spacer()
                 Picker("Appearance", selection: $appearance) {
