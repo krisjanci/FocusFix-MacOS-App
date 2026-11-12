@@ -71,6 +71,19 @@ final class AccountController: ObservableObject {
     private var refreshTask: Task<AccountSession, Error>?
     private var generation = UUID()
 
+    // Persist the onboarding request so closing during profile setup cannot lose it.
+    private func tourKey(_ id: UUID) -> String {
+        "focusfix.account.firstTour.\(api?.configuration.origin.absoluteString ?? "").\(id)"
+    }
+    var needsFirstAccountTour: Bool {
+        guard let id = session?.user.id else { return false }
+        return defaults?.bool(forKey: tourKey(id)) == true
+    }
+    func didPresentFirstAccountTour() {
+        guard let id = session?.user.id else { return }
+        defaults?.set(false, forKey: tourKey(id))
+    }
+
     var configured: Bool { api != nil }
     var researchEnrolled: Bool {
         enrollment?.enabled == true && study?.complete == true && study?.collection_enabled == true &&
@@ -166,6 +179,7 @@ final class AccountController: ObservableObject {
     private func accept(_ value: AccountSession, token: UUID, newAccount: Bool) async {
         guard token == generation else { return }
         isNewAccount = newAccount
+        if newAccount { defaults?.set(true, forKey: tourKey(value.user.id)) }
         profile = nil
         profileLoaded = false
         needsConfirmation = false
