@@ -28,7 +28,7 @@ struct SessionRetentionTests {
             try writer!.finish(startedAt: start, duration: duration, reason: "user_stop")
             writer = nil
             let retained = try SessionFiles.retainRecording(folder, duration: duration, root: sessions)
-            if duration >= 900 {
+            if duration >= 0 {
                 savedCount += 1
                 precondition(retained != nil)
                 let saved = try SavedSession(folder: retained!)
@@ -53,7 +53,10 @@ struct SessionRetentionTests {
             precondition(!SessionFiles.qualifies(duration: invalid))
         }
         let exported = try SessionFiles.exportAll(to: root, root: sessions, active: nil)
-        precondition(exported.count == 2)
+        precondition(exported.count == 6)
+        // Reopening the library reads the same six recordings from disk.
+        let reopened = try SessionFiles.list(in: sessions)
+        precondition(reopened.count == 6)
         print("Session retention tests passed")
     }
 }
