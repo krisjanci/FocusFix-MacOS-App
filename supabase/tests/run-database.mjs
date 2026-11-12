@@ -1,4 +1,5 @@
 // Real PostgreSQL semantics in an isolated, in-memory database. No live service access.
+import { verifyInvitations } from './group-invitations.mjs';
 import { verifySocial } from './social-database.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 const { PGlite } = await import(process.env.FOCUSFIX_PGLITE_MODULE || '@electric-sql/pglite');
@@ -30,6 +31,7 @@ try {
   console.log('Product-development consent, approval, storage isolation and deletion gates passed.');
   await db.exec(await readFile(new URL('consent-access.sql', import.meta.url), 'utf8'));
   await verifySocial(db);
+  await verifyInvitations(db);
   await db.exec(await readFile(new URL('work-streaks.sql', import.meta.url), 'utf8'));
   console.log('Current work streaks: decay, freezes, thaw, weekends, month boundary, inactive member ranks and private helpers passed.');
   await db.exec(await readFile(new URL('group-capacity.sql', import.meta.url), 'utf8'));
