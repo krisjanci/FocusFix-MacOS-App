@@ -60,6 +60,7 @@ struct LeaderboardRow: View {
     let metric: LeaderboardMetric
     let isCurrentUser: Bool
     var allowsAnimation = true
+    @ObservedObject private var account = AccountController.shared
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) {
@@ -68,7 +69,7 @@ struct LeaderboardRow: View {
                     PodiumMarker(place: place, allowsAnimation: allowsAnimation)
                 }
             }.frame(width: 46, alignment: .leading)
-            ProfileAvatar(profile: UserProfile(name: member.name, symbol: member.symbol, color: member.color), size: 29)
+            ProfileAvatar(profile: isCurrentUser && account.session?.user.id == member.id ? account.profile : UserProfile(name: member.name, symbol: member.symbol, color: member.color, photo: member.photo), size: 29)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(member.name).font(.callout.weight(isCurrentUser ? .semibold : .regular)).lineLimit(2)
