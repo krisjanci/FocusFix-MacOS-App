@@ -1,33 +1,32 @@
-# Declared-work replacement sync: release dependency
+# Declared-work replacement sync
 
-I inspected the checked-in `social_state` RPC: it accepts positive increments,
-deduplicates immutable event IDs and adds work seconds to daily/member rows. It
-cannot reduce a previously accepted duration. Sending a new event for a correction
-would inflate totals; reusing the old ID would silently discard the correction.
-No migration or function was deployed during this redesign.
+Migration `202611120003_declared_work_and_group_photos.sql` adds the authenticated
+`sync_declared_work` RPC. The app negotiates `declaredWorkSyncVersion: 1` before
+sending its durable replacement outbox. Older servers keep that outbox local.
+The increment-only legacy RPC never receives these replacements.
 
-Local progress version 2 preserves legacy work as its baseline and stores each new
-segment's day allocations, revision and captured account scope. Corrections replace
-only that contribution. The social ledger has a distinct version-2 replacement
-outbox, scoped to owner and service origin. It is never serialized into the legacy
-RPC's `events` array. Old private groups, healthy-break events, point thresholds and
-freeze rules retain their existing behavior. New work remains local pending a
-compatible service. Signing out/account changes cannot transfer pending records.
+Each recording keeps its captured account/service scope, immutable segment ID,
+increasing revision, recording bounds and observed declared-work intervals. The
+server splits intervals at midnight in the account's fixed scoring timezone and
+clips them to account activation and group membership. It replaces each segment's
+contribution transactionally, preserving legacy work, explicit-break credit and
+freeze rules. Identical retries are acknowledged without adding credit; conflicting
+revisions and cross-account overwrites fail. Older revisions cannot restore work.
+The client acknowledges only the exact version sent, preserving corrections made
+while a request is in flight. Offline records survive restarts and account changes.
+Finalized owned recordings upgrade previously held day-only totals from their local
+coverage; guest recordings never transfer to a signed-in account.
 
-Before enabling new work sync, implement/review an additive authenticated RPC that:
+Only interval summaries cross this boundary, never raw input events, labels,
+application names, URLs, surveys or recording files. These are declared minutes,
+not a measure of work quality or objective productivity.
 
-- accepts owner-scoped segment IDs, increasing revision numbers, fixed scoring
-  timezone and replacement observed-work intervals, with retry-safe acknowledgements;
-- retains a separate immutable legacy baseline and recomputes affected daily/member
-  contributions transactionally for increases and decreases, respecting account
-  activation and each group's join boundary;
-- rejects stale/conflicting revisions, unsupported contracts, invalid bounds,
-  cross-account segments, pre-activation/backfilled work and nonfinite durations;
-- preserves explicit-break scoring and three monthly nonconsecutive weekday freezes;
-- exposes a verified capability version, tested in isolated PostgreSQL and a disposable
-  service, before the client can release held replacement records.
+Group photo sharing is separately optional. Existing private photos remain private.
+The profile editor produces a bounded 64-pixel thumbnail only when the user enables
+sharing and saves. The social response returns only `groupPhoto`, never the original
+private photo. Turning sharing off removes it from future responses. Each user sees
+their own account photo locally even without sharing it.
 
-Do not infer capability from a successful legacy sync, deploy this draft to the
-participant project, or send held new data to test the old RPC. Current group Work
-scores therefore differ from new local declared-work totals. These are declared
-minutes, not quality-adjusted output or objective productivity.
+Run `npm --prefix supabase run test:database` for isolated PostgreSQL checks.
+`tests/declared-work-live.sql` repeats replacement, retry, correction, ownership,
+membership and thumbnail privacy checks with synthetic fixtures inside a rollback.
