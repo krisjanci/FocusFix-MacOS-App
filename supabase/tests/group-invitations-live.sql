@@ -7,6 +7,9 @@ declare
  mail text:=gen_random_uuid()::text || '@example.invalid';
 begin
  insert into auth.users(id,email) values(a,a::text || '@example.invalid'),(b,mail),(c,c::text || '@example.invalid');
+ insert into public.account_profiles(user_id,profile) values
+  (a,'{"name":"Admin sender","symbol":"leaf.fill","color":"teal"}'),
+  (b,'{"name":"Member sender","symbol":"person.fill","color":"blue"}');
  perform set_config('request.jwt.claim.sub',a::text,true);
  state:=public.social_state('create','{"timezone":"UTC","name":"Synthetic invitation verification"}');
  if state->>'groupFeaturesVersion'<>'2' then raise exception 'Feature capability missing'; end if;
@@ -37,7 +40,7 @@ begin
  perform public.social_state('invite',jsonb_build_object('timezone','UTC','group',gid,'email',c::text || '@example.invalid'));
  perform set_config('request.jwt.claim.sub',c::text,true);
  inbox:=public.group_invitations();
- if jsonb_array_length(inbox)<>1 or inbox->0->>'inviterName'<>'Group member' then
+ if jsonb_array_length(inbox)<>1 or inbox->0->>'inviterName'<>'Member sender' then
   raise exception 'Member invitation delivery or sender failed'; end if;
  perform public.decline_group_invitation((inbox->0->>'id')::uuid);
  perform set_config('request.jwt.claim.sub',b::text,true);
