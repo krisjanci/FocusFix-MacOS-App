@@ -78,13 +78,13 @@ nonisolated struct SavedSession: Identifiable, Hashable {
 
 // File operations have no UI state and must not inherit the app's MainActor default.
 nonisolated enum SessionFiles {
-    static let minimumDuration: Double = 15 * 60
+    static let minimumDuration: Double = 0
 
     static func qualifies(duration: Double) -> Bool {
         duration.isFinite && duration >= minimumDuration
     }
 
-    // In-progress data stays hidden from history and exports until Stop qualifies it.
+    // In-progress data stays hidden until Stop; every completed recording is retained.
     static func pendingRoot(in root: URL) -> URL {
         root.appendingPathComponent(".pending", isDirectory: true)
     }
@@ -92,11 +92,9 @@ nonisolated enum SessionFiles {
     // Only the current recording is removed; existing saved sessions are never pruned.
     static func retainRecording(_ folder: URL, duration: Double, root: URL) throws -> URL? {
         try validate(folder, in: pendingRoot(in: root), active: nil)
-        let saved = try SavedSession(folder: folder)
-        guard saved.recordingContract?.mode == .automatic || qualifies(duration: duration) else {
-            try FileManager.default.removeItem(at: folder)
-            return nil
-        }
+        _ = try SavedSession(folder: folder)
+        // Invalid durations leave the original files intact for recovery.
+        guard qualifies(duration: duration) else { throw RecordingContract.Invalid.bounds }
         let destination = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
         try FileManager.default.moveItem(at: folder, to: destination)
         return destination
