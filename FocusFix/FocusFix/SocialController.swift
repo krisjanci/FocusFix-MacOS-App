@@ -6,6 +6,7 @@ final class SocialController: ObservableObject {
     static let shared = SocialController(account: .shared)
     @Published private(set) var ledger: SocialLedger?
     @Published private(set) var groups: [SocialGroup] = []
+    @Published private(set) var invitations: [GroupInvitation] = []
     @Published private(set) var busy = false
     @Published private(set) var notice: String?
     @Published private(set) var pendingConfirmation = false
@@ -71,7 +72,7 @@ final class SocialController: ObservableObject {
     }
     private func clearAccountState() {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
-        ledger = nil; groups = []; selection = GroupSelection(); notice = nil
+        ledger = nil; groups = []; invitations = []; selection = GroupSelection(); notice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
     }
     func retry() async {
@@ -178,6 +179,7 @@ final class SocialController: ObservableObject {
     @discardableResult
     func refresh(action: String = "sync", fields: [String: String] = [:]) async -> Bool {
         alignAccount()
+        if ledger == nil { return await refreshInvitations() }
         guard !busy, let current = ledger, let api = account.api else { return false }
         let token = generation; busy = true
         let batch = Array(current.pending.prefix(200)); inFlight = Set(batch.map(\.id))
@@ -200,6 +202,7 @@ final class SocialController: ObservableObject {
             let state = try JSONDecoder().decode(SocialState.self, from: data)
             ledger?.accept(state, sent: Set(batch.map(\.id)))
             ledger?.progress.reconcile(at: Date(), calendar: calendar)
+            invitations = state.invitations ?? []
             groups = state.groups; hasLoadedGroups = true; syncFailed = false
             selection.reconcile(groups: groups); saveSelection()
             notice = nil
@@ -213,4 +216,36 @@ final class SocialController: ObservableObject {
             return false
         }
     }
+    // Inbox access never activates progress sharing or creates a local ledger.
+    @discardableResult
+    func refreshInvitations(declining id: UUID? = nil) async -> Bool {
+        guard !busy, userID != nil, let api = account.api else { return false }
+        let token = generation
+        busy = true
+        defer { if generation == token { busy = false } }
+        do {
+            let session = try await account.validSession()
+            let body = try JSONSerialization.data(withJSONObject: id.map { ["p_invitation": $0.uuidString] } ?? [:])
+            let data = try await api.request(path: "rest/v1/rpc/" + (id == nil ? "group_invitations" : "decline_group_invitation"),
+                body: body, token: session.access_token)
+            guard generation == token, account.session?.user.id == session.user.id else { return false }
+            invitations = try JSONDecoder().decode([GroupInvitation].self, from: data)
+            notice = nil
+            return true
+        } catch {
+            if generation == token { notice = "Invitations could not load. Please refresh to retry." }
+            return false
+        }
+    }
+
+    func respond(to invitation: GroupInvitation, accept: Bool) async {
+        guard !busy else { return }
+        if !accept { _ = await refreshInvitations(declining: invitation.id); return }
+        // The invitation card discloses that accepting also enables summary sync.
+        let recipient = userID
+        if !enabled { await enable() }
+        guard userID == recipient, enabled else { return }
+        await refresh(action: "accept", fields: ["invitation": invitation.id.uuidString])
+    }
+
 }
