@@ -5,6 +5,7 @@ import Combine
 final class SocialController: ObservableObject {
     static let shared = SocialController(account: .shared)
     @Published private(set) var ledger: SocialLedger?
+    @Published private(set) var declaredWorkSyncVersion = 0
     @Published private(set) var groups: [SocialGroup] = []
     @Published private(set) var invitations: [GroupInvitation] = []
     @Published private(set) var busy = false
@@ -36,7 +37,7 @@ final class SocialController: ObservableObject {
     private var started = false
 
     var enabled: Bool { ledger != nil }
-    var declaredWorkSyncHeld: Bool { ledger?.declaredWorkPending?.isEmpty == false }
+    var declaredWorkSyncHeld: Bool { declaredWorkSyncVersion == 0 && ledger?.declaredWorkPending?.isEmpty == false }
     var calendar: Calendar { DailyProgress.calendar(timeZone: TimeZone(identifier: ledger?.timezone ?? "") ?? .current) }
     var userID: UUID? { account.session?.user.id }
 
@@ -73,7 +74,7 @@ final class SocialController: ObservableObject {
     }
     private func clearAccountState() {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
-        ledger = nil; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
+        ledger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
     }
     func retry() async {
@@ -135,17 +136,23 @@ final class SocialController: ObservableObject {
         guard ledger != nil, let owner = userID, let origin = account.api?.configuration.origin.absoluteString else { return nil }
         return (owner, origin)
     }
-    func stageDeclaredWork(segmentID: UUID, days: [String: Double], capturedOwner: UUID?, capturedOrigin: String?) {
+    func needsDeclaredWorkDetails(_ segmentID: UUID, days: [String: Double]) -> Bool {
+        let snapshot = ledger?.declaredWorkSnapshots?[segmentID.uuidString]
+        return snapshot?.ready != true || snapshot?.days != days
+    }
+    func stageDeclaredWork(segmentID: UUID, days: [String: Double], capturedOwner: UUID?, capturedOrigin: String?,
+                           startedAt: Double? = nil, observedThrough: Double? = nil, intervals: [DeclaredWorkInterval]? = nil) {
         alignAccount()
         guard let scope = declaredWorkScope, let capturedOwner, let capturedOrigin, var value = ledger,
               value.stageDeclaredWork(DeclaredWorkPending(ownerID: capturedOwner, origin: capturedOrigin,
-                segmentID: segmentID, contractVersion: 2, days: days), owner: scope.owner, origin: scope.origin) else { return }
-        let previous = ledger?.declaredWorkPending?[segmentID.uuidString]
+                segmentID: segmentID, contractVersion: 2, days: days, startedAt: startedAt, observedThrough: observedThrough, intervals: intervals), owner: scope.owner, origin: scope.origin) else { return }
+        let previous = ledger?.declaredWorkSnapshots?[segmentID.uuidString] ?? ledger?.declaredWorkPending?[segmentID.uuidString]
         if previous == nil && days.values.allSatisfy({ $0 == 0 }) { return }
         if previous == value.declaredWorkPending?[segmentID.uuidString] { return }
         ledger = value
         persist()
-        notice = "New declared-work totals stay on this Mac until correction-compatible group sync is verified. Existing group scores are preserved."
+        pendingConfirmation = true
+        notice = "Work progress is waiting to sync."
     }
     func record(kind: String, seconds: Double, at date: Date = Date(), id: UUID = UUID()) {
         alignAccount()
@@ -208,7 +215,17 @@ final class SocialController: ObservableObject {
             groups = state.groups; hasLoadedGroups = true; syncFailed = false
             selection.reconcile(groups: groups); saveSelection()
             notice = nil
-            pendingConfirmation = ledger?.pending.isEmpty == false
+            declaredWorkSyncVersion = state.declaredWorkSyncVersion ?? 0
+            persist()
+            if declaredWorkSyncVersion >= 1 {
+                do { try await syncDeclaredWork(api: api, session: session, token: token) }
+                catch {
+                    guard generation == token else { return false }
+                    notice = "Work progress could not sync. It is saved on this Mac for retry."
+                    syncFailed = true
+                }
+            }
+            pendingConfirmation = ledger?.pending.isEmpty == false || ledger?.declaredWorkPending?.isEmpty == false
             persist()
             return true
         } catch {
@@ -218,6 +235,29 @@ final class SocialController: ObservableObject {
             return false
         }
     }
+    private func syncDeclaredWork(api: AccountAPI, session: AccountSession, token: UUID) async throws {
+        guard let ledger else { return }
+        let sent = Array((ledger.declaredWorkPending ?? [:]).values.filter(\.ready)
+            .sorted { $0.segmentID.uuidString < $1.segmentID.uuidString }.prefix(50))
+        guard !sent.isEmpty else { return }
+        let segments = try JSONSerialization.jsonObject(with: JSONEncoder().encode(sent))
+        let body = try JSONSerialization.data(withJSONObject: ["p_segments": segments, "p_timezone": ledger.timezone])
+        let data = try await api.request(path: "rest/v1/rpc/sync_declared_work", body: body, token: session.access_token)
+        guard generation == token, userID == session.user.id else { throw CancellationError() }
+        let result = try JSONDecoder().decode(DeclaredWorkResponse.self, from: data)
+        guard result.version == 1 else { throw AccountFailure(message: "Work sync needs an updated service.") }
+        self.ledger?.acknowledgeDeclaredWork(result.acknowledged, sent: sent)
+        persist()
+        // Read updated scores without repeating create/invite/other user actions or old events.
+        let refreshBody = try JSONSerialization.data(withJSONObject: ["p_action": "sync", "p_payload": ["timezone": ledger.timezone]])
+        let updated = try await api.request(path: "rest/v1/rpc/social_state", body: refreshBody, token: session.access_token)
+        guard generation == token, userID == session.user.id else { throw CancellationError() }
+        let state = try JSONDecoder().decode(SocialState.self, from: updated)
+        self.ledger?.accept(state, sent: [])
+        groups = state.groups; invitations = state.invitations ?? []
+        selection.reconcile(groups: groups); saveSelection()
+    }
+
     // Inbox access never activates progress sharing or creates a local ledger.
     @discardableResult
     func refreshInvitations(declining id: UUID? = nil) async -> Bool {
