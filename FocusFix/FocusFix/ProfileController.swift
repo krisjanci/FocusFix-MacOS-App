@@ -56,4 +56,19 @@ final class ProfileController: ObservableObject {
         }
         return data
     }
+    // A separately opted-in, bounded thumbnail keeps group refreshes small.
+    static func groupPhoto(from data: Data) throws -> Data {
+        guard let image = NSImage(data: data), image.size.width > 0, image.size.height > 0,
+              let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: bitmap) else { throw ProfileError.invalid }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        image.draw(in: NSRect(x: 0, y: 0, width: 64, height: 64), from: .zero, operation: .copy, fraction: 1)
+        guard let photo = bitmap.representation(using: .png, properties: [:]), photo.count <= 32_768 else { throw ProfileError.invalid }
+        return photo
+    }
+
 }
