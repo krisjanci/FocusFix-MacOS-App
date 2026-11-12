@@ -85,42 +85,40 @@ struct PeoplePanel: View {
                 Button(action: close) { Image(systemName: "sidebar.right") }
                     .buttonStyle(.plain).help("Collapse People").accessibilityLabel("Collapse People")
             }
-            if let notice = social.invitationNotice {
-                Text(notice).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !social.invitations.isEmpty {
-                Button { openWindow(id: "groups") } label: {
-                    Label("\(social.invitations.count) group invitation\(social.invitations.count == 1 ? "" : "s")", systemImage: "envelope.badge")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }.buttonStyle(.borderedProminent)
-            }
-            if [.signedOut, .disabled, .unavailable].contains(social.accessState) {
-                ScrollView { accessCard.padding(.top, 12) }
-            } else {
-                if let group = social.selectedGroup {
-                    GroupHeading(group: group, compact: true, metric: social.selection.metric)
-                    GroupSelectionControls(social: social)
-                    Text(social.selection.metric.explanation).font(.caption).foregroundStyle(.secondary)
-                    GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID)
-                        .frame(maxHeight: .infinity)
-                } else if social.accessState == .loading {
-                    accessCard
-                    Spacer()
-                } else {
-                    Label(social.syncFailed ? "Connect to load your groups" : "Your first group", systemImage: "person.2").font(.headline)
-                    Text("Create a private group or enter an invite code. Each group has room for 50 people.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Button("Create or join a group") { openWindow(id: "groups") }
-                    Spacer()
-                }
-                if social.accessState != .loading { accessCard }
-                HStack {
-                    Button("Manage groups") { openWindow(id: "groups") }
-                    Spacer()
-                    Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy)
-                }.font(.caption)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let notice = social.invitationNotice {
+                        Text(notice).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !social.invitations.isEmpty { InvitationInbox(social: social) }
+                    if [.signedOut, .disabled, .unavailable].contains(social.accessState) {
+                        accessCard.padding(.top, 12)
+                    } else {
+                        if let group = social.selectedGroup {
+                            GroupHeading(group: group, compact: true, metric: social.selection.metric)
+                            GroupSelectionControls(social: social)
+                            Text(social.selection.metric.explanation).font(.caption).foregroundStyle(.secondary)
+                            GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                        } else if social.accessState == .loading {
+                            accessCard
+                            Spacer()
+                        } else {
+                            Label(social.syncFailed ? "Connect to load your groups" : "Your first group", systemImage: "person.2").font(.headline)
+                            Text("Create a private group or enter an invite code. Each group has room for 50 people.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            Button("Create or join a group") { openWindow(id: "groups") }
+                            Spacer()
+                        }
+                        if social.accessState != .loading { accessCard }
+                        HStack {
+                            Button("Manage groups") { openWindow(id: "groups") }
+                            Spacer()
+                            Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
+                                .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy)
+                        }.font(.caption)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
