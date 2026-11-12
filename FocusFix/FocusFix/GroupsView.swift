@@ -83,7 +83,7 @@ private struct AddGroupSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Create or join a group").font(.title2.weight(.semibold))
-            Text("Current members will see your display name, standard avatar and two scores. Your email, photo, recordings, surveys and research participation stay private. Share codes only with people you want to invite.")
+            Text("Current members will see your display name, standard avatar and two scores. You can choose to share a profile photo with members. Your email, recordings, surveys and research participation stay private. Share codes only with people you want to invite.")
                 .font(.callout).foregroundStyle(.secondary)
             Text("Up to 50 people per group, including its creator.").font(.caption).foregroundStyle(.secondary)
             TextField("Group name", text: $name).textFieldStyle(.roundedBorder)
