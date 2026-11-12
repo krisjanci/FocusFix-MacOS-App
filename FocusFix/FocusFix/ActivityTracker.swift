@@ -520,7 +520,7 @@ final class ActivityTracker: ObservableObject {
             researchConsent = nil
             developmentConsent = nil
             if sessionFolder == nil {
-                message = "Time added to your daily goal. Sessions under 15 minutes aren't saved."
+                message = "Recording stopped. Check Sessions for your saved recordings."
             } else {
                 message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
             }
