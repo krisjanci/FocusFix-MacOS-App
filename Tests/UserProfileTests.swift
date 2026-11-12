@@ -51,6 +51,19 @@ struct UserProfileTests {
         let rendered = NSBitmapImageRep(data: avatar)!
         precondition(rendered.pixelsWide == 256 && rendered.pixelsHigh == 256)
         precondition(avatar.count <= 1_048_576)
+        precondition(profile.groupPhoto == nil)
+        let thumbnail = try ProfileController.groupPhoto(from: avatar)
+        let groupImage = NSBitmapImageRep(data: thumbnail)!
+        precondition(groupImage.pixelsWide == 64 && groupImage.pixelsHigh == 64 && thumbnail.count <= 32_768)
+        let shared = try UserProfile(name: "Group photo", photo: avatar, groupPhoto: thumbnail).validated()
+        try store.save(shared)
+        precondition(tryLoad(store) == shared)
+        for bad in [UserProfile(name: "No photo", groupPhoto: thumbnail),
+                    UserProfile(name: "Too large", photo: avatar, groupPhoto: Data(repeating: 1, count: 32_769))] {
+            do { _ = try bad.validated(); preconditionFailure("Invalid group thumbnail accepted") } catch { }
+        }
+        let legacy = try JSONDecoder().decode(UserProfile.self, from: Data("{\"name\":\"Legacy\",\"symbol\":\"leaf.fill\",\"color\":\"teal\"}".utf8))
+        precondition(legacy.groupPhoto == nil)
         let invalidImage = root.appendingPathComponent("invalid.png")
         try Data("invalid image".utf8).write(to: invalidImage)
         do { _ = try ProfileController.photo(from: invalidImage); preconditionFailure("Invalid image accepted") } catch { }
