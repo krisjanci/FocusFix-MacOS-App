@@ -17,7 +17,7 @@ struct GroupAccessCard: View {
             case .disabled:
                 Label("Enable group progress", systemImage: "person.2").font(.headline)
                 Text("Sync work and qualifying-break summaries, scores and streak freezes with your account. Guest history stays on this Mac.")
-                Text("Members see your display name, standard avatar and scores. Your email, photo and recordings stay private.")
+                Text("Members see your display name, standard avatar and scores. You can choose to share a profile photo. Your email and recordings stay private.")
                 Button("Enable group progress", action: enable).buttonStyle(.borderedProminent)
                 Text("This is an in-app choice. There is no macOS permission prompt.").font(.caption)
             case .loading:
