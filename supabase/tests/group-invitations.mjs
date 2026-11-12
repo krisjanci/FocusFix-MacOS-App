@@ -7,6 +7,8 @@ export async function verifyInvitations(db) {
   try {
     await db.query('insert into auth.users(id,email) values($1,$2),($3,$4),($5,$6)',
       [admin, `${admin}@example.invalid`, recipient, email, outsider, `${outsider}@example.invalid`]);
+    await db.query('insert into public.account_profiles(user_id,profile) values($1,$2),($3,$4)',
+      [admin,{name:'Admin sender',symbol:'leaf.fill',color:'teal'},recipient,{name:'Member sender',symbol:'person.fill',color:'blue'}]);
     const as = async id => {
       await db.exec('reset role');
       await db.query("select set_config('request.jwt.claim.sub',$1,true)", [id]);
@@ -62,7 +64,7 @@ export async function verifyInvitations(db) {
     await as(outsider);
     const memberInvite = (await inbox())[0];
     assert.equal(memberInvite.groupID,group.id);
-    assert.equal(memberInvite.inviterName,'Group member');
+    assert.equal(memberInvite.inviterName,'Member sender');
     await db.query('select public.decline_group_invitation($1)',[memberInvite.id]);
     await as(recipient);
     await denied('edit',{group:group.id,name:'Member edit'});
