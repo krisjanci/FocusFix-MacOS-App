@@ -59,6 +59,7 @@ final class ActivityTracker: ObservableObject {
         return "\(AccountController.shared.api?.configuration.origin.absoluteString ?? "")|\(session.user.id)"
     }
     private var progressReconciliation: Task<Void, Never>?
+    private var sessionRefresh: Task<Void, Never>?
     private var lastProgressSave: Double = 0
     private var progressDirty = false
     private var sessionCheckIn: CheckInPrompt?
@@ -743,10 +744,13 @@ final class ActivityTracker: ObservableObject {
         message = "Recording stopped: \(error.localizedDescription). Existing files have been kept."
     }
     private func inputInterrupted() {
-        stop(reason: "input_monitor_interrupted")
+        guard isRecording else { return }
+        stop(reason: "input_monitor_interrupted", observedEnd: lastObservedTime)
         hasError = true
         needsPermission = !InputMonitor.hasPermission
-        message = "Recording stopped because input monitoring was interrupted. The session was saved. Check Input Monitoring access, then start a new session."
+        message = needsPermission
+            ? "Recording stopped because Input Monitoring access was lost. Allow access in System Settings, then start a new session."
+            : "Input monitoring was interrupted. The session was saved through its last observation. Press Start work to start a new session."
     }
     // Remove input observers and timers, and release the app's recording activity assertion.
     private func removeMonitors() {
@@ -1205,13 +1209,23 @@ final class ActivityTracker: ObservableObject {
 
     // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
-        do {
-            let listing = try SessionFiles.inspect(in: SessionFiles.root())
-            sessions = listing.sessions
-            libraryNotice = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
-            libraryError = nil
-            reconcileSavedProgress()
-        } catch { libraryError = error.localizedDescription }
+        sessionRefresh?.cancel()
+        sessionRefresh = Task { [weak self] in
+            do {
+                // Large histories must never block input delivery or the sampling clock.
+                let listing = try await Task.detached(priority: .utility) {
+                    try SessionFiles.inspect(in: SessionFiles.root())
+                }.value
+                guard !Task.isCancelled, let self else { return }
+                self.sessions = listing.sessions
+                self.libraryNotice = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
+                self.libraryError = nil
+                self.reconcileSavedProgress()
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.libraryError = error.localizedDescription
+            }
+        }
     }
     // Check whether a library entry is the session currently being recorded.
     func isActive(_ session: SavedSession) -> Bool {
