@@ -57,6 +57,37 @@ import CoreGraphics
         precondition(!gate.accepts(old))
         gate.start()
         precondition(!gate.accepts(old) && gate.accepts(gate.generation))
-        print("Input monitoring: key/repeat/delete, pointer, scroll, target routing and stale-session isolation passed.")
+        // Simulate a busy UI thread without recording or posting any real input.
+        // The former main-run-loop tap could not process this while main was blocked.
+        let loop = InputMonitorRunLoop.shared
+        precondition(loop !== CFRunLoopGetMain())
+        let received = DispatchSemaphore(value: 0)
+        let interrupted = DispatchSemaphore(value: 0)
+        let context = InputTapContext { input in
+            if let input {
+                precondition(!Thread.isMainThread)
+                precondition(input.type == .keyDown && input.keyCode == 51)
+                received.signal()
+            } else { interrupted.signal() }
+        }
+        CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue) {
+            context.receive(type: .keyDown, event: key)
+            context.receive(type: .tapDisabledByTimeout, event: key)
+            context.receive(type: .tapDisabledByUserInput, event: key)
+        }
+        CFRunLoopWakeUp(loop)
+        precondition(received.wait(timeout: .now() + 2) == .success)
+        precondition(interrupted.wait(timeout: .now() + 2) == .success)
+        precondition(interrupted.wait(timeout: .now() + 2) == .success)
+
+        // Repeat restarts: a late interruption or event cannot stop the next session.
+        for _ in 0..<100 {
+            let previous = gate.generation
+            gate.stop()
+            gate.start()
+            precondition(!gate.accepts(previous))
+            precondition(gate.accepts(gate.generation))
+        }
+        print("Input monitoring: synthetic metrics, background delivery during UI stalls, interruptions and restart isolation passed.")
     }
 }
