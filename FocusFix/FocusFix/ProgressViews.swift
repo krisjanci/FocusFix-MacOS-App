@@ -146,20 +146,12 @@ struct WorkStreakFlame: View {
     private var tint: Color { status.count == 0 ? .secondary : status.frozen ? .blue : .orange }
     var body: some View {
         HStack(spacing: compact ? 5 : 7) {
-            ZStack(alignment: .bottomTrailing) {
-                if status.count > 0 && !status.frozen {
-                    BurningStreakFlame(size: compact ? 18 : 23)
-                } else {
-                    Image(systemName: "flame.fill").font(.system(size: compact ? 18 : 23, weight: .semibold))
-                }
-                if status.frozen && status.count > 0 {
-                    Image(systemName: "snowflake")
-                        .font(.system(size: compact ? 9 : 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(2)
-                        .background(.blue, in: Circle())
-                        .offset(x: 4, y: 2)
-                }
+            if status.count > 0 {
+                BurningStreakFlame(size: compact ? 18 : 23, frozen: status.frozen)
+            } else {
+                StreakFireContour(time: 0)
+                    .fill(.secondary)
+                    .frame(width: compact ? 18 : 23, height: (compact ? 18 : 23) * 1.18)
             }
             Text("\(status.count)").font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
         }
@@ -172,31 +164,67 @@ struct WorkStreakFlame: View {
     }
 }
 
-// A gentle flicker runs only while the flame is visible in the active window.
+// The base stays planted: only the upper contour and heat glow flicker.
 private struct BurningStreakFlame: View {
     let size: CGFloat
+    var frozen = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.controlActiveState) private var activeState
     @State private var visible = false
-    private var animated: Bool { visible && !reduceMotion && scenePhase == .active && activeState == .key }
+    private var animated: Bool { visible && !frozen && !reduceMotion && scenePhase == .active && activeState == .key }
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !animated)) { context in
             let time = animated ? context.date.timeIntervalSinceReferenceDate : 0
-            let flicker = sin(time * 7) * 0.5 + sin(time * 11) * 0.5
-            ZStack(alignment: .bottom) {
-                Image(systemName: "flame.fill")
-                    .foregroundStyle(LinearGradient(colors: [.yellow, .orange, .red.opacity(0.9)], startPoint: .bottom, endPoint: .top))
-                    .shadow(color: .orange.opacity(0.18 + (flicker + 1) * 0.10), radius: 3)
-                Image(systemName: "flame.fill")
-                    .foregroundStyle(.yellow.opacity(0.8))
-                    .scaleEffect(x: 0.42, y: 0.52, anchor: .bottom)
+            let heat = (sin(time * 9) + sin(time * 15 + 1)) / 2
+            ZStack {
+                StreakFireContour(time: time)
+                    .fill(LinearGradient(colors: [.yellow, .orange, .red], startPoint: .bottom, endPoint: .top))
+                    .shadow(color: .orange.opacity(frozen ? 0.12 : 0.26 + heat * 0.08), radius: 2)
+                    .padding(.horizontal, frozen ? size * 0.16 : 0)
+                    .padding(.vertical, frozen ? size * 0.10 : 0)
+                if frozen {
+                    // Warm fire remains visible through a faceted, translucent ice block.
+                    RoundedRectangle(cornerRadius: size * 0.16)
+                        .fill(LinearGradient(colors: [.cyan.opacity(0.20), .blue.opacity(0.12), .cyan.opacity(0.32)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                    RoundedRectangle(cornerRadius: size * 0.16)
+                        .strokeBorder(.cyan.opacity(0.85), lineWidth: 1)
+                    Path { path in
+                        path.move(to: CGPoint(x: size * 0.12, y: size * 0.40))
+                        path.addLine(to: CGPoint(x: size * 0.29, y: size * 0.14))
+                        path.addLine(to: CGPoint(x: size * 0.70, y: size * 0.10))
+                        path.move(to: CGPoint(x: size * 0.72, y: size * 0.91))
+                        path.addLine(to: CGPoint(x: size * 0.88, y: size * 0.71))
+                    }
+                    .stroke(.white.opacity(0.80), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+                }
             }
-            .font(.system(size: size, weight: .semibold))
-            .scaleEffect(x: 1 + flicker * 0.035, y: 1 + sin(time * 8) * 0.06, anchor: .bottom)
-            .rotationEffect(.degrees(sin(time * 6) * 1.8), anchor: .bottom)
+            .frame(width: size, height: size * 1.18)
         }
         .onAppear { visible = true }.onDisappear { visible = false }
         .accessibilityHidden(true)
+    }
+}
+
+// A solid silhouette avoids the cutout and duplicate inner flame in the SF Symbol.
+private struct StreakFireContour: Shape {
+    var time: Double
+    func path(in rect: CGRect) -> Path {
+        let rise = sin(time * 9) * 0.025 + sin(time * 15) * 0.015
+        func point(_ x: Double, _ y: Double) -> CGPoint {
+            CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
+        }
+        var path = Path()
+        path.move(to: point(0.50, 0.98))
+        path.addCurve(to: point(0.12, 0.62), control1: point(0.14, 0.98), control2: point(0.02, 0.82))
+        path.addCurve(to: point(0.24, 0.38 + rise), control1: point(0.14, 0.52), control2: point(0.23, 0.46))
+        path.addQuadCurve(to: point(0.28, 0.59), control: point(0.22, 0.53))
+        path.addCurve(to: point(0.45, 0.03 + rise), control1: point(0.51, 0.41), control2: point(0.49, 0.21))
+        path.addCurve(to: point(0.79, 0.44 - rise), control1: point(0.67, 0.13), control2: point(0.74, 0.31))
+        path.addQuadCurve(to: point(0.78, 0.29 - rise), control: point(0.82, 0.36))
+        path.addCurve(to: point(0.50, 0.98), control1: point(1.11, 0.65), control2: point(0.94, 0.98))
+        path.closeSubpath()
+        return path
     }
 }
