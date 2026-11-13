@@ -48,11 +48,63 @@ nonisolated struct InputDeliveryGate {
     func accepts(_ token: UInt64) -> Bool { active && token == generation }
 }
 
+// A dedicated run loop keeps history loading, menus and file panels out of the tap.
+// One idle thread is shared across starts; each tap's context lives until teardown
+// has run on this loop, after any in-flight callback has returned.
+nonisolated enum InputMonitorRunLoop {
+    private final class Ready: @unchecked Sendable {
+        let condition = NSCondition()
+        var loop: CFRunLoop?
+        func publish(_ value: CFRunLoop) {
+            condition.lock()
+            loop = value
+            condition.signal()
+            condition.unlock()
+        }
+        func wait() -> CFRunLoop {
+            condition.lock()
+            defer { condition.unlock() }
+            while loop == nil { condition.wait() }
+            return loop!
+        }
+    }
+    static let shared: CFRunLoop = {
+        let ready = Ready()
+        let thread = Thread {
+            let loop = CFRunLoopGetCurrent()!
+            var context = CFRunLoopSourceContext()
+            let keepAlive = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context)!
+            CFRunLoopAddSource(loop, keepAlive, .commonModes)
+            ready.publish(loop)
+            CFRunLoopRun()
+        }
+        thread.name = "FocusFix input monitor"
+        thread.qualityOfService = .userInitiated
+        thread.start()
+        return ready.wait()
+    }()
+}
+
+nonisolated final class InputTapContext: @unchecked Sendable {
+    let deliver: @Sendable (ActivityInput?) -> Void
+    init(deliver: @escaping @Sendable (ActivityInput?) -> Void) { self.deliver = deliver }
+    func receive(type: CGEventType, event: CGEvent) {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            deliver(nil)
+        } else {
+            autoreleasepool {
+                if let input = ActivityInput(event: event) { deliver(input) }
+            }
+        }
+    }
+}
+
 @MainActor
 final class InputMonitor {
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
     private var gate = InputDeliveryGate()
+    private var context: InputTapContext?
     private var onInput: ((ActivityInput) -> Void)?
     private var onInterruption: (() -> Void)?
 
@@ -77,55 +129,57 @@ final class InputMonitor {
             .otherMouseDown, .otherMouseUp, .scrollWheel, .mouseMoved,
             .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
         let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
+        gate.start()
+        let token = gate.generation
+        let context = InputTapContext { [weak self] input in
+            // Only immutable metrics cross threads. UI and file I/O stay on main.
+            DispatchQueue.main.async {
+                guard let self, self.gate.accepts(token) else { return }
+                if let input { self.onInput?(input) }
+                else { self.onInterruption?() }
+            }
+        }
         guard let tap = CGEvent.tapCreate(tap: .cgAnnotatedSessionEventTap,
             place: .tailAppendEventTap, options: .listenOnly, eventsOfInterest: mask,
             callback: { _, type, event, context in
                 if let context {
-                    // The source is installed exclusively on the main run loop.
-                    MainActor.assumeIsolated {
-                        Unmanaged<InputMonitor>.fromOpaque(context).takeUnretainedValue()
-                            .receive(type: type, event: event)
-                    }
+                    Unmanaged<InputTapContext>.fromOpaque(context).takeUnretainedValue()
+                        .receive(type: type, event: event)
                 }
                 return Unmanaged.passUnretained(event)
-            }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }
+            }, userInfo: Unmanaged.passUnretained(context).toOpaque()) else { gate.stop(); return false }
         guard let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
             CFMachPortInvalidate(tap)
+            gate.stop()
             return false
         }
         self.onInput = onInput
         self.onInterruption = onInterruption
         port = tap
         source = runLoopSource
-        gate.start()
-        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        self.context = context
+        CFRunLoopAddSource(InputMonitorRunLoop.shared, runLoopSource, .commonModes)
+        CFRunLoopWakeUp(InputMonitorRunLoop.shared)
         CGEvent.tapEnable(tap: tap, enable: true)
         if !isEnabled { stop(); return false }
         return true
     }
 
-    private func receive(type: CGEventType, event: CGEvent) {
-        let token = gate.generation
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            // Do not silently resume after lost observations. End the session explicitly.
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.gate.accepts(token) else { return }
-                self.onInterruption?()
-            }
-            return
-        }
-        guard let input = ActivityInput(event: event) else { return }
-        // Return from the tap before any CSV I/O or UI work; preserve main-queue ordering.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.gate.accepts(token) else { return }
-            self.onInput?(input)
-        }
-    }
-
     func stop() {
         gate.stop()
-        if let port { CGEvent.tapEnable(tap: port, enable: false); CFMachPortInvalidate(port) }
-        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+        if let port, let source, let context {
+            let loop = InputMonitorRunLoop.shared
+            CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue) {
+                // Retain the callback context until the worker has removed this tap.
+                withExtendedLifetime(context) {
+                    CGEvent.tapEnable(tap: port, enable: false)
+                    CFRunLoopRemoveSource(loop, source, .commonModes)
+                    CFMachPortInvalidate(port)
+                }
+            }
+            CFRunLoopWakeUp(loop)
+        }
+        context = nil
         source = nil
         port = nil
         onInput = nil
