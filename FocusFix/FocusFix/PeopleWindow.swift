@@ -1,5 +1,10 @@
 import SwiftUI
 import AppKit
+import QuartzCore
+
+enum PeopleWindowAnimation {
+    static let duration: TimeInterval = 0.3
+}
 
 struct CollectorWindowResizeLock: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
@@ -15,7 +20,7 @@ struct CollectorWindowResizeLock: ViewModifier {
 // native dragging, zooming, tiling and full-screen entry are disabled.
 struct PeopleWindowBridge: NSViewRepresentable {
     let fullScreen: Bool
-    let resolved: (CGSize) -> Void
+    let resolved: (NSWindow, CGSize) -> Void
 
     func makeNSView(context: Context) -> WindowProbe {
         let view = WindowProbe()
@@ -32,7 +37,7 @@ struct PeopleWindowBridge: NSViewRepresentable {
     }
 
     final class WindowProbe: NSView {
-        var resolve: ((CGSize) -> Void)?
+        var resolve: ((NSWindow, CGSize) -> Void)?
         var fullScreen = false
         private var compactFrame: CGRect?
         private var observers: [NSObjectProtocol] = []
@@ -62,12 +67,16 @@ struct PeopleWindowBridge: NSViewRepresentable {
             window.collectionBehavior.insert(.fullScreenNone)
             window.standardWindowButton(.zoomButton)?.isEnabled = false
             let size = window.contentRect(forFrameRect: screen.visibleFrame).size
-            resolve?(size)
+            resolve?(window, size)
             if fullScreen {
                 if compactFrame == nil { compactFrame = window.frame }
                 window.setFrame(screen.visibleFrame, display: true)
             } else if changed, let saved = compactFrame {
-                window.setFrame(CollectorWindowLayout.restoredFrame(saved, visible: screen.visibleFrame), display: true)
+                let visible = screen.visibleFrame
+                let restored = CGRect(x: min(max(saved.minX, visible.minX), visible.maxX - saved.width),
+                                      y: min(max(saved.minY, visible.minY), visible.maxY - saved.height),
+                                      width: saved.width, height: saved.height)
+                window.setFrame(restored, display: true)
                 compactFrame = nil
             }
         }
