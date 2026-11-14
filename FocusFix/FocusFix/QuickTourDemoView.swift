@@ -70,11 +70,11 @@ struct QuickTourDemoView: View {
                     Text("These controls only change this demo. Automatic recording starts as Unknown. Start work declares work; End work returns to Unknown.")
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Button("Enable automatic") { tour.practiceAutomatic() }
-                        Button("Start work") { tour.practiceWork() }.disabled(!tour.demoAutomatic)
+                        Button("Enable automatic") { tour.practiceAutomatic() }.buttonPressFeedback()
+                        Button("Start work") { tour.practiceWork() }.buttonPressFeedback().disabled(!tour.demoAutomatic)
                     }
                     HStack {
-                        Button("End work") { tour.practiceEndWork() }.disabled(tour.demoContext != .work)
+                        Button("End work") { tour.practiceEndWork() }.buttonPressFeedback().disabled(tour.demoContext != .work)
                     }
                 }.padding(12).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
@@ -105,7 +105,7 @@ struct QuickTourDemoView: View {
             }
             HStack {
                 if tour.phase == .start || tour.saved {
-                    Button("Start work") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }
+                    Button("Start work") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }.buttonPressFeedback()
                         .buttonStyle(.borderedProminent).disabled(tour.phase != .start)
                 } else {
                     practiceButton("End work", symbol: "stop.fill", phase: .save, action: .save)
@@ -158,7 +158,7 @@ struct QuickTourDemoView: View {
                     ForEach([30, 60, 90], id: \.self) { value in
                         Button("\(value) min") {
                             tour.perform(.minutes(value), phase: .duration, visit: visit)
-                        }.buttonStyle(.bordered)
+                        }.buttonPressFeedback().buttonStyle(.bordered)
                             .tint(tour.phase == .confirmStart && tour.minutes == value ? teal : .secondary)
                             .disabled(tour.phase != .duration)
                     }
@@ -249,7 +249,7 @@ struct QuickTourDemoView: View {
             tour.perform(action, phase: phase, visit: visit)
         } label: {
             if let symbol { Label(title, systemImage: symbol) } else { Text(title) }
-        }
+        }.buttonPressFeedback()
         Group {
             if tour.phase == phase && defaultAction { button.keyboardShortcut(.defaultAction) }
             else if tour.phase == phase { button }
