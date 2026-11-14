@@ -81,7 +81,7 @@ struct PeoplePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("PEOPLE").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary)
+                Text(allowsCollapsing ? "PEOPLE" : "GROUPS").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary)
                 Spacer()
                 if allowsCollapsing {
                 Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
