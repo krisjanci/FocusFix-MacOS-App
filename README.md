@@ -5,7 +5,7 @@ FocusFix is a personal macOS app for recording computer activity, marking work t
 ## Getting started
 
 1. Open FocusFix and choose whether to enable recording. Grant macOS Input Monitoring access if you want activity capture.
-2. Select **Start work** for a manual session, or **Plan session…** to set a target first.
+2. Select **Start work** for a manual session, or choose **Add tags** or **Work target** in the timer card and confirm **Start work**.
 3. Use **Take a break** and **I’m back** for explicit breaks. **End work** saves a manual session.
 4. Open **Sessions** to review, export, or delete local recordings. Days with multiple recordings appear as expandable folders. Batch exports use the same day folders; days with one recording stay as single entries.
 5. Open **Quick tour** for a nine-step practice flow. The tour uses demo data and changes no settings or recordings.
@@ -36,4 +36,6 @@ Group work streaks sync observed declared-work intervals with retry-safe replace
 
 Groups and Analytics share one right-side panel. The bottom-right **Analytics** button shows blurred illustrative charts and **Coming soon**; switching panels keeps the same window width. Appearance is an icon-only button beside the recording status; each click cycles System → Light → Dark → System, with no menu.
 
-Activity labels now follow **Start work** and **End work**, including planned-session and menu-bar equivalents. Automatic recording outside declared work is **Unknown**. Manual context menus and history corrections are no longer offered. Breaks remain separate from activity context. Local exports map historical `non_work` context fields to `unknown` in intervals, revision history, reminder requests, and study check-in prompts. Export notes explain this conversion; saved originals and hosted uploads are unchanged.
+Activity labels now follow **Start work** and **End work**, including timer-card setup and menu-bar equivalents. Automatic recording outside declared work is **Unknown**. Manual context menus and history corrections are no longer offered. Breaks remain separate from activity context. Local exports map historical `non_work` context fields to `unknown` in intervals, revision history, reminder requests, and study check-in prompts. Export notes explain this conversion; saved originals and hosted uploads are unchanged.
+
+The timer card offers matching **Add tags** and **Work target** controls. When you are not working, confirming either editor with **Start work** begins work, including when automatic capture is currently Unknown. Cancel leaves recording unchanged. During work, **Done** saves the edit without restarting; target changes retain credit already earned in that work period. Library tag edits remain edits to saved recordings.
