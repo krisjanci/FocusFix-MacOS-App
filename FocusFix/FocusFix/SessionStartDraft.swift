@@ -11,6 +11,16 @@ struct SessionStartDraft {
     var durationChoice = 60
     var customMinutes = "60"
 
+    static func workTarget(asksForFatigue: Bool, targetMinutes: Int? = nil,
+                           tags: [String] = [], tagColors: [String: String] = [:]) -> Self {
+        var draft = Self(asksForFatigue: asksForFatigue, tags: tags, tagColors: tagColors)
+        draft.planning = true
+        let minutes = targetMinutes ?? 60
+        draft.durationChoice = [30, 60, 90].contains(minutes) ? minutes : 0
+        draft.customMinutes = String(minutes)
+        return draft
+    }
+
     var targetMinutes: Int? {
         guard planning else { return nil }
         let value = durationChoice == 0 ? Int(customMinutes) : durationChoice
