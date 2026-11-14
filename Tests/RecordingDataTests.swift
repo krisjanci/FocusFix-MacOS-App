@@ -276,6 +276,24 @@ struct RecordingDataTests {
         precondition(dstFinal["ended_at_utc"] as? String == "2026-11-01T06:01:00Z")
         precondition(dstFinal["duration_seconds"] as? Double == 90)
 
+        // Both bounds must use the same floating-point decoder. JSONSerialization
+        // parses these subsecond values one ULP away from JSONDecoder on macOS.
+        let fractionalRoot = exports.appendingPathComponent("fractional-storage")
+        for duration in [0.000397875, 0.005281167, 1.234567891, 5.00000003] {
+            let fractional = try RecordingWriter(root: SessionFiles.pendingRoot(in: fractionalRoot),
+                id: UUID().uuidString, startedAt: dstStart)
+            try fractional.finish(startedAt: dstStart, duration: duration, reason: "end_work")
+            let retained = try SessionFiles.retainRecording(fractional.folder, duration: duration, root: fractionalRoot)!
+            let loaded = try SavedSession(folder: retained)
+            precondition(loaded.duration == duration && loaded.recordingContract?.observedThrough == duration)
+            // A real mismatch must still fail; no fuzzy duration tolerance was added.
+            let metadataURL = retained.appendingPathComponent("session.json")
+            var mismatched = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as! [String: Any]
+            mismatched["duration_seconds"] = duration + 0.001
+            try JSONSerialization.data(withJSONObject: mismatched).write(to: metadataURL)
+            do { _ = try SavedSession(folder: retained); preconditionFailure("Mismatched duration must fail") }
+            catch {}
+        }
         print("PASS: recording schema and timing, session reload, single, selected and all-session exports, duplicate protection, legacy and unfinished sessions, active-session and path guards, local time and DST offsets.")
     }
 }
