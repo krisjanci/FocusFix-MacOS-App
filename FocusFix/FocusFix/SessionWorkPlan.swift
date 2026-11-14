@@ -1,6 +1,6 @@
 import Foundation
 
-// A session owns a value snapshot. Later start-window edits cannot change an active plan.
+// Work credit belongs to the current work period, even before a target is chosen.
 struct SessionWorkPlan: Equatable {
     let targetMinutes: Int?
     private(set) var workSeconds: Double = 0
@@ -13,13 +13,22 @@ struct SessionWorkPlan: Equatable {
     var isComplete: Bool { targetMinutes.map { workSeconds >= Double($0) * 60 } ?? false }
     var reminderPending: Bool { isComplete && !acknowledged }
     var summary: String {
-        "Planned session · \(Int(min(workSeconds / 60, Double(Int.max / 2)))) / \(targetMinutes ?? 0) min"
+        "Work target · \(Int(min(workSeconds / 60, Double(Int.max / 2)))) / \(targetMinutes ?? 0) min"
     }
 
     mutating func credit(_ seconds: Double) {
-        guard targetMinutes != nil, seconds.isFinite, seconds > 0,
+        guard seconds.isFinite, seconds > 0,
               (workSeconds + seconds).isFinite else { return }
         workSeconds += seconds
+    }
+
+    // Editing a target keeps work already observed, without crediting it twice.
+    mutating func setTarget(_ minutes: Int?) {
+        let replacement = SessionWorkPlan(targetMinutes: minutes)
+        guard replacement.targetMinutes != targetMinutes else { return }
+        let observedWorkSeconds = workSeconds
+        self = replacement
+        credit(observedWorkSeconds)
     }
 
     mutating func keepGoing() {
