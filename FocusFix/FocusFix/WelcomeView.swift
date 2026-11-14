@@ -29,7 +29,7 @@ struct WelcomeView: View {
                     HStack {
                         Text(launch.page == .createAccount ? "Create your account" : "Log in to FocusFix").font(.title2.weight(.semibold))
                         Spacer()
-                        Button("Back") { launch.showWelcome() }.disabled(account.busy)
+                        Button("Back") { launch.showWelcome() }.buttonPressFeedback().disabled(account.busy)
                     }
                     Text(launch.page == .createAccount ? "Build your routine and stay connected with your groups." : "Welcome back. Your focus journey continues here.")
                         .font(.callout).foregroundStyle(.secondary)
@@ -41,10 +41,10 @@ struct WelcomeView: View {
                         .font(.callout).foregroundStyle(.secondary)
                     if !account.profileLoaded {
                         if account.busy { ProgressView("Loading your profile…") }
-                        else { Button("Retry loading profile") { Task { await account.loadProfile() } } }
+                        else { Button("Retry loading profile") { Task { await account.loadProfile() } }.buttonPressFeedback() }
                     }
                     ProfileEditor(onSaved: { launch.finishProfileSetup() })
-                    Button("Skip for now") { launch.finishProfileSetup() }.controlSize(.large)
+                    Button("Skip for now") { launch.finishProfileSetup() }.buttonPressFeedback().controlSize(.large)
                 case .welcome, .app:
                     Text("Your space to focus.").font(.title2.weight(.semibold))
                     Text("Create an account for a personal profile, or get started locally as a guest.")
@@ -52,13 +52,13 @@ struct WelcomeView: View {
                     VStack(spacing: 12) {
                         Button { launch.showAccount(create: false) } label: {
                             Text("Log in").frame(maxWidth: .infinity)
-                        }.buttonStyle(.borderedProminent)
+                        }.buttonPressFeedback().buttonStyle(.borderedProminent)
                         Button { launch.showAccount(create: true) } label: {
                             Text("Create new account").frame(maxWidth: .infinity)
-                        }.buttonStyle(.bordered)
+                        }.buttonPressFeedback().buttonStyle(.bordered)
                     }.controlSize(.large).disabled(!account.configured && !launch.isPreview)
                     if !launch.isPreview && account.configured && account.remembersSignIn {
-                        Button("Retry saved sign-in") { launch.restore() }
+                        Button("Retry saved sign-in") { launch.restore() }.buttonPressFeedback()
                     }
                     if !account.configured && !launch.isPreview {
                         Text("Online accounts aren't connected in this build. Guest mode is ready to use.")
@@ -71,7 +71,7 @@ struct WelcomeView: View {
                 if launch.page != .profileSetup {
                     Divider()
                     HStack {
-                        Button("Continue as guest") { launch.useGuest() }
+                        Button("Continue as guest") { launch.useGuest() }.buttonPressFeedback()
                         Spacer()
                         QuickTourButton()
                     }
@@ -98,7 +98,7 @@ struct WelcomePreviewView: View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                Button("Close preview") { dismiss() }.padding(12)
+                Button("Close preview") { dismiss() }.buttonPressFeedback().padding(12)
             }
             WelcomeView(launch: launch, account: launch.account)
         }
