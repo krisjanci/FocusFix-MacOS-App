@@ -18,7 +18,7 @@ struct QuickTourTests {
         tour.practiceAutomatic()
         precondition(tour.demoAutomatic && tour.demoContext == .unknown)
         tour.practiceWork(); precondition(tour.demoContext == .work)
-        tour.practiceNotWorkingNotification(); precondition(tour.demoContext == .nonWork)
+        tour.practiceEndWork(); precondition(tour.demoContext == .unknown)
         for action in [QuickTourAction.save, .done, .minutes(60), .next, .startBreak] { act(action) }
         precondition(tour.phase == .start)
         let originalVisit = tour.visit
