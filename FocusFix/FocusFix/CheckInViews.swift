@@ -46,34 +46,21 @@ struct SessionCheckInView: View {
     @ObservedObject var tracker: ActivityTracker
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SessionStartDraft
-    @State private var editingTags = false
+    @State private var notice: String?
     @ObservedObject var tagLibrary: SessionTagLibrary
 
     init(tracker: ActivityTracker, tagLibrary: SessionTagLibrary? = nil) {
         self.tracker = tracker
         self.tagLibrary = tagLibrary ?? .shared
-        _draft = State(initialValue: SessionStartDraft(asksForFatigue: tracker.sessionSurveyOptions.beforeSession,
-            tags: tracker.isRecording || tracker.sessionFolder == nil ? tracker.sessionTags : [],
-            tagColors: tracker.isRecording || tracker.sessionFolder == nil ? tracker.sessionTagColors : [:]))
+        _draft = State(initialValue: SessionStartDraft.workTarget(
+            asksForFatigue: !tracker.isWorking && tracker.sessionSurveyOptions.beforeSession,
+            targetMinutes: tracker.timerTargetMinutes, tags: tracker.timerTags, tagColors: tracker.timerTagColors))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Plan session").font(.title2.weight(.semibold))
+            Text("Work target").font(.title2.weight(.semibold))
             if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
-            HStack {
-                if draft.planning { Text("Work target").font(.headline) }
-                else { Button("Add work target") { draft.addPlan() } }
-                Button { editingTags = true } label: { Label("Tags…", systemImage: "tag") }
-                Spacer()
-                if draft.planning { Button("Remove target") { draft.removePlan() } }
-            }
-            if !draft.tags.isEmpty {
-                SessionTagChips(tags: draft.tags, colors: tagLibrary.resolvedColors(for: draft.tags, saved: draft.tagColors))
-                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                    .background { TagTintBackground(colors: draft.tags.map { tagLibrary.color(for: $0, saved: draft.tagColors) })
-                        .clipShape(RoundedRectangle(cornerRadius: 8)) }
-            }
             if draft.planning {
                 Picker("Work target", selection: $draft.durationChoice) {
                     Text("30 min").tag(30)
@@ -85,17 +72,22 @@ struct SessionCheckInView: View {
                     HStack {
                         TextField("Minutes", text: $draft.customMinutes)
                             .textFieldStyle(.roundedBorder).frame(width: 80)
-                            .accessibilityLabel("Planned session minutes")
+                            .accessibilityLabel("Work target minutes")
                         Text("minutes · 1–480").font(.caption).foregroundStyle(.secondary)
                     }
                     if !draft.validPlan {
-                        Text("Enter a whole number from 1 to 480, or remove the plan.")
+                        Text("Enter a whole number from 1 to 480.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if !draft.planning { Button("Add work target") { draft.addPlan() } }
+            if tracker.isWorking, draft.planning {
+                Button("Remove target") { draft.removePlan() }
+            }
+            if let notice { Text(notice).font(.callout).foregroundStyle(.red) }
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
@@ -103,20 +95,16 @@ struct SessionCheckInView: View {
                     Button("Skip & start work") { start(skippingFatigue: true) }
                         .disabled(!draft.validPlan)
                 }
-                Button("Start work") { start() }
+                Button(tracker.isWorking ? "Done" : "Start work") { start() }
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
-        .sheet(isPresented: $editingTags) {
-            SessionTagEditor(tags: draft.tags, colors: draft.tagColors, library: tagLibrary) { tags, colors in
-                draft.tags = tags; draft.tagColors = colors
-            }
-        }
     }
 
     private func start(skippingFatigue: Bool = false) {
         guard let selection = draft.selection(skippingFatigue: skippingFatigue) else { return }
-        tracker.completeSessionCheckIn(selection)
+        do { try tracker.completeSessionCheckIn(selection) }
+        catch { notice = error.localizedDescription }
     }
 }
 
