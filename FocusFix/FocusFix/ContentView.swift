@@ -183,6 +183,27 @@ struct ContentView: View {
 
             DailyProgressCard(tracker: tracker)
 
+            HStack(spacing: 12) {
+                Button {
+                    if tracker.isWorking { tracker.endWork() } else { tracker.requestStart() }
+                } label: {
+                    Label(tracker.isWorking ? "End work" : "Start work",
+                          systemImage: tracker.isWorking ? "stop.fill" : "play.fill")
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                if onBreak {
+                    Button { tracker.returnFromBreak() } label: {
+                        Label("I'm back", systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                } else if tracker.isWorking {
+                    Button { tracker.chooseBreak() } label: {
+                        Label("Take a break", systemImage: "leaf")
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                }
+            }
+
             if tracker.isRecording && !onBreak &&
                 (!tracker.isWorking || tracker.breakPromptPending || tracker.latestBreak != nil || tracker.notificationNotice != nil) {
                 BreakControls(tracker: tracker, showsTakeBreak: !tracker.isWorking).tint(teal)
@@ -234,26 +255,6 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent).tint(teal)
                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
                     .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-            }
-            HStack(spacing: 12) {
-                Button {
-                    if tracker.isWorking { tracker.endWork() } else { tracker.requestStart() }
-                } label: {
-                    Label(tracker.isWorking ? "End work" : "Start work",
-                          systemImage: tracker.isWorking ? "stop.fill" : "play.fill")
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                if onBreak {
-                    Button { tracker.returnFromBreak() } label: {
-                        Label("I'm back", systemImage: "arrow.uturn.backward")
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                } else if tracker.isWorking {
-                    Button { tracker.chooseBreak() } label: {
-                        Label("Take a break", systemImage: "leaf")
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                }
             }
             HStack {
                 Button { togglePanel(.groups) } label: {
