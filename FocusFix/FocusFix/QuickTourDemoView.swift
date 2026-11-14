@@ -78,11 +78,20 @@ struct QuickTourDemoView: View {
                     }
                 }.padding(12).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
-            SessionClockFace(time: String(format: "00:00:%02d", tour.elapsed))
-                .contentTransition(.numericText())
-                .padding(22).frame(maxWidth: .infinity)
-                .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
-                .practiceTarget(.work)
+            VStack(spacing: 16) {
+                SessionClockFace(time: String(format: "00:00:%02d", tour.elapsed))
+                    .contentTransition(.numericText())
+                HStack {
+                    SessionTagButton(tags: [], colors: [:]) {}.disabled(true)
+                    practiceButton("Work target", symbol: "scope", phase: .start, action: .start)
+                        .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
+                    Spacer()
+                }
+            }
+            .padding(22).frame(maxWidth: .infinity)
+            .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+            .practiceTarget(.work)
             DailyProgressDisplay(workMinutes: tour.dailyMinutes, streak: 2, breakCount: tour.breaks,
                 complete: tour.dailyMinutes == 60, workSeconds: Double(tour.dailyMinutes * 60))
                 .practiceTarget(.progress)
@@ -98,7 +107,6 @@ struct QuickTourDemoView: View {
                 if tour.phase == .start || tour.saved {
                     Button("Start work") { tour.perform(.quickStart, phase: .start, visit: tour.visit) }
                         .buttonStyle(.borderedProminent).disabled(tour.phase != .start)
-                    practiceButton("Plan session…", phase: .start, action: .start)
                 } else {
                     practiceButton("End work", symbol: "stop.fill", phase: .save, action: .save)
                 }
@@ -141,7 +149,7 @@ struct QuickTourDemoView: View {
     private var planning: some View {
         let visit = tour.visit
         return VStack(alignment: .leading, spacing: 24) {
-            Text("Plan session").font(.title2.weight(.semibold))
+            Text("Work target").font(.title2.weight(.semibold))
             if tour.phase == .plan {
                 practiceButton("Add work target", phase: .plan, action: .plan)
             } else {
