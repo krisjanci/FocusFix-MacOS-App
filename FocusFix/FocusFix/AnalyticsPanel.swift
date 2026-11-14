@@ -3,6 +3,7 @@ import SwiftUI
 // Illustrative artwork only: this placeholder never reads recordings or fetches data.
 struct AnalyticsPanel: View {
     let close: () -> Void
+    var allowsCollapsing = true
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -10,9 +11,11 @@ struct AnalyticsPanel: View {
             HStack {
                 Text("ANALYTICS").font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
                 Spacer()
+                if allowsCollapsing {
                 Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
                     .buttonStyle(.plain).help("Collapse Analytics")
                     .accessibilityLabel("Collapse Analytics")
+                }
             }
             Text("Your focus, over time").font(.title2.weight(.semibold))
             ZStack {
