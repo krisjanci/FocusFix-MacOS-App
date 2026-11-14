@@ -168,7 +168,7 @@ struct ContentView: View {
                         }
                     Button { tracker.requestWorkTarget() } label: {
                         Label(tracker.timerTargetMinutes.map { "Work target · \($0) min" } ?? "Work target", systemImage: "scope")
-                            .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                            .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonStyle(.plain).help("Choose a work target")
                     Spacer(minLength: 0)
@@ -176,7 +176,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity).padding(26)
             .background {
-                TagTintBackground(colors: tracker.sessionTags.map { tagLibrary.color(for: $0, saved: tracker.sessionTagColors) },
+                TagTintBackground(colors: tracker.timerTags.map { tagLibrary.color(for: $0, saved: tracker.timerTagColors) },
                                   opacity: onBreak ? 0.2 : 0.15)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
