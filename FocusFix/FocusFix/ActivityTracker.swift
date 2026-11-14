@@ -403,9 +403,9 @@ final class ActivityTracker: ObservableObject {
         if isWorking {
             sessionWorkPlan.setTarget(selection.plan.targetMinutes)
         } else {
-            let prompt = sessionCheckIn
-            guard !sessionSurveyOptions.beforeSession || prompt != nil else { return }
-            try beginConfiguredWork(selection, prompt: prompt)
+            // Capture may have stopped while an active-target editor was open.
+            // That editor has no start survey; confirmation still acts as Start work.
+            try beginConfiguredWork(selection, prompt: sessionCheckIn)
         }
         sessionCheckIn = nil
         sessionCheckInPresented = false
