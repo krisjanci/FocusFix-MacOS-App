@@ -137,11 +137,6 @@ struct BreakControls: View {
                 }
             } else {
                 HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Total recording")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text(tracker.formattedTime).monospacedDigit()
-                    }
                     Spacer()
                     Button("Take a break") { tracker.chooseBreak() }
                 }
