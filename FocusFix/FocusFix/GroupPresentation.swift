@@ -51,38 +51,28 @@ enum GroupAccessState: Equatable {
     }
 }
 
-// Groups and Analytics occupy the same expansion slot, including the sheet fallback.
+// Both modes share one panel selection; compact mode presents it as a sheet.
 enum CollectorPanel: String, Identifiable {
     case groups, analytics
     var id: String { rawValue }
 }
 
-struct CollectorPanelSelection {
-    var expanded: CollectorPanel?
-    var sheet: CollectorPanel?
-
-    mutating func toggle(_ panel: CollectorPanel, canExpand: Bool) {
-        if expanded == panel || sheet == panel { close(); return }
-        expanded = canExpand ? panel : nil
-        sheet = canExpand ? nil : panel
-    }
-    mutating func close() { expanded = nil; sheet = nil }
-    mutating func adapt(canExpand: Bool) {
-        guard !canExpand, let panel = expanded else { return }
-        expanded = nil
-        sheet = panel
-    }
-}
-
-struct PeopleWindowLayout {
+enum CollectorWindowLayout {
     static let compactWidth: CGFloat = 490
-    static let panelWidth: CGFloat = 359
-    static let expandedWidth: CGFloat = 850
-    static func canExpand(in visibleFrame: CGRect) -> Bool { visibleFrame.width >= expandedWidth }
-    static func clampedFrame(current: CGRect, expanded: Bool, visible: CGRect) -> CGRect {
-        let width = min(expanded ? expandedWidth : compactWidth, visible.width)
-        let height = min(current.height, visible.height)
-        return CGRect(x: min(max(current.minX, visible.minX), visible.maxX - width),
-                      y: min(max(current.minY, visible.minY), visible.maxY - height), width: width, height: height)
+    static let minimumPanelWidth: CGFloat = 300
+
+    // Uniform scaling preserves the compact view's proportions. On unusually
+    // narrow screens, keep the right panel usable rather than clipping controls.
+    static func fullScreenScale(contentHeight: CGFloat, available: CGSize) -> CGFloat {
+        min(available.height / max(1, contentHeight),
+            max(1, available.width - minimumPanelWidth) / compactWidth)
+    }
+
+    static func restoredFrame(_ saved: CGRect, visible: CGRect) -> CGRect {
+        let width = min(saved.width, visible.width)
+        let height = min(saved.height, visible.height)
+        return CGRect(x: min(max(saved.minX, visible.minX), visible.maxX - width),
+                      y: min(max(saved.minY, visible.minY), visible.maxY - height),
+                      width: width, height: height)
     }
 }
