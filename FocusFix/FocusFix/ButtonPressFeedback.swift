@@ -31,7 +31,15 @@ import AppKit
 
     func unregister(_ marker: ButtonPressMarker) {
         markers.removeValue(forKey: ObjectIdentifier(marker))
-        if active === marker { active = nil; stopReleaseTimer() }
+        if active === marker {
+            active = nil; stopReleaseTimer()
+            // Reparenting a native view need not dismiss its SwiftUI view. Clear
+            // that press after layout, unless a fresh press has already begun.
+            DispatchQueue.main.async { [weak self, weak marker] in
+                guard let self, let marker, self.active !== marker else { return }
+                marker.pressed?(false)
+            }
+        }
         markers = markers.filter { $0.value.value != nil }
         guard markers.isEmpty else { return }
         if let monitor { NSEvent.removeMonitor(monitor) }
