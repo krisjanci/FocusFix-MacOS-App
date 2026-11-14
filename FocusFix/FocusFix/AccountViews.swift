@@ -15,11 +15,11 @@ struct AccountControls: View {
             } else if let session = account.session {
                 Text("Signed in as \(session.user.email ?? "your account")").font(.callout)
                 if !account.profileLoaded {
-                    Button("Retry loading profile") { Task { await account.loadProfile() } }.disabled(account.busy)
+                    Button("Retry loading profile") { Task { await account.loadProfile() } }.buttonPressFeedback().disabled(account.busy)
                 }
                 HStack {
-                    Button("Sign out") { Task { await account.signOut() } }
-                    Button("Delete account…", role: .destructive) { confirmDeletion = true }
+                    Button("Sign out") { Task { await account.signOut() } }.buttonPressFeedback()
+                    Button("Delete account…", role: .destructive) { confirmDeletion = true }.buttonPressFeedback()
                 }.disabled(account.busy)
                 Text("Account profiles sync privately. Creating an account does not enable recording sharing or publish your activity.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -81,7 +81,7 @@ struct AccountSignInForm: View {
                         await account.verify(email: email, code: code, newPassword: password, remember: remember)
                         password = ""; code = ""
                     }
-                }.disabled(isPreview || code.isEmpty)
+                }.buttonPressFeedback().disabled(isPreview || code.isEmpty)
             }
             VStack(spacing: 14) {
                 Button {
@@ -91,7 +91,7 @@ struct AccountSignInForm: View {
                     }
                 } label: {
                     Text(creating ? "Create account" : "Log in").fontWeight(.semibold).frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).controlSize(.large)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).controlSize(.large)
                     .disabled(isPreview || email.isEmpty || password.isEmpty)
                 Divider()
                 Button {
@@ -99,14 +99,14 @@ struct AccountSignInForm: View {
                     onModeChange(creating)
                 } label: {
                     Text(creating ? "Log in instead" : "Create new account").frame(maxWidth: .infinity)
-                }.buttonStyle(.bordered).controlSize(.large)
+                }.buttonPressFeedback().buttonStyle(.bordered).controlSize(.large)
             }
             HStack {
                 if account.remembersSignIn {
-                    Button("Use saved account") { Task { await account.restore(remember: remember) } }.disabled(isPreview)
+                    Button("Use saved account") { Task { await account.restore(remember: remember) } }.buttonPressFeedback().disabled(isPreview)
                     Spacer()
                 }
-                Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.disabled(isPreview || email.isEmpty)
+                Button("Forgot password?") { Task { await account.requestRecovery(email: email) } }.buttonPressFeedback().disabled(isPreview || email.isEmpty)
             }
             if account.busy { ProgressView().controlSize(.small) }
             if let notice = account.notice { Text(notice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
@@ -143,16 +143,16 @@ struct ResearchSharingControls: View {
                 Text("Sign in from Profile to review the study and request to join. Signing in does not share recordings.")
                     .font(.callout).foregroundStyle(.secondary)
             } else {
-                Button("Refresh participation status") { Task { _ = await account.refreshResearchAccess() } }
+                Button("Refresh participation status") { Task { _ = await account.refreshResearchAccess() } }.buttonPressFeedback()
                     .disabled(account.busy || research.busy)
                 if let study = account.study, study.complete {
                     Text(study.eligibility_text).font(.callout)
                     if study.allegheny_only { Text("This study is restricted to eligible Allegheny students.").font(.callout) }
-                    if let url = study.informationURL { Link("Study information and researcher contact", destination: url) }
+                    if let url = study.informationURL { Link("Study information and researcher contact", destination: url).buttonPressFeedback() }
                     if account.researchInterest == nil && !account.cohortFull && study.recruitment_enabled {
                         HStack {
-                            Button("Request to join") { applying = true; consentPresented = true }
-                            Button("No thanks") { UserDefaults.standard.set(true, forKey: "focusfix.research.invitationDeclined") }
+                            Button("Request to join") { applying = true; consentPresented = true }.buttonPressFeedback()
+                            Button("No thanks") { UserDefaults.standard.set(true, forKey: "focusfix.research.invitationDeclined") }.buttonPressFeedback()
                         }
                     }
                     Toggle("Share new sessions", isOn: Binding(get: { research.enabled }, set: { value in
@@ -166,10 +166,10 @@ struct ResearchSharingControls: View {
                 }
                 Text("\(research.state.sessions.count) sessions queued").font(.caption)
                 HStack {
-                    Button("Deliver now") { research.deliver() }.disabled(!research.enabled || research.state.sessions.isEmpty || research.busy)
-                    Button("Export next ZIP…") { export() }.disabled(research.state.sessions.isEmpty || research.busy)
+                    Button("Deliver now") { research.deliver() }.buttonPressFeedback().disabled(!research.enabled || research.state.sessions.isEmpty || research.busy)
+                    Button("Export next ZIP…") { export() }.buttonPressFeedback().disabled(research.state.sessions.isEmpty || research.busy)
                 }
-                Button("Request deletion of research data…", role: .destructive) { deletionConfirmation = true }
+                Button("Request deletion of research data…", role: .destructive) { deletionConfirmation = true }.buttonPressFeedback()
                     .disabled(research.deletionPending)
                 if research.busy || research.synchronizingWithdrawal || research.deletionPending { ProgressView().controlSize(.small) }
                 Text(research.notice).font(.caption).foregroundStyle(.secondary)
@@ -241,7 +241,7 @@ private struct StudyConsentView: View {
                     Text(study.withdrawal_policy)
                     Text("Turning sharing off cancels pending uploads. Data already received is handled under the study policy. Deletion of recordings does not automatically remove their influence from trained models.")
                     Text("Questions: \(study.researcher_contact)")
-                    if let url = study.informationURL { Link("Full study information", destination: url) }
+                    if let url = study.informationURL { Link("Full study information", destination: url).buttonPressFeedback() }
                     Text("Consent version: \(study.version)").font(.caption)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -249,9 +249,9 @@ private struct StudyConsentView: View {
             Toggle("I meet the study eligibility requirements", isOn: $eligible)
             Toggle(applying ? "I have reviewed the study and want researcher review" : "I consent to the disclosed uses and automatic uploads of new sessions", isOn: $understood)
             HStack {
-                Button("No thanks", role: .cancel) { dismiss() }
+                Button("No thanks", role: .cancel) { dismiss() }.buttonPressFeedback()
                 Spacer()
-                Button(applying ? "Request to join" : "Agree and enable sharing", action: accept)
+                Button(applying ? "Request to join" : "Agree and enable sharing", action: accept).buttonPressFeedback()
                     .buttonStyle(.borderedProminent)
                     .disabled(!study.complete || !adultUS || !eligible || !understood)
             }
