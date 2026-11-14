@@ -7,7 +7,7 @@ FocusFix is a personal macOS app for recording computer activity, marking work t
 1. Open FocusFix and choose whether to enable recording. Grant macOS Input Monitoring access if you want activity capture.
 2. Select **Start work** for a manual session, or **Plan session…** to set a target first.
 3. Use **Take a break** and **I’m back** for explicit breaks. **End work** saves a manual session.
-4. Open **Sessions** to review, correct work labels, export, or delete local recordings. Days with multiple recordings appear as expandable folders. Batch exports use the same day folders; days with one recording stay as single entries.
+4. Open **Sessions** to review, export, or delete local recordings. Days with multiple recordings appear as expandable folders. Batch exports use the same day folders; days with one recording stay as single entries.
 5. Open **Quick tour** for a nine-step practice flow. The tour uses demo data and changes no settings or recordings.
 
 Automatic recording is optional in **Settings → Privacy & Data Sharing** and has its own acknowledgement. It may include non-work computer use, begins with an **Unknown** label, and continues while the menu-bar app runs. **Pause recording** or **Quit** stops capture. Closing a window alone may leave it running. The visible status shows whether recording is active. Five minutes of continuous idle time, sleep/lock, or loss of Input Monitoring permission also stop capture.
@@ -32,4 +32,8 @@ A public download is not posted yet. A release still needs the database migratio
 
 Source is licensed under [GPL-3.0-only](LICENSE). [Open a GitHub issue](https://github.com/krisjanci/FocusFix-MacOS-App/issues) for general support. Issues are public; do not post recordings, credentials, or personal information. Technical recording details are in [RECORDING-CONTRACT.md](RECORDING-CONTRACT.md).
 
-Group work streaks sync observed declared-work intervals with retry-safe replacements, including corrected sessions. Positive, unfrozen streaks have a gentle burning animation that respects Reduce Motion. Account buttons use FocusFix teal. Your own account photo appears in your group row; enable **Show my photo to members of my groups** in your profile and save to share a small thumbnail with others. Existing private photos stay private.
+Group work streaks sync observed declared-work intervals with retry-safe replacements, including historical corrections. Positive, unfrozen streaks have a gentle burning animation that respects Reduce Motion. Account buttons use FocusFix teal. Your own account photo appears in your group row; enable **Show my photo to members of my groups** in your profile and save to share a small thumbnail with others. Existing private photos stay private.
+
+Groups and Analytics share one right-side panel. The bottom-right **Analytics** button shows blurred illustrative charts and **Coming soon**; switching panels keeps the same window width. Appearance is an icon-only menu beside the recording status.
+
+Activity labels now follow **Start work** and **End work**, including planned-session and menu-bar equivalents. Automatic recording outside declared work is **Unknown**. Manual context menus and history corrections are no longer offered. Breaks remain separate from activity context. Local exports map historical `non_work` context fields to `unknown` in intervals, revision history, reminder requests, and study check-in prompts. Export notes explain this conversion; saved originals and hosted uploads are unchanged.
