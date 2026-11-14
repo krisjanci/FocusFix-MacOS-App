@@ -245,7 +245,102 @@ nonisolated enum SessionFiles {
         }
         // copyItem fails rather than overwriting if another file appears here.
         try FileManager.default.copyItem(at: session.folder, to: copy)
-        return copy
+        do {
+            try normalizeExportContexts(in: copy)
+            return copy
+        } catch {
+            try? FileManager.default.removeItem(at: copy)
+            throw error
+        }
+    }
+
+    // Change only known activity-context fields in the exported copy. In particular,
+    // tags, free text, IDs, timestamps and intervention phases are never substituted.
+    private static func replacingLegacyContext(_ value: Any, path: ArraySlice<String>) -> (Any, Bool) {
+        guard let key = path.first else {
+            return (value as? String == "non_work" ? "unknown" : value, value as? String == "non_work")
+        }
+        if key == "*", var array = value as? [Any] {
+            var changed = false
+            for index in array.indices {
+                let result = replacingLegacyContext(array[index], path: path.dropFirst())
+                array[index] = result.0; changed = changed || result.1
+            }
+            return (array, changed)
+        }
+        guard var object = value as? [String: Any], let child = object[key] else { return (value, false) }
+        let result = replacingLegacyContext(child, path: path.dropFirst())
+        object[key] = result.0
+        return (object, result.1)
+    }
+
+    private static func normalizedExportJSON(_ data: Data, paths: [[String]]) throws -> Data {
+        var value = try JSONSerialization.jsonObject(with: data)
+        var changed = false
+        for path in paths {
+            let result = replacingLegacyContext(value, path: path[...])
+            value = result.0; changed = changed || result.1
+        }
+        return try changed ? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) : data
+    }
+
+    private static func normalizeExportContexts(in folder: URL) throws {
+        let files = Set(try FileManager.default.contentsOfDirectory(atPath: folder.path))
+        let specifications: [(String, [[String]], Bool)] = [
+            ("context_intervals.json", [["intervals", "*", "context"], ["revisions", "*", "previousIntervals", "*", "context"]], false),
+            ("reminders.jsonl", [["request", "context"]], true),
+            ("study_check_ins.jsonl", [["prompt", "contextAtPrompt"]], true)
+        ]
+        for (name, paths, lines) in specifications where files.contains(name) {
+            let file = folder.appendingPathComponent(name)
+            let properties = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard properties.isRegularFile == true, properties.isSymbolicLink != true else {
+                throw CocoaError(.fileReadUnsupportedScheme)
+            }
+            if !lines {
+                let data = try Data(contentsOf: file)
+                let normalized = try normalizedExportJSON(data, paths: paths)
+                if normalized != data { try normalized.write(to: file, options: .atomic) }
+                continue
+            }
+            // Stream logs, retaining byte-for-byte formatting on unchanged lines.
+            let temporary = folder.appendingPathComponent(".normalized-\(UUID().uuidString)")
+            FileManager.default.createFile(atPath: temporary.path, contents: nil)
+            let input = try FileHandle(forReadingFrom: file)
+            let output = try FileHandle(forWritingTo: temporary)
+            defer { try? input.close(); try? output.close(); try? FileManager.default.removeItem(at: temporary) }
+            var pending = Data()
+            func writeLine(_ data: Data) throws {
+                guard data.count <= 16 * 1024 * 1024 else { throw CocoaError(.fileReadTooLarge) }
+                if data.allSatisfy({ $0 == 32 || $0 == 9 || $0 == 13 }) { try output.write(contentsOf: data) }
+                else { try output.write(contentsOf: normalizedExportJSON(data, paths: paths)) }
+            }
+            while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                pending.append(chunk)
+                while let newline = pending.firstIndex(of: 10) {
+                    try writeLine(Data(pending[..<newline]))
+                    try output.write(contentsOf: Data([10]))
+                    pending.removeSubrange(...newline)
+                }
+                // Consistent with the context snapshot's per-document safety bound.
+                guard pending.count <= 16 * 1024 * 1024 else { throw CocoaError(.fileReadTooLarge) }
+            }
+            if !pending.isEmpty { try writeLine(pending) }
+            try output.close(); try input.close()
+            try FileManager.default.removeItem(at: file)
+            try FileManager.default.moveItem(at: temporary, to: file)
+        }
+        let note = """
+        FocusFix local export
+        Activity context labels are work and unknown. Historical non_work labels in context intervals,
+        revision history, reminder requests and study check-in prompts are exported as unknown.
+        Saved originals are unchanged. Times, identifiers, unrelated text and activity CSVs are preserved.
+        Work is a declaration of intent; breaks and missing observations remain separate.
+        """
+        let noteFile = folder.appendingPathComponent("export-notes.txt")
+        // Do not follow a copied symlink when writing the reserved export note.
+        if files.contains("export-notes.txt") { try FileManager.default.removeItem(at: noteFile) }
+        try note.write(to: noteFile, atomically: true, encoding: .utf8)
     }
 
     // Re-read storage and copy every inactive session into one new folder.
