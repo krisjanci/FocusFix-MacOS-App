@@ -62,7 +62,7 @@ struct PrivacyResearchSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Screen-use break reminders outside declared work", isOn: $screenUseReminders)
                     .onChange(of: screenUseReminders) { _, _ in tracker.reminderPreferenceChanged() }
-                Text("Off by default. These are screen-use reminders during Unknown or Not working activity, without inferring work. ‘I’m not working’ labels from now and keeps recording; edit earlier labels in Sessions.")
+                Text("Off by default. These are screen-use reminders during Unknown activity, without inferring work. Start work declares work; End work returns automatic recording to Unknown.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Launch at login", isOn: Binding(get: { login.requested }, set: { login.setEnabled($0) }))
                 Text(login.explanation).font(.caption).foregroundStyle(.secondary)
