@@ -133,7 +133,7 @@ struct QuickTourTests {
             measured: CGSize(width: 248, height: 76)) == nil)
         precondition(QuickTourLayout.caption(target: .zero, in: CGSize(width: 100, height: 100),
             measured: CGSize(width: 248, height: 112)) == nil)
-        precondition(QuickTourPhase.start.caption.contains("Start") && QuickTourPhase.start.caption.contains("Plan session"))
+        precondition(QuickTourPhase.start.caption.contains("Start") && QuickTourPhase.start.caption.contains("Work target"))
         precondition(QuickTourPhase.confirmStart.caption.contains("Start"))
         precondition(QuickTourPhase.save.caption.contains("End work"))
         print("Practice tour actions, stale callbacks, replay, isolation, short copy and measured placement passed")
