@@ -7,11 +7,11 @@ struct SessionWorkPlanTests {
         precondition(!draft.planning && draft.selection()?.plan.targetMinutes == nil)
         var disabled = draft.selection()!.plan
         disabled.credit(3600)
-        precondition(disabled.workSeconds == 0 && !disabled.isComplete)
+        precondition(disabled.workSeconds == 3600 && !disabled.isComplete)
         draft.addPlan()
         precondition(draft.targetMinutes == 60)
         var plan = draft.selection()!.plan
-        precondition(plan.summary == "Planned session · 0 / 60 min")
+        precondition(plan.summary == "Work target · 0 / 60 min")
         draft.durationChoice = 30
         precondition(plan.targetMinutes == 60 && draft.selection()?.plan.targetMinutes == 30)
         draft.durationChoice = 0
@@ -75,6 +75,35 @@ struct SessionWorkPlanTests {
         precondition(plan.workSeconds == 4500)
         precondition(!SessionWorkPlan(targetMinutes: 0).isComplete)
         precondition(!SessionWorkPlan(targetMinutes: 481).isComplete)
+
+        // Choosing a target during work retains untargeted work already earned.
+        var editable = SessionWorkPlan()
+        editable.credit(600)
+        editable.setTarget(30)
+        precondition(editable.workSeconds == 600 && editable.targetMinutes == 30 && !editable.isComplete)
+        editable.credit(1200)
+        precondition(editable.isComplete && editable.reminderPending)
+        editable.keepGoing()
+        editable.setTarget(30) // Saving an unchanged target must not re-open its reminder.
+        precondition(editable.acknowledged && !editable.reminderPending && editable.workSeconds == 1800)
+        editable.setTarget(60)
+        precondition(!editable.isComplete && !editable.acknowledged && editable.workSeconds == 1800)
+        editable.setTarget(nil)
+        precondition(editable.targetMinutes == nil && editable.workSeconds == 1800 && !editable.isComplete)
+        editable.credit(60)
+        editable.setTarget(30)
+        precondition(editable.isComplete && editable.workSeconds == 1860)
+        for minutes in [1, 30, 60, 90, 75, 480] {
+            let target = SessionStartDraft.workTarget(asksForFatigue: false, targetMinutes: minutes)
+            precondition(target.planning && target.selection()?.plan.targetMinutes == minutes)
+        }
+        let newTarget = SessionStartDraft.workTarget(asksForFatigue: false)
+        precondition(newTarget.planning && newTarget.targetMinutes == 60)
+        let existing = SessionStartDraft.workTarget(asksForFatigue: false, targetMinutes: 75,
+            tags: ["Reading"], tagColors: ["Reading": "#7963CF"])
+        precondition(existing.durationChoice == 0 && existing.customMinutes == "75")
+        precondition(existing.selection()?.tags == ["Reading"])
+        precondition(existing.selection()?.tagColors == ["Reading": "#7963CF"])
 
         // The same returned credit drives both ledgers, including transitions between ticks.
         var clock = ProgressClock()
