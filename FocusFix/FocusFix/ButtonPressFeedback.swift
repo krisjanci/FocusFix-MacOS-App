@@ -54,7 +54,7 @@ import AppKit
         let point = marker.convert(event.locationInWindow, from: nil)
         // AppKit's visibleRect can extend beyond an unclipped view's bounds.
         // Test both so nearby controls never react to another button's click.
-        return marker.bounds.contains(point) && marker.visibleRect.contains(point)
+        return ButtonPressGeometry.contains(point, bounds: marker.bounds, visibleRect: marker.visibleRect)
     }
 
     private func receive(_ event: NSEvent) {
