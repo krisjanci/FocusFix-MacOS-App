@@ -29,20 +29,20 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text("FocusFix").font(.largeTitle.bold())
                 Text("Version \(version)").foregroundStyle(.secondary)
-                if let privacy = AppLinks.privacy { Link("Privacy policy", destination: privacy) }
+                if let privacy = AppLinks.privacy { Link("Privacy policy", destination: privacy).buttonPressFeedback() }
                 Text("Record activity patterns on your Mac, plan breaks, and reflect with optional check-ins. FocusFix does not diagnose fatigue or measure objective productivity.")
                 Divider()
                 PrivacyNoticeDetails()
                 Divider()
-                Link("Get support on GitHub", destination: AppLinks.support)
+                Link("Get support on GitHub", destination: AppLinks.support).buttonPressFeedback()
                 Text("GitHub Issues are public. Do not post recordings, participant IDs, credentials, or personal information. You can report a problem without sharing session files.")
                     .font(.caption).foregroundStyle(.secondary)
                 Divider()
                 Text("Copyright © 2026 Kristian Janci").font(.headline)
                 Text("Licensed under the GNU General Public License, version 3 only. You may copy, modify and redistribute this software under that license. It comes without warranty, including merchantability or fitness for a particular purpose. Third-party material retains its own notices.")
                 HStack {
-                    Button("Read GPL v3") { showLicense = true }
-                    Link("Source code", destination: AppLinks.source)
+                    Button("Read GPL v3") { showLicense = true }.buttonPressFeedback()
+                    Link("Source code", destination: AppLinks.source).buttonPressFeedback()
                 }
             }.padding(26).textSelection(.enabled)
         }.frame(minWidth: 500, idealWidth: 560, minHeight: 480, idealHeight: 650)
@@ -61,7 +61,7 @@ private struct LicenseView: View {
     }
     var body: some View {
         VStack(alignment: .trailing) {
-            Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
             ScrollView { Text(license).font(.system(.caption, design: .monospaced)).textSelection(.enabled).padding() }
         }.padding().frame(width: 640, height: 560)
     }
