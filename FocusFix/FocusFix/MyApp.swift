@@ -116,12 +116,10 @@ private struct RecordingMenu: View {
                 }
             }
         }
-        if !(tracker.isRecording && tracker.userContext == .work) {
-            Button("Plan session…") {
-                openWindow(id: "collector")
-                NSApp.activate(ignoringOtherApps: true)
-                tracker.requestPlannedStart()
-            }
+        Button("Work target…") {
+            openWindow(id: "collector")
+            NSApp.activate(ignoringOtherApps: true)
+            tracker.requestWorkTarget()
         }
         Button("Sessions") {
             openWindow(id: "sessions")
