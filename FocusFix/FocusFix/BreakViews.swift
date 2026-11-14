@@ -71,19 +71,19 @@ struct BreakSetupView: View {
             Text("Detailed tracking pauses during your break. Use “I'm back” or return to another app to finish early.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Start break") {
                     guard let minutes, valid else { return }
                     tracker.beginBreak(minutes: minutes, activity: label, fatigue: fatigue, productivity: productivity)
-                }.buttonStyle(.borderedProminent)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent)
                     .disabled(!valid || (tracker.sessionSurveyOptions.beforeBreak && (fatigue == nil || productivity == nil)))
             }
             if tracker.sessionSurveyOptions.beforeBreak {
                 Button("Skip ratings & start break") {
                     guard let minutes, valid else { return }
                     tracker.beginBreak(minutes: minutes, activity: label, fatigue: nil, productivity: nil)
-                }.disabled(!valid).font(.callout)
+                }.buttonPressFeedback().disabled(!valid).font(.callout)
             }
         }.padding(28)
         }.frame(width: 480, height: 520)
@@ -106,12 +106,12 @@ struct BreakReviewView: View {
             Text("Break length: \(durationText(record.actualSeconds ?? 0))").monospacedDigit()
             BreakActivityPicker(selection: $activity, custom: $custom)
             HStack {
-                Button("Later") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Later") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Save activity") {
                     tracker.confirmBreakActivity(label)
                     dismiss()
-                }.buttonStyle(.borderedProminent).disabled(label.isEmpty || !tracker.isRecording)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).disabled(label.isEmpty || !tracker.isRecording)
             }
         }.padding(28).frame(width: 400)
         .onAppear {
@@ -131,14 +131,14 @@ struct BreakControls: View {
             if tracker.breakPromptPending {
                 Text("A moment for a break?").font(.headline)
                 HStack {
-                    Button("Take a break") { tracker.chooseBreak() }.buttonStyle(.borderedProminent)
-                    Button("Skip") { tracker.deferBreak(snooze: false) }.help("Wait 25 more minutes, then look for an idle moment")
-                    Button("Snooze 10 min") { tracker.deferBreak(snooze: true) }
+                    Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback().buttonStyle(.borderedProminent)
+                    Button("Skip") { tracker.deferBreak(snooze: false) }.buttonPressFeedback().help("Wait 25 more minutes, then look for an idle moment")
+                    Button("Snooze 10 min") { tracker.deferBreak(snooze: true) }.buttonPressFeedback()
                 }
             } else {
                 HStack {
                     Spacer()
-                    Button("Take a break") { tracker.chooseBreak() }
+                    Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback()
                 }
             }
             if let last = tracker.latestBreak {
@@ -146,7 +146,7 @@ struct BreakControls: View {
                     Text("Last break · \(durationText(last.actualSeconds ?? 0))")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button(last.actualActivity.isEmpty ? "Confirm activity" : "Edit activity") { reviewing = true }
+                    Button(last.actualActivity.isEmpty ? "Confirm activity" : "Edit activity") { reviewing = true }.buttonPressFeedback()
                         .font(.caption)
                 }
             }
