@@ -209,7 +209,22 @@ final class ActivityTracker: ObservableObject {
         needsPermission = false
         message = "Input Monitoring is enabled. Press Start work when you are ready."
     }
-    // Start immediately; planning and its optional check-in are a separate action.
+    var isWorking: Bool { isRecording && userContext == .work }
+    var timerTags: [String] { isWorking ? sessionTags : [] }
+    var timerTagColors: [String: String] { isWorking ? sessionTagColors : [:] }
+    var timerTargetMinutes: Int? { isWorking ? sessionWorkPlan.targetMinutes : nil }
+
+    // Editing never starts capture; the editor's explicit Start work confirms it.
+    func canOpenWorkSetup() -> Bool {
+        guard !recordingNoticePresented, !sessionCheckInPresented else { return false }
+        guard RecordingNotice().enabled else {
+            recordingNoticePresented = true
+            return false
+        }
+        return true
+    }
+
+    // Start immediately; the target editor and its optional check-in are separate.
     func requestStart() {
         guard !sessionCheckInPresented, !recordingNoticePresented else { return }
         if isRecording {
@@ -232,17 +247,53 @@ final class ActivityTracker: ObservableObject {
               mode: automatic ? .automatic : .manual)
         if automatic, isRecording { setContext(.work) }
     }
-    func requestPlannedStart() {
-        guard !(isRecording && userContext == .work), !sessionCheckInPresented,
-              !recordingNoticePresented else { return }
-        guard !RecordingNotice().needsAcknowledgement else {
-            recordingNoticePresented = true
-            return
-        }
-        // Use the recording's frozen survey choices when automatic capture is already running.
+    func requestWorkTarget() {
+        guard canOpenWorkSetup() else { return }
+        // Use the recording's frozen survey choices when automatic capture is running.
         if !isRecording { sessionSurveyOptions = SurveyPreferences.shared.snapshot }
-        sessionCheckIn = sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: elapsed) : nil
+        sessionCheckIn = !isWorking && sessionSurveyOptions.beforeSession ? CheckInPrompt(elapsed: elapsed) : nil
         sessionCheckInPresented = true
+    }
+
+    // The timer's tag editor starts work on confirmation when idle or recording Unknown.
+    // Library tag editing continues to update only the selected saved recording.
+    func saveTimerTags(_ tags: [String], colors: [String: String]) throws {
+        if isWorking { try updateCurrentTags(tags, colors: colors); return }
+        if !isRecording { sessionSurveyOptions = SurveyPreferences.shared.snapshot }
+        try beginConfiguredWork(SessionStartSelection(fatigue: nil, plan: SessionWorkPlan(), tags: tags, tagColors: colors))
+    }
+
+    private func beginConfiguredWork(_ selection: SessionStartSelection, prompt: CheckInPrompt? = nil) throws {
+        let tags = try SessionTags.validated(selection.tags)
+        let colors = try SessionTags.colors(selection.tagColors, for: tags)
+        guard RecordingNotice().enabled else {
+            throw SessionTags.TagError("Enable activity recording before starting work.")
+        }
+        guard InputMonitor.hasPermission else {
+            needsPermission = true
+            throw SessionTags.TagError("Input Monitoring access is needed. Cancel, enable access on the main screen, then try again.")
+        }
+        if isRecording {
+            try updateCurrentTags(tags, colors: colors)
+            if let prompt {
+                try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
+                    status: selection.fatigue == nil ? .skipped : .answered, breakID: "",
+                    shownAt: prompt.shownAt, answeredAt: Date(), shownElapsed: prompt.elapsed,
+                    answeredElapsed: now, fatigue: selection.fatigue, productivity: nil))
+            }
+            setContext(.work)
+            guard isWorking else { throw SessionTags.TagError(message) }
+            sessionWorkPlan = selection.plan
+        } else {
+            let automatic = AutomaticRecordingPreferences.shared.enabled
+            AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
+            lifecycle.failed = false
+            start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
+                  prompt: prompt, plan: selection.plan, tags: tags, tagColors: colors,
+                  mode: automatic ? .automatic : .manual)
+            if automatic, isRecording { setContext(.work) }
+            guard isWorking else { throw SessionTags.TagError(message) }
+        }
     }
     func endWork() {
         guard isRecording, userContext == .work else { return }
@@ -346,32 +397,15 @@ final class ActivityTracker: ObservableObject {
         recordingNoticePresented = false
     }
     // Accept a selected fatigue score, or an explicit skip, then start the session.
-    func completeSessionCheckIn(_ selection: SessionStartSelection) {
+    func completeSessionCheckIn(_ selection: SessionStartSelection) throws {
         guard sessionCheckInPresented,
               selection.fatigue.map({ (0...10).contains($0) }) ?? true else { return }
-        let prompt = sessionCheckIn
-        guard !sessionSurveyOptions.beforeSession || prompt != nil else { return }
-        if isRecording {
-            // Automatic capture continues while the user plans; label work only on confirmation.
-            do {
-                try updateCurrentTags(selection.tags, colors: selection.tagColors)
-                if let prompt {
-                    try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
-                        status: selection.fatigue == nil ? .skipped : .answered, breakID: "",
-                        shownAt: prompt.shownAt, answeredAt: Date(), shownElapsed: prompt.elapsed,
-                        answeredElapsed: now, fatigue: selection.fatigue, productivity: nil))
-                }
-            } catch { fail(error); return }
-            setContext(.work)
-            if isRecording { sessionWorkPlan = selection.plan }
+        if isWorking {
+            sessionWorkPlan.setTarget(selection.plan.targetMinutes)
         } else {
-            let automatic = AutomaticRecordingPreferences.shared.enabled
-            AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
-            lifecycle.failed = false
-            start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
-                  prompt: prompt, plan: selection.plan, tags: selection.tags, tagColors: selection.tagColors,
-                  mode: automatic ? .automatic : .manual)
-            if automatic, isRecording { setContext(.work) }
+            let prompt = sessionCheckIn
+            guard !sessionSurveyOptions.beforeSession || prompt != nil else { return }
+            try beginConfiguredWork(selection, prompt: prompt)
         }
         sessionCheckIn = nil
         sessionCheckInPresented = false
