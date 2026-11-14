@@ -35,6 +35,7 @@ struct BreakSetupView: View {
     @State private var customActivity = ""
     @State private var fatigue: Int?
     @State private var productivity: Int?
+    @State private var contentHeight: CGFloat = 320
     // Read either a preset duration or the typed custom minutes.
     private var minutes: Double? { preset == 0 ? Double(customMinutes.replacingOccurrences(of: ",", with: ".")) : Double(preset) }
     // Use the chosen activity, or trimmed custom text for Other.
@@ -76,7 +77,7 @@ struct BreakSetupView: View {
                 Button("Start break") {
                     guard let minutes, valid else { return }
                     tracker.beginBreak(minutes: minutes, activity: label, fatigue: fatigue, productivity: productivity)
-                }.buttonPressFeedback().buttonStyle(.borderedProminent)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).controlSize(.large)
                     .disabled(!valid || (tracker.sessionSurveyOptions.beforeBreak && (fatigue == nil || productivity == nil)))
             }
             if tracker.sessionSurveyOptions.beforeBreak {
@@ -85,9 +86,22 @@ struct BreakSetupView: View {
                     tracker.beginBreak(minutes: minutes, activity: label, fatigue: nil, productivity: nil)
                 }.buttonPressFeedback().disabled(!valid).font(.callout)
             }
-        }.padding(28)
-        }.frame(width: 480, height: 520)
+        }.padding(24)
+            .background(GeometryReader { geometry in
+                Color.clear.preference(key: BreakSetupHeightKey.self, value: geometry.size.height)
+            })
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(width: 440, height: min(contentHeight, 600))
+        .onPreferenceChange(BreakSetupHeightKey.self) { height in
+            if height > 0 { contentHeight = height }
+        }
     }
+}
+
+private struct BreakSetupHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 struct BreakReviewView: View {
