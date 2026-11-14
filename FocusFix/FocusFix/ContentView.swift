@@ -16,8 +16,7 @@ struct ContentView: View {
     @State private var editingSessionTags = false
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
-    @State private var peopleExpanded = false
-    @State private var peopleSheet = false
+    @State private var panels = CollectorPanelSelection()
     @State private var collectorWindow: NSWindow?
     @State private var collectorHeight: CGFloat = 620
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
@@ -32,12 +31,12 @@ struct ContentView: View {
                 .background(GeometryReader { geometry in
                     Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
                 })
-                .frame(height: peopleExpanded ? expandedPanelHeight : nil, alignment: .top)
+                .frame(height: panels.expanded != nil ? expandedPanelHeight : nil, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
-            if peopleExpanded {
+            if let panel = panels.expanded {
                 HStack(spacing: 0) {
                     Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
-                    PeoplePanel(social: social, close: { peopleExpanded = false })
+                    sidePanel(panel, close: { panels.close() })
                         .frame(width: PeopleWindowLayout.panelWidth)
                 }
                 .frame(height: expandedPanelHeight)
@@ -50,21 +49,20 @@ struct ContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
-        .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: peopleExpanded)
+        .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: panels.expanded)
         .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
-        .background(PeopleWindowBridge(expanded: peopleExpanded, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
-        .sheet(isPresented: $peopleSheet) {
-            PeoplePanel(social: social, close: { peopleSheet = false }).frame(width: 380, height: 580)
+        .background(PeopleWindowBridge(expanded: panels.expanded != nil, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
+        .sheet(item: $panels.sheet) { panel in
+            sidePanel(panel, close: { panels.close() }).frame(width: 380, height: 580)
         }
         .onChange(of: tour.isPresented) { _, shown in
-            if shown { peopleExpanded = false; peopleSheet = false }
+            if shown { panels.close() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { note in
             guard let window = note.object as? NSWindow, window === collectorWindow,
-                  peopleExpanded, let screen = window.screen,
-                  !PeopleWindowLayout.canExpand(in: screen.visibleFrame) else { return }
-            peopleExpanded = false; peopleSheet = true
+                  let screen = window.screen else { return }
+            panels.adapt(canExpand: PeopleWindowLayout.canExpand(in: screen.visibleFrame))
         }
     }
 
@@ -74,11 +72,39 @@ struct ContentView: View {
         return max(collectorHeight, min(620, available))
     }
 
-    private func togglePeople() {
-        if peopleExpanded { peopleExpanded = false; return }
-        if let screen = collectorWindow?.screen, PeopleWindowLayout.canExpand(in: screen.visibleFrame) {
-            peopleExpanded = true
-        } else { peopleSheet = true }
+    private func togglePanel(_ panel: CollectorPanel) {
+        let canExpand = collectorWindow?.screen.map { PeopleWindowLayout.canExpand(in: $0.visibleFrame) } ?? false
+        panels.toggle(panel, canExpand: canExpand)
+    }
+
+    @ViewBuilder private func sidePanel(_ panel: CollectorPanel, close: @escaping () -> Void) -> some View {
+        switch panel {
+        case .groups: PeoplePanel(social: social, close: close)
+        case .analytics: AnalyticsPanel(close: close)
+        }
+    }
+
+    private var appearanceSymbol: String {
+        switch appearance {
+        case "light": "sun.max"
+        case "dark": "moon"
+        default: "circle.lefthalf.filled"
+        }
+    }
+
+    private var appearanceMenu: some View {
+        Menu {
+            Picker("Appearance", selection: $appearance) {
+                Label("System", systemImage: "circle.lefthalf.filled").tag("system")
+                Label("Light", systemImage: "sun.max").tag("light")
+                Label("Dark", systemImage: "moon").tag("dark")
+            }
+        } label: {
+            Image(systemName: appearanceSymbol).frame(width: 28, height: 24)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .accessibilityLabel("Appearance: \(appearance.capitalized)")
+        .help("Appearance: \(appearance.capitalized)")
     }
 
     private var collectorContent: some View {
@@ -102,11 +128,7 @@ struct ContentView: View {
             }
             HStack(alignment: .top) {
                 RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
-                Menu("Context") {
-                    Button("Work") { tracker.setContext(.work) }
-                    Button("Not working") { tracker.setContext(.nonWork) }
-                    Button("Unknown") { tracker.setContext(.unknown) }
-                }.disabled(!tracker.isRecording).accessibilityLabel("Change activity context")
+                appearanceMenu
             }
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
@@ -225,23 +247,25 @@ struct ContentView: View {
                 Spacer()
             }
             HStack {
-                Button(action: togglePeople) {
+                Button { togglePanel(.groups) } label: {
                     HStack(spacing: 6) {
-                        Label(peopleExpanded ? "Hide people" : "Groups", systemImage: "person.2")
+                        Label(panels.expanded == .groups ? "Hide people" : "Groups", systemImage: "person.2")
                         if !social.invitations.isEmpty {
                             Circle().fill(.red).frame(width: 7, height: 7)
                                 .accessibilityLabel("\(social.invitations.count) pending invitations")
                         }
                     }
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel((peopleExpanded ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
+                    .accessibilityLabel((panels.expanded == .groups ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
                     .help("Show people in your selected group")
                 Spacer()
-                Picker("Appearance", selection: $appearance) {
-                    Label("System", systemImage: "circle.lefthalf.filled").tag("system")
-                    Label("Light", systemImage: "sun.max").tag("light")
-                    Label("Dark", systemImage: "moon").tag("dark")
-                }.labelsHidden().frame(width: 120).help("Appearance")
+                Button { togglePanel(.analytics) } label: {
+                    Label("Analytics", systemImage: "chart.bar.xaxis")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(panels.expanded == .analytics ? teal : Color.secondary)
+                .accessibilityLabel(panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel")
+                .help("Analytics")
             }
         }
         .padding(30).frame(width: 490)
