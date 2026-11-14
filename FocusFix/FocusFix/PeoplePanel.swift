@@ -13,12 +13,12 @@ struct GroupAccessCard: View {
             case .signedOut:
                 Label("Sign in to join groups", systemImage: "person.crop.circle").font(.headline)
                 Text("Your account connects you to private groups. Recording and personal progress still work as a guest.")
-                Button("Sign in from Profile", action: signIn).buttonStyle(.borderedProminent)
+                Button("Sign in from Profile", action: signIn).buttonPressFeedback().buttonStyle(.borderedProminent)
             case .disabled:
                 Label("Enable group progress", systemImage: "person.2").font(.headline)
                 Text("Sync work and qualifying-break summaries, scores and streak freezes with your account. Guest history stays on this Mac.")
                 Text("Members see your display name, standard avatar and scores. You can choose to share a profile photo. Your email and recordings stay private.")
-                Button("Enable group progress", action: enable).buttonStyle(.borderedProminent)
+                Button("Enable group progress", action: enable).buttonPressFeedback().buttonStyle(.borderedProminent)
                 Text("This is an in-app choice. There is no macOS permission prompt.").font(.caption)
             case .loading:
                 HStack { ProgressView().controlSize(.small); Text("Loading your groups…") }
@@ -29,11 +29,11 @@ struct GroupAccessCard: View {
             case .offline:
                 Label("Progress sync enabled · Retry needed", systemImage: "arrow.triangle.2.circlepath").font(.callout.weight(.medium))
                 Text("Your pending progress is kept on this Mac. Showing the latest groups available this launch.")
-                Button("Retry sync", action: retry)
+                Button("Retry sync", action: retry).buttonPressFeedback()
             case .unavailable:
                 Label("Group progress unavailable", systemImage: "exclamationmark.circle").font(.headline)
                 Text("The saved progress could not be opened. Its existing file has been kept.")
-                Button("Retry", action: retry)
+                Button("Retry", action: retry).buttonPressFeedback()
             }
             if let notice { Text(notice).font(.caption).textSelection(.enabled) }
         }
@@ -82,7 +82,7 @@ struct PeoplePanel: View {
             HStack {
                 Text("PEOPLE").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary)
                 Spacer()
-                Button(action: close) { Image(systemName: "sidebar.right") }
+                Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
                     .buttonStyle(.plain).help("Collapse People").accessibilityLabel("Collapse People")
             }
             ScrollView {
@@ -107,14 +107,14 @@ struct PeoplePanel: View {
                             Label(social.syncFailed ? "Connect to load your groups" : "Your first group", systemImage: "person.2").font(.headline)
                             Text("Create a private group or enter an invite code. Each group has room for 50 people.")
                                 .font(.callout).foregroundStyle(.secondary)
-                            Button("Create or join a group") { openWindow(id: "groups") }
+                            Button("Create or join a group") { openWindow(id: "groups") }.buttonPressFeedback()
                             Spacer()
                         }
                         if social.accessState != .loading { accessCard }
                         HStack {
-                            Button("Manage groups") { openWindow(id: "groups") }
+                            Button("Manage groups") { openWindow(id: "groups") }.buttonPressFeedback()
                             Spacer()
-                            Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
+                            Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }.buttonPressFeedback()
                                 .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy)
                         }.font(.caption)
                     }
