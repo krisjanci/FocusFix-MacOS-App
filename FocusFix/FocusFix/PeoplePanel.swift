@@ -75,7 +75,6 @@ struct GroupSelectionControls: View {
 struct PeoplePanel: View {
     @ObservedObject var social: SocialController
     let close: () -> Void
-    var allowsCollapsing = true
     @Environment(\.openWindow) private var openWindow
     @State private var profilePresented = false
     var body: some View {
@@ -83,10 +82,8 @@ struct PeoplePanel: View {
             HStack {
                 Text("PEOPLE").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary)
                 Spacer()
-                if allowsCollapsing {
                 Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
                     .buttonStyle(.plain).help("Collapse People").accessibilityLabel("Collapse People")
-                }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
