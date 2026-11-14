@@ -16,68 +16,65 @@ struct CollectorWindowResizeLock: ViewModifier {
     }
 }
 
-// The collector has two sizes. Only the explicit mode button changes its size;
-// native dragging, zooming, tiling and full-screen entry are disabled.
+// The width change is deferred until SwiftUI has updated its content-size constraints.
 struct PeopleWindowBridge: NSViewRepresentable {
-    let fullScreen: Bool
-    let resolved: (NSWindow, CGSize) -> Void
-
+    let expanded: Bool
+    let reduceMotion: Bool
+    let resolved: (NSWindow) -> Void
     func makeNSView(context: Context) -> WindowProbe {
         let view = WindowProbe()
         view.resolve = resolved
-        view.fullScreen = fullScreen
+        view.reduceMotion = reduceMotion
         return view
     }
-
     func updateNSView(_ view: WindowProbe, context: Context) {
         view.resolve = resolved
-        let changed = view.fullScreen != fullScreen
-        view.fullScreen = fullScreen
-        DispatchQueue.main.async { [weak view] in view?.applyMode(changed: changed) }
+        view.reduceMotion = reduceMotion
+        DispatchQueue.main.async { [weak view] in view?.lockManualResizing() }
+        guard view.expanded != expanded else { return }
+        view.expanded = expanded
+        view.resize()
     }
-
     final class WindowProbe: NSView {
-        var resolve: ((NSWindow, CGSize) -> Void)?
-        var fullScreen = false
-        private var compactFrame: CGRect?
-        private var observers: [NSObjectProtocol] = []
-
-        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
-
+        var resolve: ((NSWindow) -> Void)?
+        var expanded: Bool?
+        var reduceMotion = false
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            observers.forEach(NotificationCenter.default.removeObserver)
-            observers.removeAll()
             guard let window else { return }
-            for name in [NSWindow.didChangeScreenNotification, NSWindow.didChangeScreenProfileNotification] {
-                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                    self?.applyMode(changed: false)
-                })
+            lockManualResizing()
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let window else { return }
+                self?.resolve?(window)
+                self?.resize()
             }
-            observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-                self?.applyMode(changed: false)
-            })
-            DispatchQueue.main.async { [weak self] in self?.applyMode(changed: false) }
         }
-
-        func applyMode(changed: Bool) {
-            guard let window, let screen = window.screen else { return }
-            window.styleMask.remove(.resizable)
-            window.collectionBehavior.remove(.fullScreenPrimary)
-            window.collectionBehavior.insert(.fullScreenNone)
-            window.standardWindowButton(.zoomButton)?.isEnabled = false
-            let size = window.contentRect(forFrameRect: screen.visibleFrame).size
-            resolve?(window, size)
-            if fullScreen {
-                if compactFrame == nil { compactFrame = window.frame }
-                window.setFrame(screen.visibleFrame, display: true)
-            } else if changed, let saved = compactFrame {
-                let visible = screen.visibleFrame
-                let restored = CGRect(x: min(max(saved.minX, visible.minX), visible.maxX - saved.width),
-                                      y: min(max(saved.minY, visible.minY), visible.maxY - saved.height),
-                                      width: saved.width, height: saved.height)
-                window.setFrame(restored, display: true)
-                compactFrame = nil
+        func lockManualResizing() {
+            // Older systems lack SwiftUI's windowResizeBehavior modifier.
+            // Avoid changing native styles while modern SwiftUI is laying out.
+            if #unavailable(macOS 15.0), let window, window.styleMask.contains(.resizable) {
+                window.styleMask.remove(.resizable)
+            }
+        }
+        func resize() {
+            let desired = expanded ?? false
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.expanded == desired, let window = self.window, let screen = window.screen else { return }
+                self.lockManualResizing()
+                let target = PeopleWindowLayout.clampedFrame(current: window.frame, expanded: desired, visible: screen.visibleFrame)
+                if abs(window.frame.width - target.width) > 0.5 || window.frame.origin != target.origin {
+                    if self.reduceMotion || !window.isVisible {
+                        window.setFrame(target, display: true, animate: false)
+                    } else {
+                        NSAnimationContext.runAnimationGroup { context in
+                            context.duration = PeopleWindowAnimation.duration
+                            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                            window.animator().setFrame(target, display: true)
+                        } completionHandler: { [weak self] in
+                            self?.lockManualResizing()
+                        }
+                    }
+                }
             }
         }
     }
