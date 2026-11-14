@@ -161,10 +161,18 @@ struct ContentView: View {
                         }
                     }
                 }
-                SessionTagButton(tags: tracker.sessionTags,
-                    colors: tagLibrary.resolvedColors(for: tracker.sessionTags, saved: tracker.sessionTagColors)) {
-                        editingSessionTags = true
-                    }.frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    SessionTagButton(tags: tracker.timerTags,
+                        colors: tagLibrary.resolvedColors(for: tracker.timerTags, saved: tracker.timerTagColors)) {
+                            if tracker.canOpenWorkSetup() { editingSessionTags = true }
+                        }
+                    Button { tracker.requestWorkTarget() } label: {
+                        Label(tracker.timerTargetMinutes.map { "Work target · \($0) min" } ?? "Work target", systemImage: "scope")
+                            .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                    }.buttonStyle(.plain).help("Choose a work target")
+                    Spacer(minLength: 0)
+                }
             }
             .frame(maxWidth: .infinity).padding(26)
             .background {
@@ -236,11 +244,6 @@ struct ContentView: View {
                           systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
                         .frame(minWidth: 124)
                 }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                if !(tracker.isRecording && tracker.userContext == .work) {
-                    Button("Plan session…") { tracker.requestPlannedStart() }
-                        .controlSize(.large)
-                        .help("Choose a work target and tags before starting")
-                }
                 Button { openWindow(id: "sessions") } label: {
                     Image(systemName: "folder").accessibilityLabel("Sessions")
                 }.controlSize(.large)
@@ -273,8 +276,9 @@ struct ContentView: View {
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
         .sheet(isPresented: $editingSessionTags) {
-            SessionTagEditor(tags: tracker.sessionTags, colors: tracker.sessionTagColors, library: tagLibrary) { tags, colors in
-                try tracker.updateCurrentTags(tags, colors: colors)
+            SessionTagEditor(tags: tracker.timerTags, colors: tracker.timerTagColors, library: tagLibrary,
+                             confirmationTitle: tracker.isWorking ? "Done" : "Start work") { tags, colors in
+                try tracker.saveTimerTags(tags, colors: colors)
             }
         }
         .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal).interactiveDismissDisabled() }
