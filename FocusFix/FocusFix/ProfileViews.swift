@@ -60,7 +60,7 @@ struct ProfileEditor: View {
                         }.padding(6).foregroundStyle(.white).background(Color.accentColor, in: Circle())
                             .offset(x: 14, y: 14)
                     }.frame(width: 62, height: 62).contentShape(Circle())
-                }.buttonStyle(.plain)
+                }.buttonPressFeedback().buttonStyle(.plain)
                     .accessibilityElement(children: .ignore)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel((editing ? draft : savedProfile)?.photo == nil ? "Add profile photo" : "Change profile photo")
@@ -76,7 +76,7 @@ struct ProfileEditor: View {
                         Button(savedProfile?.name ?? "Add your name") {
                             beginEditing()
                             nameFocused = true
-                        }.buttonStyle(.plain).font(.headline)
+                        }.buttonPressFeedback().buttonStyle(.plain).font(.headline)
                             .accessibilityLabel(savedProfile.map { "Edit name, \($0.name)" } ?? "Add your name")
                             .help("Edit your name")
                             .disabled(account.session != nil && !account.profileLoaded)
@@ -87,7 +87,7 @@ struct ProfileEditor: View {
             }
             if editing {
                 HStack {
-                    if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil } }
+                    if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil }.buttonPressFeedback() }
                 }
                 Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your private account profile. Choose a photo under 10 MB.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -109,14 +109,14 @@ struct ProfileEditor: View {
                         if account.session != nil {
                             Task { if await account.saveProfile(draft) { editing = false; onSaved() } }
                         } else if controller.save(draft) { editing = false; onSaved() }
-                    }.buttonStyle(.borderedProminent)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent)
                         .disabled((try? draft.validated()) == nil || account.busy)
                     Button("Cancel") {
                         draft = savedProfile ?? UserProfile()
                         editing = false
                         nameFocused = false
                         photoError = nil
-                    }
+                    }.buttonPressFeedback()
                 }
             }
             if let notice = controller.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
