@@ -23,7 +23,7 @@ enum QuickTourPhase: String, CaseIterable {
     }
     var caption: String {
         switch self {
-        case .start: return "Try Start work or Plan session."
+        case .start: return "Try Start work or Work target in the timer card."
         case .plan: return "Choose Add work target to plan."
         case .duration: return "Choose 30, 60, or 90 minutes."
         case .confirmStart: return "Click Start when ready."
@@ -34,7 +34,7 @@ enum QuickTourPhase: String, CaseIterable {
         case .progress: return "Your daily goal counts declared work."
         case .save: return "Click End work to finish."
         case .sessions: return "Find your work in Sessions."
-        case .savedSession: return "Review, correct, export, or delete sessions."
+        case .savedSession: return "Review, tag, export, or delete sessions."
         case .profile: return "A profile is optional. Guest use stays local."
         case .editName: return "Click your name to change it."
         case .name: return "Try a name, then click Next."
