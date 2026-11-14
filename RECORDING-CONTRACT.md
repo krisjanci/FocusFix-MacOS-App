@@ -1,5 +1,22 @@
 # Local recording contract — schema 11
 
+## Current controls and local exports
+
+The current UI offers only Work and Unknown through Start work / End work
+(including planned-session and menu-bar equivalents). Manual recording starts as
+Work and ends on End work; automatic recording starts Unknown and returns to
+Unknown on End work. Manual context selection, history corrections, and the
+Not working notification action have been removed. Break intervention phases are
+unchanged. Legacy `non_work` remains decodable for stored history.
+
+Local single, selected, and all-session exports map legacy `non_work` to `unknown`
+only in activity-context fields in context intervals, previous revision intervals,
+reminder requests, and study check-in prompts. Export notes disclose the mapping.
+Original recordings, IDs, timestamps, unrelated text, and CSV bytes are unchanged;
+normalization failures remove incomplete exports. Hosted uploads are unchanged.
+The historical implementation steps below document the original schema and APIs;
+references to context controls and history editing describe the earlier UI.
+
 I separate recording mode (manual/automatic), capture state (disabled, ready,
 recording, user-paused, idle-paused, permission-unavailable), activity context
 (work, non_work, unknown) and intervention phase (normal, explicit_break,
