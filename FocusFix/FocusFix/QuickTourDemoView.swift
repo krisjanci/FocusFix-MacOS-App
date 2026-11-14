@@ -67,14 +67,14 @@ struct QuickTourDemoView: View {
                     Text("Practice automatic recording").font(.headline)
                     RecordingStatusPanel(state: tour.demoAutomatic ? .recording : .disabled,
                         mode: .automatic, context: tour.demoContext, phase: .normal)
-                    Text("These controls only change this demo. Non-work labels apply from now; earlier labels can be corrected in history.")
+                    Text("These controls only change this demo. Automatic recording starts as Unknown. Start work declares work; End work returns to Unknown.")
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button("Enable automatic") { tour.practiceAutomatic() }
                         Button("Start work") { tour.practiceWork() }.disabled(!tour.demoAutomatic)
                     }
                     HStack {
-                        Button("Notification: I’m not working") { tour.practiceNotWorkingNotification() }.disabled(!tour.demoAutomatic)
+                        Button("End work") { tour.practiceEndWork() }.disabled(tour.demoContext != .work)
                     }
                 }.padding(12).background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
