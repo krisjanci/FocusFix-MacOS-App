@@ -48,25 +48,43 @@ import CoreGraphics
         for (signedIn,enabled,busy,loaded,failed,notice,expected) in states {
             precondition(GroupAccessState.resolve(signedIn: signedIn, enabled: enabled, busy: busy, loaded: loaded, failed: failed, notice: notice) == expected)
         }
-        // Full-screen geometry preserves the collector's aspect ratio, fills
-        // the height on laptop/wide displays, and reserves room for the panel.
-        for available in [CGSize(width: 1512, height: 865), CGSize(width: 2560, height: 1412), CGSize(width: 1024, height: 700)] {
-            let scale = CollectorWindowLayout.fullScreenScale(contentHeight: 740, available: available)
-            precondition(abs(740 * scale - available.height) < 0.001)
-            precondition(available.width - 490 * scale >= CollectorWindowLayout.minimumPanelWidth)
+        let screen = CGRect(x: -1440, y: 24, width: 1440, height: 876)
+        precondition(PeopleWindowLayout.canExpand(in: screen))
+        precondition(!PeopleWindowLayout.canExpand(in: CGRect(x:0,y:0,width:849,height:700)))
+        let expanded = PeopleWindowLayout.clampedFrame(current: CGRect(x:-500,y:10,width:490,height:1000),expanded:true,visible:screen)
+        precondition(screen.contains(expanded) && expanded.width == 850)
+        let collapsed = PeopleWindowLayout.clampedFrame(current: expanded,expanded:false,visible:screen)
+        precondition(collapsed.width == 490 && screen.contains(collapsed))
+        let narrow = CGRect(x:0,y:0,width:700,height:600)
+        precondition(narrow.contains(PeopleWindowLayout.clampedFrame(current:expanded,expanded:true,visible:narrow)))
+        // Switching content reuses the same expansion width in either direction.
+        var panels = CollectorPanelSelection()
+        precondition(panels.expanded == nil && panels.sheet == nil)
+        panels.toggle(.groups, canExpand: true)
+        precondition(panels.expanded == .groups && panels.sheet == nil)
+        for panel in [CollectorPanel.analytics, .groups, .analytics] {
+            panels.toggle(panel, canExpand: true)
+            precondition(panels.expanded == panel && panels.sheet == nil)
+            let frame = PeopleWindowLayout.clampedFrame(current: expanded, expanded: panels.expanded != nil, visible: screen)
+            precondition(frame.width == 850 && frame == expanded)
         }
-        let portrait = CGSize(width: 700, height: 1000)
-        let portraitScale = CollectorWindowLayout.fullScreenScale(contentHeight: 740, available: portrait)
-        precondition(490 * portraitScale <= 400 && 740 * portraitScale <= 1000)
-        // Returning from another display restores compact bounds inside the screen,
-        // including displays to the left of the primary and smaller replacements.
-        let saved = CGRect(x: -1800, y: 900, width: 490, height: 740)
-        for visible in [CGRect(x: -1440, y: 24, width: 1440, height: 876), CGRect(x: 0, y: 0, width: 400, height: 600)] {
-            let restored = CollectorWindowLayout.restoredFrame(saved, visible: visible)
-            precondition(visible.contains(restored))
-            precondition(restored.width == min(490, visible.width))
-            precondition(restored.height == min(740, visible.height))
-        }
-        print("Group presentation, proportional full-screen scaling and compact restoration passed")
+        panels.toggle(.analytics, canExpand: true)
+        precondition(panels.expanded == nil && panels.sheet == nil)
+        panels.toggle(.analytics, canExpand: true)
+        panels.adapt(canExpand: false)
+        precondition(panels.expanded == nil && panels.sheet == .analytics)
+        panels.toggle(.groups, canExpand: false)
+        precondition(panels.expanded == nil && panels.sheet == .groups)
+        panels.toggle(.groups, canExpand: false)
+        precondition(panels.expanded == nil && panels.sheet == nil)
+        panels.toggle(.analytics, canExpand: false)
+        panels.close()
+        precondition(panels.expanded == nil && panels.sheet == nil)
+        panels.toggle(.groups, canExpand: true)
+        panels.adapt(canExpand: true)
+        precondition(panels.expanded == .groups)
+        panels.close()
+        precondition(panels.expanded == nil && panels.sheet == nil)
+        print("Shared group selection, access states, tied and zero-score podium rules, and screen-clamped expansion passed")
     }
 }
