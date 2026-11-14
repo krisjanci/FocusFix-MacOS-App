@@ -47,11 +47,9 @@ struct SessionCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SessionStartDraft
     @State private var notice: String?
-    @ObservedObject var tagLibrary: SessionTagLibrary
 
-    init(tracker: ActivityTracker, tagLibrary: SessionTagLibrary? = nil) {
+    init(tracker: ActivityTracker) {
         self.tracker = tracker
-        self.tagLibrary = tagLibrary ?? .shared
         _draft = State(initialValue: SessionStartDraft.workTarget(
             asksForFatigue: !tracker.isWorking && tracker.sessionSurveyOptions.beforeSession,
             targetMinutes: tracker.timerTargetMinutes, tags: tracker.timerTags, tagColors: tracker.timerTagColors))
