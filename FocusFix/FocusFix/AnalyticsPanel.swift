@@ -10,7 +10,7 @@ struct AnalyticsPanel: View {
             HStack {
                 Text("ANALYTICS").font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
                 Spacer()
-                Button(action: close) { Image(systemName: "sidebar.right") }
+                Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
                     .buttonStyle(.plain).help("Collapse Analytics")
                     .accessibilityLabel("Collapse Analytics")
             }
