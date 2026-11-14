@@ -79,14 +79,16 @@ struct SessionTagEditor: View {
     @State private var search = ""
     @State private var editing: TagEditRequest?
     let managingOnly: Bool
+    let confirmationTitle: String
     let save: ([String], [String: String]) throws -> Void
 
     init(tags: [String], colors: [String: String] = [:], library: SessionTagLibrary? = nil,
-         managingOnly: Bool = false, save: @escaping ([String], [String: String]) throws -> Void) {
+         managingOnly: Bool = false, confirmationTitle: String = "Done", save: @escaping ([String], [String: String]) throws -> Void) {
         self.library = library ?? .shared
         _selection = State(initialValue: tags)
         _colors = State(initialValue: colors)
         self.managingOnly = managingOnly
+        self.confirmationTitle = confirmationTitle
         self.save = save
     }
     private var available: [String] {
@@ -142,7 +144,7 @@ struct SessionTagEditor: View {
                     .disabled(!library.loaded)
                 if !managingOnly, !selection.isEmpty { Button("Clear") { selection = []; colors = [:]; notice = nil } }
                 Spacer()
-                Button("Done") {
+                Button(confirmationTitle) {
                     do {
                         if !managingOnly {
                             let valid = try SessionTags.validated(selection)
