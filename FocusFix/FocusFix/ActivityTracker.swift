@@ -249,7 +249,8 @@ final class ActivityTracker: ObservableObject {
         if recordingMode == .automatic { setContext(.unknown) }
         else { stop(reason: "end_work") }
     }
-    func setContext(_ context: ActivityContext, source: ContextSource = .userAction) {
+    private func setContext(_ context: ActivityContext, source: ContextSource = .userAction) {
+        let context: ActivityContext = context == .work ? .work : .unknown
         guard isRecording, let writer else { return }
         let time = now
         guard time - lastSamplingTick <= 5 else { stop(reason: "capture_gap", observedEnd: lastObservedTime); return }
@@ -267,12 +268,6 @@ final class ActivityTracker: ObservableObject {
             resetMouse(at: time, phase: activityPhase)
             updateProgress(at: time, persist: true)
         } catch { fail(error) }
-    }
-    func correctContext(_ context: ActivityContext, start: Double, end: Double, session: SavedSession) throws {
-        try SessionFiles.correctContext(context, start: start, end: end, for: session,
-            root: SessionFiles.root(), active: isRecording ? sessionFolder : nil,
-            expectedRevision: session.recordingContract?.revisions.count ?? 0)
-        refreshSessions()
     }
     // Close the starting check-in without recording a session or an answer.
     func cancelSessionCheckIn() { sessionCheckIn = nil }
@@ -1000,7 +995,7 @@ final class ActivityTracker: ObservableObject {
         } else if session == contract.recordingID.uuidString, let interval = contract.intervals.last,
                   reminderEligibility.accepts(token: token, recordingID: contract.recordingID, contextID: interval.logicalID, active: true) {
             if action == UNNotificationDefaultActionIdentifier { openMainWindow?(); return }
-            guard ["take", "skip", "snooze", "not_working"].contains(action),
+            guard ["take", "skip", "snooze"].contains(action),
                   let request = reminderEligibility.consume(token: token, recordingID: contract.recordingID,
                     contextID: interval.logicalID, active: true, monotonic: reminderMonotonic, snooze: action == "snooze") else { return }
             do { try writer?.logReminder(ReminderLogEntry(request: request, action: action, effectiveElapsed: now, recordedAtUTC: Date())) }
@@ -1009,7 +1004,6 @@ final class ActivityTracker: ObservableObject {
             case "take": chooseBreak(); openMainWindow?()
             case "skip": deferBreak(snooze: false)
             case "snooze": deferBreak(snooze: true)
-            case "not_working": setContext(.nonWork, source: .notification)
             default: break
             }
         } else if session == contract.recordingID.uuidString, token == breakPolicy.activeBreak?.id {
