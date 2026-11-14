@@ -99,7 +99,7 @@ struct ContentView: View {
     private var appearanceButton: some View {
         Button { appearance = nextAppearance } label: {
             Image(systemName: appearanceSymbol).frame(width: 28, height: 24)
-        }
+        }.buttonPressFeedback()
         .buttonStyle(.plain)
         .accessibilityLabel("Appearance")
         .accessibilityValue(appearance.capitalized)
@@ -112,7 +112,7 @@ struct ContentView: View {
             HStack(spacing: 14) {
                 Button { sharingPresented = true } label: {
                     ProfileAvatar(profile: account.session == nil ? profile.profile : account.profile, size: 30)
-                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.secondary)
                     .help("Your profile")
                     .accessibilityLabel((account.session == nil ? profile.profile : account.profile).map { "Profile for \($0.name), your profile" } ?? "Your profile")
                 Image(nsImage: NSApplication.shared.applicationIconImage)
@@ -155,8 +155,8 @@ struct ContentView: View {
                                 .font(.callout.weight(.medium)).foregroundStyle(teal)
                             if tracker.sessionWorkPlan.reminderPending {
                                 Spacer()
-                                Button("End work") { tracker.endWork() }
-                                Button("Keep going") { tracker.keepGoingAfterPlan() }
+                                Button("End work") { tracker.endWork() }.buttonPressFeedback()
+                                Button("Keep going") { tracker.keepGoingAfterPlan() }.buttonPressFeedback()
                             }
                         }
                     }
@@ -170,7 +170,7 @@ struct ContentView: View {
                         Label(tracker.timerTargetMinutes.map { "Work target · \($0) min" } ?? "Work target", systemImage: "scope")
                             .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
-                    }.buttonStyle(.plain).help("Choose a work target")
+                    }.buttonPressFeedback().buttonStyle(.plain).help("Choose a work target")
                     Spacer(minLength: 0)
                 }
             }
@@ -189,8 +189,8 @@ struct ContentView: View {
                 HStack {
                     Text("Check-in available").font(.callout)
                     Spacer()
-                    Button("Answer") { tracker.openTimedCheckIn() }
-                    Button("Skip") { tracker.skipTimedCheckIn() }
+                    Button("Answer") { tracker.openTimedCheckIn() }.buttonPressFeedback()
+                    Button("Skip") { tracker.skipTimedCheckIn() }.buttonPressFeedback()
                 }
             }
 
@@ -206,7 +206,7 @@ struct ContentView: View {
                     Button(tracker.notificationPermission.opensSettings ? "Open notification settings" : "Enable notifications") {
                         if tracker.notificationPermission.opensSettings { tracker.openNotificationSettings() }
                         else { tracker.enableNotifications() }
-                    }.disabled(tracker.notificationPermissionBusy)
+                    }.buttonPressFeedback().disabled(tracker.notificationPermissionBusy)
                     if let notice = tracker.notificationNotice {
                         Text(notice).font(.caption).foregroundStyle(.secondary)
                     }
@@ -227,14 +227,14 @@ struct ContentView: View {
                     Text(tracker.message)
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button("Enable Input Monitoring") { tracker.requestPermission() }
+                    Button("Enable Input Monitoring") { tracker.requestPermission() }.buttonPressFeedback()
                         .buttonStyle(.borderedProminent).tint(teal)
                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
                     .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
             HStack(spacing: 12) {
                 if onBreak {
-                    Button("I'm back") { tracker.returnFromBreak() }
+                    Button("I'm back") { tracker.returnFromBreak() }.buttonPressFeedback()
                         .buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
                 }
                 Button {
@@ -243,10 +243,10 @@ struct ContentView: View {
                     Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work",
                           systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
                         .frame(minWidth: 124)
-                }.buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
                 Button { openWindow(id: "sessions") } label: {
                     Image(systemName: "folder").accessibilityLabel("Sessions")
-                }.controlSize(.large)
+                }.buttonPressFeedback().controlSize(.large)
                 Spacer()
             }
             HStack {
@@ -258,13 +258,13 @@ struct ContentView: View {
                                 .accessibilityLabel("\(social.invitations.count) pending invitations")
                         }
                     }
-                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityLabel((panels.expanded == .groups ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
                     .help("Show people in your selected group")
                 Spacer()
                 Button { togglePanel(.analytics) } label: {
                     Label("Analytics", systemImage: "chart.bar.xaxis")
-                }
+                }.buttonPressFeedback()
                 .buttonStyle(.plain)
                 .foregroundStyle(panels.expanded == .analytics ? teal : Color.secondary)
                 .accessibilityLabel(panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel")
