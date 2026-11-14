@@ -32,9 +32,9 @@ struct RecordingNoticeView: View {
             Text("After closing this notice, Start work begins manual capture. Automatic recording needs a separate explicit choice in Privacy & Data Sharing.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button("Not now") { tracker.declineRecordingNotice(); dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Not now") { tracker.declineRecordingNotice(); dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Enable recording") { tracker.acceptRecordingNotice(); dismiss() }
+                Button("Enable recording") { tracker.acceptRecordingNotice(); dismiss() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent)
             }
         }.padding(26).frame(width: 510, height: 520)
@@ -54,9 +54,9 @@ struct AutomaticRecordingNoticeView: View {
             Text("Input Monitoring must already be available before automatic capture can start. You can set it up with Manage Input Monitoring after this choice; opening Settings does not request it.")
                 .font(.callout).foregroundStyle(.secondary)
             HStack {
-                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Not now") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Enable automatic recording") { onEnable(); dismiss() }.buttonStyle(.borderedProminent)
+                Button("Enable automatic recording") { onEnable(); dismiss() }.buttonPressFeedback().buttonStyle(.borderedProminent)
             }
         }.padding(26).frame(width: 530)
     }
