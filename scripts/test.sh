@@ -52,6 +52,7 @@ run_test DailyProgressTests "$source_dir/DailyProgress.swift" "$source_dir/Break
     "$source_dir/RecordingData.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test RecordingDataTests "$source_dir/RecordingData.swift" \
     "$source_dir/BreakPolicy.swift" "$source_dir/SavedSession.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
+run_test ExportContextTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test BreakPolicyTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test SurveyDataTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test TimedCheckInTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
