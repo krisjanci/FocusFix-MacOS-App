@@ -28,32 +28,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @StateObject private var research = ResearchSharingController.shared
     @StateObject private var development = DevelopmentSharingController.shared
     @State private var launchFinished = false
-    @AppStorage("appearance") private var appearance = "system"
-    // Translate System/Light/Dark preferences into SwiftUI's appearance setting.
-    private var colorScheme: ColorScheme? {
-        appearance == "dark" ? .dark : appearance == "light" ? .light : nil
-    }
     // Create the main window, session/test windows and menu bar, applying the remembered appearance.
     var body: some Scene {
         Window("FocusFix", id: "collector") {
             CollectorRootView(tracker: tracker, launch: launch, account: account, launchFinished: $launchFinished)
-                .preferredColorScheme(colorScheme)
+                .modifier(SavedAppearance())
                 .onAppear { research.checkDue(); development.checkDue(); SocialController.shared.start(); tracker.reconcileProgress() }
         }.windowResizability(.contentSize)
         .commands { FocusFixCommands() }
         Window("About, privacy & support — FocusFix", id: "about") {
-            AboutView().preferredColorScheme(colorScheme)
+            AboutView().modifier(SavedAppearance())
         }.defaultSize(width: 560, height: 650)
         Window("Sessions — FocusFix", id: "sessions") {
-            SessionLibraryView(tracker: tracker).preferredColorScheme(colorScheme)
+            SessionLibraryView(tracker: tracker).modifier(SavedAppearance())
         }.defaultSize(width: 760, height: 520)
         Window("Groups — FocusFix", id: "groups") {
-            GroupsView().preferredColorScheme(colorScheme)
+            GroupsView().modifier(SavedAppearance())
         }.defaultSize(width: 620, height: 580)
         Window("Test tracking — FocusFix", id: "tracking") {
-            TrackingTestView(tracker: tracker).preferredColorScheme(colorScheme)
+            TrackingTestView(tracker: tracker).modifier(SavedAppearance())
         }.windowResizability(.contentSize)
-        Settings { PrivacyResearchSettings().preferredColorScheme(colorScheme) }
+        Settings { PrivacyResearchSettings().modifier(SavedAppearance()) }
         MenuBarExtra {
             RecordingMenu(tracker: tracker, launch: launch)
         } label: {
