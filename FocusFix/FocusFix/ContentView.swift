@@ -183,7 +183,8 @@ struct ContentView: View {
 
             DailyProgressCard(tracker: tracker)
 
-            if tracker.isRecording && !onBreak {
+            if tracker.isRecording && !onBreak &&
+                (!tracker.isWorking || tracker.breakPromptPending || tracker.latestBreak != nil || tracker.notificationNotice != nil) {
                 BreakControls(tracker: tracker, showsTakeBreak: !tracker.isWorking).tint(teal)
             }
 
