@@ -16,11 +16,7 @@ struct ContentView: View {
     @State private var editingSessionTags = false
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
-    @State private var panelSheet: CollectorPanel?
-    @State private var selectedPanel: CollectorPanel = .groups
-    @State private var fullScreen = false
-    @State private var screenContentSize = CGSize(width: 1200, height: 800)
-    @Namespace private var panelSwitch
+    @State private var panels = CollectorPanelSelection()
     @State private var collectorWindow: NSWindow?
     @State private var collectorHeight: CGFloat = 620
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
@@ -29,90 +25,63 @@ struct ContentView: View {
 
     // Arrange the main UI and route buttons/sheets to the tracker rather than duplicating recording logic.
     var body: some View {
-        Group {
-            if fullScreen {
-                let scale = min(screenContentSize.height / collectorHeight,
-                                max(1, screenContentSize.width - 300) / 490)
+        HStack(alignment: .top, spacing: 0) {
+            collectorContent
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
+                })
+                .frame(height: panels.expanded != nil ? expandedPanelHeight : nil, alignment: .top)
+                .background(Color(nsColor: .windowBackgroundColor))
+            if let panel = panels.expanded {
                 HStack(spacing: 0) {
-                    measuredCollector
-                        .scaleEffect(scale, anchor: .topLeading)
-                        .frame(width: 490 * scale, height: screenContentSize.height, alignment: .topLeading)
-                    Divider()
-                    VStack(spacing: 0) {
-                        sidePanel(selectedPanel, permanent: true, close: {})
-                        panelPicker.padding(20)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+                    sidePanel(panel, close: { panels.close() })
+                        .frame(width: PeopleWindowLayout.panelWidth)
                 }
-                .frame(width: screenContentSize.width, height: screenContentSize.height)
-            } else {
-                measuredCollector
+                .frame(height: expandedPanelHeight)
+                .transition(.opacity)
             }
         }
+        // Keep the minimum width compact so SwiftUI doesn't force the window to
+        // its expanded size before AppKit can animate the frame.
+        .frame(minWidth: PeopleWindowLayout.compactWidth, maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
+        .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: panels.expanded)
         .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
-        .background(PeopleWindowBridge(fullScreen: fullScreen, resolved: { window, size in
-            collectorWindow = window
-            if screenContentSize != size { screenContentSize = size }
-        }))
-        .sheet(item: $panelSheet) { panel in
-            sidePanel(panel, close: { panelSheet = nil }).frame(width: 380, height: 580)
+        .background(PeopleWindowBridge(expanded: panels.expanded != nil, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
+        .sheet(item: $panels.sheet) { panel in
+            sidePanel(panel, close: { panels.close() }).frame(width: 380, height: 580)
         }
         .onChange(of: tour.isPresented) { _, shown in
-            if shown { panelSheet = nil }
+            if shown { panels.close() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { note in
+            guard let window = note.object as? NSWindow, window === collectorWindow,
+                  let screen = window.screen else { return }
+            panels.adapt(canExpand: PeopleWindowLayout.canExpand(in: screen.visibleFrame))
         }
     }
 
-    private var measuredCollector: some View {
-        collectorContent
-            .fixedSize(horizontal: false, vertical: true)
-            .background(GeometryReader { geometry in
-                Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
-            })
+    private var expandedPanelHeight: CGFloat {
+        let chrome = collectorWindow.map { $0.frame.height - ($0.contentView?.frame.height ?? $0.frame.height) } ?? 28
+        let available = (collectorWindow?.screen?.visibleFrame.height ?? 900) - chrome
+        return max(collectorHeight, min(620, available))
     }
 
     private func togglePanel(_ panel: CollectorPanel) {
-        if fullScreen { selectedPanel = panel } else { panelSheet = panel }
+        let canExpand = collectorWindow?.screen.map { PeopleWindowLayout.canExpand(in: $0.visibleFrame) } ?? false
+        panels.toggle(panel, canExpand: canExpand)
     }
 
-    @ViewBuilder private func sidePanel(_ panel: CollectorPanel, permanent: Bool = false, close: @escaping () -> Void) -> some View {
+    @ViewBuilder private func sidePanel(_ panel: CollectorPanel, close: @escaping () -> Void) -> some View {
         switch panel {
-        case .groups: PeoplePanel(social: social, close: close, allowsCollapsing: !permanent)
-        case .analytics: AnalyticsPanel(close: close, allowsCollapsing: !permanent)
+        case .groups: PeoplePanel(social: social, close: close)
+        case .analytics: AnalyticsPanel(close: close)
         }
-    }
-
-    private var panelPicker: some View {
-        HStack(spacing: 0) {
-            panelTab(.groups, title: "Groups", symbol: "person.2")
-            panelTab(.analytics, title: "Analytics", symbol: "chart.bar.xaxis")
-        }
-        .padding(5)
-        .background(Color.primary.opacity(0.07), in: Capsule())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Right panel")
-    }
-
-    private func panelTab(_ panel: CollectorPanel, title: String, symbol: String) -> some View {
-        Button {
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { selectedPanel = panel }
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(.headline)
-                .foregroundStyle(selectedPanel == panel ? teal : Color.secondary)
-                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                .background {
-                    if selectedPanel == panel {
-                        Capsule().fill(Color(nsColor: .windowBackgroundColor))
-                            .matchedGeometryEffect(id: "selection", in: panelSwitch)
-                            .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selectedPanel == panel ? .isSelected : [])
     }
 
     private var appearanceSymbol: String {
@@ -156,15 +125,6 @@ struct ContentView: View {
                 }
                 Spacer()
                 WorkStreakBadge(tracker: tracker)
-                Button {
-                    panelSheet = nil
-                    fullScreen.toggle()
-                } label: {
-                    Image(systemName: fullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                        .frame(width: 26, height: 26)
-                }.buttonStyle(.plain).buttonPressFeedback()
-                    .help(fullScreen ? "Use compact window" : "Use full screen")
-                    .accessibilityLabel(fullScreen ? "Use compact window" : "Use full screen")
             }
             HStack(alignment: .top) {
                 RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
@@ -299,27 +259,25 @@ struct ContentView: View {
             HStack {
                 Button { togglePanel(.groups) } label: {
                     HStack(spacing: 6) {
-                        Label("Groups", systemImage: "person.2")
+                        Label(panels.expanded == .groups ? "Hide people" : "Groups", systemImage: "person.2")
                         if !social.invitations.isEmpty {
                             Circle().fill(.red).frame(width: 7, height: 7)
                                 .accessibilityLabel("\(social.invitations.count) pending invitations")
                         }
                     }
                 }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel("Show Groups" + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
+                    .accessibilityLabel((panels.expanded == .groups ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
                     .help("Show people in your selected group")
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button { openWindow(id: "sessions") } label: {
-                    Label("Sessions", systemImage: "folder")
-                        .frame(width: fullScreen ? 180 : nil, height: fullScreen ? 28 : nil)
+                    Image(systemName: "folder").accessibilityLabel("Sessions")
                 }.buttonPressFeedback().controlSize(.large)
-                    .labelStyle(CollectorSessionsLabelStyle(showTitle: fullScreen))
                 Button { togglePanel(.analytics) } label: {
                     Label("Analytics", systemImage: "chart.bar.xaxis")
                 }.buttonPressFeedback()
                 .buttonStyle(.plain)
-                .foregroundStyle(fullScreen && selectedPanel == .analytics ? teal : Color.secondary)
-                .accessibilityLabel("Show Analytics")
+                .foregroundStyle(panels.expanded == .analytics ? teal : Color.secondary)
+                .accessibilityLabel(panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel")
                 .help("Analytics")
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -350,15 +308,5 @@ struct ContentView: View {
             tracker.refreshNotificationPermission()
             tracker.refreshInputPermission()
         }
-    }
-}
-
-private struct CollectorSessionsLabelStyle: LabelStyle {
-    let showTitle: Bool
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.icon
-            if showTitle { configuration.title }
-        }.accessibilityLabel("Sessions")
     }
 }
