@@ -13,7 +13,7 @@ struct GroupsView: View {
                     Text("Groups").font(.title2.weight(.semibold))
                     Spacer()
                     if social.busy { ProgressView().controlSize(.small).accessibilityLabel("Syncing groups") }
-                    Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }
+                    Button { Task { await social.retry() } } label: { Image(systemName: "arrow.clockwise") }.buttonPressFeedback()
                         .accessibilityLabel("Refresh groups").help("Refresh groups").disabled(social.busy || social.userID == nil)
                 }
                 if let notice = social.invitationNotice {
@@ -41,10 +41,10 @@ struct GroupsView: View {
                     if social.accessState != .loading { accessCard }
                     Divider()
                     HStack {
-                        Button("Create or join") { sheet = .add }
-                        if let group = social.selectedGroup { Button("Manage group") { sheet = .manage(group.id) } }
+                        Button("Create or join") { sheet = .add }.buttonPressFeedback()
+                        if let group = social.selectedGroup { Button("Manage group") { sheet = .manage(group.id) }.buttonPressFeedback() }
                         Spacer()
-                        Button { scoringPresented = true } label: { Image(systemName: "info.circle") }
+                        Button { scoringPresented = true } label: { Image(systemName: "info.circle") }.buttonPressFeedback()
                             .accessibilityLabel("Scoring and streak freeze rules").help("Scoring and streak freeze rules")
                     }.disabled(social.busy)
                 }
@@ -89,14 +89,14 @@ private struct AddGroupSheet: View {
             TextField("Group name", text: $name).textFieldStyle(.roundedBorder)
             Button("Create group") {
                 Task { if await social.refresh(action: "create", fields: ["name": name]) { dismiss() } }
-            }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || social.busy)
+            }.buttonPressFeedback().disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || social.busy)
             Divider()
             TextField("Invite code", text: $code).textFieldStyle(.roundedBorder)
             Button("Join group") {
                 Task { if await social.refresh(action: "join", fields: ["code": code]) { dismiss() } }
-            }.disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || social.busy)
+            }.buttonPressFeedback().disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || social.busy)
             if let notice = social.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-            HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
+            HStack { Spacer(); Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction) }
         }.padding(24).frame(width: 420).tint(.teal)
     }
 }
@@ -115,7 +115,7 @@ private struct ManageGroupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Manage group").font(.title2.weight(.semibold))
-                Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer(); Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -132,7 +132,7 @@ private struct ManageGroupSheet: View {
                             TextField("Description (optional)", text: $details, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
                             Button("Save details") {
                                 Task { await social.refresh(action: "edit", fields: ["group": groupID.uuidString, "name": name, "description": details]) }
-                            }.disabled(social.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || details.count > 300)
+                            }.buttonPressFeedback().disabled(social.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 60 || details.count > 300)
                         }
                         Divider()
                         Text("Invite someone").font(.headline)
@@ -143,7 +143,7 @@ private struct ManageGroupSheet: View {
                             Task {
                                 if await social.refresh(action: "invite", fields: ["group": groupID.uuidString, "email": email]) { inviteSent = true }
                             }
-                        }.buttonStyle(.borderedProminent).disabled(social.busy || !email.contains("@") || email.count > 254 || group.members.count >= SocialGroup.capacity)
+                        }.buttonPressFeedback().buttonStyle(.borderedProminent).disabled(social.busy || !email.contains("@") || email.count > 254 || group.members.count >= SocialGroup.capacity)
                         if inviteSent { Text("If this account can receive an invitation, it will appear in their FocusFix inbox.").font(.caption).foregroundStyle(.secondary) }
                         if group.owner == social.userID {
                             Text("Or share an invite code").font(.caption.weight(.medium))
@@ -151,10 +151,10 @@ private struct ManageGroupSheet: View {
                                 Text(code).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 Button("Copy invite code") {
                                     NSPasteboard.general.clearContents(); NSPasteboard.general.setString(code, forType: .string)
-                                }
+                                }.buttonPressFeedback()
                             }
                             if group.members.count >= SocialGroup.capacity { Text("This group is full. Remove a member before someone else can join.").font(.caption).foregroundStyle(.secondary) }
-                            Button("Reset invite code") { confirm("Reset invite code?", "Previously shared codes will stop working.", action: "reset", group: group) }.disabled(social.busy)
+                            Button("Reset invite code") { confirm("Reset invite code?", "Previously shared codes will stop working.", action: "reset", group: group) }.buttonPressFeedback().disabled(social.busy)
                             Divider()
                             ForEach(group.members.filter { $0.id != social.userID }) { member in
                                 HStack {
@@ -166,14 +166,14 @@ private struct ManageGroupSheet: View {
                                         Button("Remove member…", role: .destructive) {
                                         confirmation = GroupConfirmation(title: "Remove \(member.name)?", message: "Rejoining starts a new group score.", action: "remove", fields: ["group": group.id.uuidString, "member": member.id.uuidString])
                                         }
-                                    } label: { Image(systemName: "ellipsis") }
+                                    } label: { Image(systemName: "ellipsis") }.buttonPressFeedback()
                                     .accessibilityLabel("Manage \(member.name)").disabled(social.busy)
                                 }
                             }
                             Divider()
-                            Button("Delete group", role: .destructive) { confirm("Delete this group?", "This removes the group and its scores for everyone.", action: "delete", group: group) }.disabled(social.busy)
+                            Button("Delete group", role: .destructive) { confirm("Delete this group?", "This removes the group and its scores for everyone.", action: "delete", group: group) }.buttonPressFeedback().disabled(social.busy)
                         } else {
-                            Button("Leave group", role: .destructive) { confirm("Leave this group?", "Your score will be removed. Rejoining starts a new score.", action: "leave", group: group) }.disabled(social.busy)
+                            Button("Leave group", role: .destructive) { confirm("Leave this group?", "Your score will be removed. Rejoining starts a new score.", action: "leave", group: group) }.buttonPressFeedback().disabled(social.busy)
                         }
                     } else { Text("You are no longer a member of this group.").foregroundStyle(.secondary) }
                     if let notice = social.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
@@ -215,8 +215,8 @@ struct InvitationInbox: View {
                         Text("Accepting enables group progress sync. Members see your name, avatar and streaks; recordings stay private.").font(.caption).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Button("Accept") { Task { await social.respond(to: invitation, accept: true) } }.buttonStyle(.borderedProminent)
-                        Button("Decline") { Task { await social.respond(to: invitation, accept: false) } }.buttonStyle(.bordered)
+                        Button("Accept") { Task { await social.respond(to: invitation, accept: true) } }.buttonPressFeedback().buttonStyle(.borderedProminent)
+                        Button("Decline") { Task { await social.respond(to: invitation, accept: false) } }.buttonPressFeedback().buttonStyle(.bordered)
                     }.disabled(social.busy)
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
