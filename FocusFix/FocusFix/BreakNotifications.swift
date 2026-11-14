@@ -40,12 +40,11 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         let take = UNNotificationAction(identifier: "take", title: "Take a break", options: [.foreground])
         let skip = UNNotificationAction(identifier: "skip", title: "Skip", options: [])
         let snooze = UNNotificationAction(identifier: "snooze", title: "Snooze 10 min", options: [])
-        let notWorking = UNNotificationAction(identifier: "not_working", title: "I’m not working", options: [])
         let back = UNNotificationAction(identifier: "back", title: "I'm back", options: [.foreground])
         let answer = UNNotificationAction(identifier: "answer_check_in", title: "Answer", options: [.foreground])
         let skipCheckIn = UNNotificationAction(identifier: "skip_check_in", title: "Skip", options: [])
         center.setNotificationCategories([
-            UNNotificationCategory(identifier: "break_prompt", actions: [take, notWorking, snooze, skip], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "break_prompt", actions: [take, snooze, skip], intentIdentifiers: []),
             UNNotificationCategory(identifier: "break_finished", actions: [back], intentIdentifiers: []),
             UNNotificationCategory(identifier: "work_check_in", actions: [answer, skipCheckIn], intentIdentifiers: [])
         ])
@@ -58,7 +57,7 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         breakIDs.insert(id)
         let content = UNMutableNotificationContent()
         content.title = finished ? "Your break timer has finished" : screenUse ? "Screen-use break reminder" : "A moment for a work break?"
-        content.body = finished ? "Return when you're ready. Extra time away is included in your break." : "Take a break, snooze, or mark Not working from now. Recording continues. Correct an earlier interval in Sessions."
+        content.body = finished ? "Return when you're ready. Extra time away is included in your break." : "Take a break, snooze, or skip this reminder. Use End work in FocusFix when you finish working."
         content.categoryIdentifier = finished ? "break_finished" : "break_prompt"
         content.userInfo = ["session": session, "token": token, "work_period_id": workPeriodID, "policy_version": ReminderRequest.policyVersion]
         // No sound, no forced foreground window, and only one prompt per decision.
