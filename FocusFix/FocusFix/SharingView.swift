@@ -10,7 +10,7 @@ struct SharingView: View {
                 HStack {
                     Label("Your profile", systemImage: "person.crop.circle").font(.title2.weight(.semibold))
                     Spacer()
-                    Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                    Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 }
                 ProfileEditor()
                 Divider()
@@ -24,7 +24,7 @@ struct SharingView: View {
                             openWindow(id: "tracking")
                             NSApp.activate(ignoringOtherApps: true)
                         }
-                    } label: { Label("Test tracking", systemImage: "keyboard") }
+                    } label: { Label("Test tracking", systemImage: "keyboard") }.buttonPressFeedback()
                     QuickTourButton(beforeOpen: { dismiss() })
                 }
                 SettingsLink { Label("Privacy & Data Sharing settings", systemImage: "hand.raised") }
@@ -54,7 +54,7 @@ struct PrivacyResearchSettings: View {
                 }))
                 Text("Manual recording starts with Start work. Automatic recording is a separate choice below. Turning all recording off stops both modes and keeps saved recordings.")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Manage Input Monitoring") { tracker.requestPermission() }.disabled(!recordingEnabled)
+                Button("Manage Input Monitoring") { tracker.requestPermission() }.buttonPressFeedback().disabled(!recordingEnabled)
                 Toggle("Enable automatic recording", isOn: Binding(get: { automatic.enabled }, set: { value in
                     if value { automaticConsentPresented = true } else { automatic.disable() }
                 })).disabled(!recordingEnabled)
@@ -73,8 +73,8 @@ struct PrivacyResearchSettings: View {
                 Divider()
                 QuickTourButton()
                 AdvancedSettingsView(tracker: tracker)
-                if let privacy = AppLinks.privacy { Link("Privacy policy", destination: privacy) }
-                Link("Support on GitHub", destination: AppLinks.support)
+                if let privacy = AppLinks.privacy { Link("Privacy policy", destination: privacy).buttonPressFeedback() }
+                Link("Support on GitHub", destination: AppLinks.support).buttonPressFeedback()
                 Text("Support issues are public. Never post recordings, credentials, or personal information.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(26)
