@@ -17,7 +17,7 @@ struct RatingSlider: View {
                 Spacer()
                 // The thumb starts in the middle, but no answer is selected yet.
                 // This button also lets someone select exactly 5 without dragging.
-                Button(rating.map { "\($0) / 10" } ?? "Select 5 / 10") { rating = rating ?? 5 }
+                Button(rating.map { "\($0) / 10" } ?? "Select 5 / 10") { rating = rating ?? 5 }.buttonPressFeedback()
                     .buttonStyle(.bordered)
                     .accessibilityLabel(rating.map { "\(title): \($0) out of 10" } ?? "Choose 5 out of 10 for \(title)")
             }
@@ -25,9 +25,9 @@ struct RatingSlider: View {
                 .accessibilityLabel(title)
                 .accessibilityValue(rating.map { "\($0) out of 10" } ?? "Not answered")
             HStack {
-                Button("0 · \(low)") { rating = 0 }
+                Button("0 · \(low)") { rating = 0 }.buttonPressFeedback()
                 Spacer()
-                Button("10 · \(high)") { rating = 10 }
+                Button("10 · \(high)") { rating = 10 }.buttonPressFeedback()
             }.buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -81,19 +81,19 @@ struct SessionCheckInView: View {
                 Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if !draft.planning { Button("Add work target") { draft.addPlan() } }
+            if !draft.planning { Button("Add work target") { draft.addPlan() }.buttonPressFeedback() }
             if tracker.isWorking, draft.planning {
-                Button("Remove target") { draft.removePlan() }
+                Button("Remove target") { draft.removePlan() }.buttonPressFeedback()
             }
             if let notice { Text(notice).font(.callout).foregroundStyle(.red) }
             HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 if draft.asksForFatigue {
-                    Button("Skip & start work") { start(skippingFatigue: true) }
+                    Button("Skip & start work") { start(skippingFatigue: true) }.buttonPressFeedback()
                         .disabled(!draft.validPlan)
                 }
-                Button(tracker.isWorking ? "Done" : "Start work") { start() }
+                Button(tracker.isWorking ? "Done" : "Start work") { start() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
         }.padding(28).frame(width: 440)
@@ -120,12 +120,12 @@ struct WorkCheckInView: View {
             RatingSlider(title: SurveyEntry.productivityQuestion,
                 low: "Not productive", high: "Extremely productive", rating: $productivity)
             HStack {
-                Button("Skip") { tracker.skipTimedCheckIn() }.keyboardShortcut(.cancelAction)
+                Button("Skip") { tracker.skipTimedCheckIn() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Save") {
                     guard let fatigue, let productivity else { return }
                     tracker.completeTimedCheckIn(fatigue: fatigue, productivity: productivity)
-                }.buttonStyle(.borderedProminent).disabled(fatigue == nil || productivity == nil)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).disabled(fatigue == nil || productivity == nil)
             }
         }.padding(28).frame(width: 440)
     }
