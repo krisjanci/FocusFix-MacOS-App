@@ -23,20 +23,20 @@ struct DevelopmentSharingControls: View {
                 if sharing.enabled {
                     Text("New finished recordings started after you agreed may be sent to the developer. Your local copies remain on this Mac.")
                         .font(.caption).foregroundStyle(.secondary)
-                    Button("Turn off sharing") { sharing.disable() }
+                    Button("Turn off sharing") { sharing.disable() }.buttonPressFeedback()
                 } else if sharing.collectionEnabled && sharing.approved {
-                    Button("Review and enable sharing…") { consentPresented = true }
+                    Button("Review and enable sharing…") { consentPresented = true }.buttonPressFeedback()
                         .disabled(sharing.busy || sharing.deletionPending)
                 }
-                Button("Refresh sharing status") { Task { await sharing.refresh() } }
+                Button("Refresh sharing status") { Task { await sharing.refresh() } }.buttonPressFeedback()
                     .disabled(sharing.busy)
                 Button("Request deletion of shared recordings…", role: .destructive) {
                     deletionPresented = true
-                }.disabled(sharing.deletionPending)
+                }.buttonPressFeedback().disabled(sharing.deletionPending)
                 if sharing.busy || sharing.deletionPending { ProgressView().controlSize(.small) }
                 Text(sharing.notice).font(.caption).foregroundStyle(.secondary)
                 if let url = account.api?.configuration.privacyPolicyURL {
-                    Link("Recording and privacy details", destination: url)
+                    Link("Recording and privacy details", destination: url).buttonPressFeedback()
                 }
             }
         }
@@ -77,12 +77,12 @@ private struct DevelopmentConsentView: View {
             Text("An automatic recording already in progress is not shared until a new recording segment starts after consent.")
                 .foregroundStyle(.secondary)
             if let url = account.api?.configuration.privacyPolicyURL {
-                Link("Read the privacy details", destination: url)
+                Link("Read the privacy details", destination: url).buttonPressFeedback()
             }
             HStack {
-                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Not now") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("I agree and enable sharing") { accept() }
+                Button("I agree and enable sharing") { accept() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent)
                     .disabled(!sharing.collectionEnabled || !sharing.approved)
             }
