@@ -92,19 +92,19 @@ struct ContentView: View {
         }
     }
 
-    private var appearanceMenu: some View {
-        Menu {
-            Picker("Appearance", selection: $appearance) {
-                Label("System", systemImage: "circle.lefthalf.filled").tag("system")
-                Label("Light", systemImage: "sun.max").tag("light")
-                Label("Dark", systemImage: "moon").tag("dark")
-            }.pickerStyle(.inline)
-        } label: {
+    private var nextAppearance: String {
+        appearance == "light" ? "dark" : appearance == "dark" ? "system" : "light"
+    }
+
+    private var appearanceButton: some View {
+        Button { appearance = nextAppearance } label: {
             Image(systemName: appearanceSymbol).frame(width: 28, height: 24)
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .accessibilityLabel("Appearance: \(appearance.capitalized)")
-        .help("Appearance: \(appearance.capitalized)")
+        .buttonStyle(.plain)
+        .accessibilityLabel("Appearance")
+        .accessibilityValue(appearance.capitalized)
+        .accessibilityHint("Switch to \(nextAppearance.capitalized)")
+        .help("Appearance: \(appearance.capitalized). Click to switch to \(nextAppearance.capitalized).")
     }
 
     private var collectorContent: some View {
@@ -128,7 +128,7 @@ struct ContentView: View {
             }
             HStack(alignment: .top) {
                 RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
-                appearanceMenu
+                appearanceButton
             }
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
