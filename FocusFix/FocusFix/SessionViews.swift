@@ -46,9 +46,9 @@ struct SessionLibraryView: View {
             } else {
                 HStack {
                     Text("\(selectedSessions.count) selected").monospacedDigit()
-                    Button("Select All") { selection = Set(tracker.sessions.map(\.id)); expandedDays.formUnion(SessionDay.groups(tracker.sessions).map(\.id)) }
+                    Button("Select All") { selection = Set(tracker.sessions.map(\.id)); expandedDays.formUnion(SessionDay.groups(tracker.sessions).map(\.id)) }.buttonPressFeedback()
                         .keyboardShortcut("a", modifiers: .command)
-                    Button("Deselect All") { selection.removeAll() }.disabled(selection.isEmpty)
+                    Button("Deselect All") { selection.removeAll() }.buttonPressFeedback().disabled(selection.isEmpty)
                     Spacer()
                     Text("⌘-click to add · ⇧-click for a range")
                         .font(.caption).foregroundStyle(.secondary)
@@ -83,20 +83,20 @@ struct SessionLibraryView: View {
             }
             Divider()
             HStack {
-                Button { tracker.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }
+                Button { tracker.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }.buttonPressFeedback()
                     .help("Refresh sessions").accessibilityLabel("Refresh sessions")
                 Button("Show in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting(selectedSessions.map(\.folder))
-                }.disabled(selectedSessions.isEmpty)
+                }.buttonPressFeedback().disabled(selectedSessions.isEmpty)
                 Spacer()
                 Button(selectedSessions.count > 1 ? "Delete Selected…" : "Delete…", role: .destructive) {
                     pendingDeletion = selectedSessions
                     confirmDeletion = true
-                }.disabled(!canActOnSelection)
-                Button(exportingAll ? "Exporting…" : "Export All…") { exportAll() }
+                }.buttonPressFeedback().disabled(!canActOnSelection)
+                Button(exportingAll ? "Exporting…" : "Export All…") { exportAll() }.buttonPressFeedback()
                     .disabled(exportingAll || tracker.libraryError != nil || !tracker.sessions.contains { !tracker.isActive($0) })
                     .help("Export all saved sessions into one folder. The current recording is skipped.")
-                Button(selectedSessions.count > 1 ? "Export Selected…" : "Export…") { exportSelected() }
+                Button(selectedSessions.count > 1 ? "Export Selected…" : "Export…") { exportSelected() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent).tint(teal)
                     .disabled(!canActOnSelection)
             }.padding(18)
