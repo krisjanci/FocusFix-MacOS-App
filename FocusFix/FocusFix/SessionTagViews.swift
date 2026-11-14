@@ -63,7 +63,7 @@ struct SessionTagButton: View {
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Color.primary.opacity(0.06), in: Capsule())
             } else { SessionTagChips(tags: tags, colors: colors) }
-        }.buttonStyle(.plain)
+        }.buttonPressFeedback().buttonStyle(.plain)
             .help("Click to change this session's tags and colors")
             .accessibilityLabel(tags.isEmpty ? "Add tags" : "Edit tags: \(tags.joined(separator: ", "))")
     }
@@ -100,7 +100,7 @@ struct SessionTagEditor: View {
             HStack {
                 Text("Tags").font(.title3.weight(.semibold))
                 Spacer()
-                if !managingOnly { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
+                if !managingOnly { Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction) }
             }
             if available.count > 6 { TextField("Find a tag", text: $search).textFieldStyle(.roundedBorder) }
             ScrollView {
@@ -115,7 +115,7 @@ struct SessionTagEditor: View {
                                     Text(name).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                                     if !managingOnly, selection.contains(name) { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
                                 }.padding(9).contentShape(Rectangle())
-                            }.buttonStyle(.plain).accessibilityLabel(name)
+                            }.buttonPressFeedback().buttonStyle(.plain).accessibilityLabel(name)
                                 .accessibilityValue(managingOnly ? "Edit tag" : selection.contains(name) ? "Selected" : "Not selected")
                             Menu {
                                 Button("Edit name and color…") { edit(name) }
@@ -125,7 +125,7 @@ struct SessionTagEditor: View {
                                         catch { notice = error.localizedDescription }
                                     }
                                 }
-                            } label: { Image(systemName: "ellipsis") }
+                            } label: { Image(systemName: "ellipsis") }.buttonPressFeedback()
                             .menuStyle(.borderlessButton).frame(width: 24).accessibilityLabel("Options for \(name)")
                         }.background(selection.contains(name) && !managingOnly
                             ? Color(tagHex: library.color(for: name, saved: colors)).opacity(0.1) : Color.clear,
@@ -136,13 +136,13 @@ struct SessionTagEditor: View {
             }.frame(height: CGFloat(min(max(available.count, 1), 6)) * 42)
             if let message = notice ?? library.notice {
                 Text(message).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-                if !library.loaded { Button("Reload tag list") { library.reload() } }
+                if !library.loaded { Button("Reload tag list") { library.reload() }.buttonPressFeedback() }
             }
             Divider()
             HStack {
-                Button { editing = TagEditRequest(name: nil, color: SessionTags.palette[0]) } label: { Label("New tag", systemImage: "plus") }
+                Button { editing = TagEditRequest(name: nil, color: SessionTags.palette[0]) } label: { Label("New tag", systemImage: "plus") }.buttonPressFeedback()
                     .disabled(!library.loaded)
-                if !managingOnly, !selection.isEmpty { Button("Clear") { selection = []; colors = [:]; notice = nil } }
+                if !managingOnly, !selection.isEmpty { Button("Clear") { selection = []; colors = [:]; notice = nil }.buttonPressFeedback() }
                 Spacer()
                 Button(confirmationTitle) {
                     do {
@@ -152,7 +152,7 @@ struct SessionTagEditor: View {
                         }
                         dismiss()
                     } catch { notice = error.localizedDescription }
-                }.buttonStyle(.borderedProminent)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent)
             }
         }.padding(18).frame(width: 360).tint(.teal)
         .sheet(item: $editing) { request in
@@ -211,17 +211,17 @@ private struct TagDetailsEditor: View {
                     Button { color = hex } label: {
                         Circle().fill(Color(tagHex: hex)).frame(width: 23, height: 23)
                             .overlay { if color == hex { Image(systemName: "checkmark").font(.caption2.bold()).foregroundStyle(.white) } }
-                    }.buttonStyle(.plain).accessibilityLabel("Choose color \(hex)")
+                    }.buttonPressFeedback().buttonStyle(.plain).accessibilityLabel("Choose color \(hex)")
                 }
             }
             if let notice { Text(notice).font(.caption).foregroundStyle(.red) }
             HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Save") {
                     do { try save(SessionTags.name(name), SessionTags.color(color)); dismiss() }
                     catch { notice = error.localizedDescription }
-                }.buttonStyle(.borderedProminent).disabled((try? SessionTags.name(name)) == nil)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).disabled((try? SessionTags.name(name)) == nil)
             }
         }.padding(20).frame(width: 320).tint(.teal)
     }
