@@ -15,7 +15,7 @@ struct QuickTourButton: View {
             }
         } label: {
             Label("Quick tour", systemImage: "book.closed")
-        }.help("Try a short spotlight practice tour")
+        }.buttonPressFeedback().help("Try a short spotlight practice tour")
     }
 }
 
@@ -152,9 +152,9 @@ struct QuickTourView: View {
             Text("Practice · nothing saved").font(.caption.weight(.medium))
             Spacer(minLength: 4)
             Text(tour.position).font(.caption).monospacedDigit().accessibilityLabel("Step \(tour.index + 1) of \(QuickTourController.stepCount)")
-            Button("Back") { tour.back() }.disabled(tour.isFirst)
+            Button("Back") { tour.back() }.buttonPressFeedback().disabled(tour.isFirst)
                 .keyboardShortcut("[", modifiers: .command)
-            Button { tour.finish() } label: { Image(systemName: "xmark") }
+            Button { tour.finish() } label: { Image(systemName: "xmark") }.buttonPressFeedback()
                 .accessibilityLabel("Close practice tour").keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -175,7 +175,7 @@ struct QuickTourView: View {
                     Spacer()
                     Button(phase.offersDone ? "Done" : "Next") {
                         tour.perform(phase.offersDone ? .done : .next, phase: phase, visit: visit)
-                    }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                 }
             }
         }
