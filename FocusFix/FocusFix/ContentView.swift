@@ -183,7 +183,9 @@ struct ContentView: View {
 
             DailyProgressCard(tracker: tracker)
 
-            if tracker.isRecording && !onBreak { BreakControls(tracker: tracker).tint(teal) }
+            if tracker.isRecording && !onBreak {
+                BreakControls(tracker: tracker, showsTakeBreak: !tracker.isWorking).tint(teal)
+            }
 
             if tracker.timedCheckInPending && !onBreak {
                 HStack {
@@ -233,21 +235,24 @@ struct ContentView: View {
                     .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
             HStack(spacing: 12) {
-                if onBreak {
-                    Button("I'm back") { tracker.returnFromBreak() }.buttonPressFeedback()
-                        .buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                }
                 Button {
-                    if tracker.isRecording && tracker.userContext == .work { tracker.endWork() } else { tracker.requestStart() }
+                    if tracker.isWorking { tracker.endWork() } else { tracker.requestStart() }
                 } label: {
-                    Label(tracker.isRecording && tracker.userContext == .work ? "End work" : "Start work",
-                          systemImage: tracker.isRecording && tracker.userContext == .work ? "stop.fill" : "play.fill")
-                        .frame(minWidth: 124)
+                    Label(tracker.isWorking ? "End work" : "Start work",
+                          systemImage: tracker.isWorking ? "stop.fill" : "play.fill")
+                        .frame(maxWidth: .infinity, minHeight: 36)
                 }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
-                Button { openWindow(id: "sessions") } label: {
-                    Image(systemName: "folder").accessibilityLabel("Sessions")
-                }.buttonPressFeedback().controlSize(.large)
-                Spacer()
+                if onBreak {
+                    Button { tracker.returnFromBreak() } label: {
+                        Label("I'm back", systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                } else if tracker.isWorking {
+                    Button { tracker.chooseBreak() } label: {
+                        Label("Take a break", systemImage: "leaf")
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonPressFeedback().buttonStyle(.borderedProminent).tint(teal).controlSize(.large)
+                }
             }
             HStack {
                 Button { togglePanel(.groups) } label: {
@@ -261,7 +266,10 @@ struct ContentView: View {
                 }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityLabel((panels.expanded == .groups ? "Collapse People panel" : "Expand group People panel") + (social.invitations.isEmpty ? "" : ", \(social.invitations.count) pending group invitations"))
                     .help("Show people in your selected group")
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { openWindow(id: "sessions") } label: {
+                    Image(systemName: "folder").accessibilityLabel("Sessions")
+                }.buttonPressFeedback().controlSize(.large)
                 Button { togglePanel(.analytics) } label: {
                     Label("Analytics", systemImage: "chart.bar.xaxis")
                 }.buttonPressFeedback()
@@ -269,6 +277,7 @@ struct ContentView: View {
                 .foregroundStyle(panels.expanded == .analytics ? teal : Color.secondary)
                 .accessibilityLabel(panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel")
                 .help("Analytics")
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .padding(30).frame(width: 490)
