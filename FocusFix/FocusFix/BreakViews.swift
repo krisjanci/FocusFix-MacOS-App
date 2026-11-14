@@ -124,18 +124,21 @@ struct BreakReviewView: View {
 
 struct BreakControls: View {
     @ObservedObject var tracker: ActivityTracker
+    var showsTakeBreak = true
     @State private var reviewing = false
-    // Show Take a break, Skip and Snooze, plus the most recent break's activity review.
+    // Keep reminders and review here when the main action row offers Take a break.
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if tracker.breakPromptPending {
                 Text("A moment for a break?").font(.headline)
                 HStack {
-                    Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback().buttonStyle(.borderedProminent)
+                    if showsTakeBreak {
+                        Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback().buttonStyle(.borderedProminent)
+                    }
                     Button("Skip") { tracker.deferBreak(snooze: false) }.buttonPressFeedback().help("Wait 25 more minutes, then look for an idle moment")
                     Button("Snooze 10 min") { tracker.deferBreak(snooze: true) }.buttonPressFeedback()
                 }
-            } else {
+            } else if showsTakeBreak {
                 HStack {
                     Spacer()
                     Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback()
