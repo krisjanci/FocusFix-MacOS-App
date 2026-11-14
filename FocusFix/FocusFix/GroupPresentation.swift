@@ -51,6 +51,29 @@ enum GroupAccessState: Equatable {
     }
 }
 
+// Groups and Analytics occupy the same expansion slot, including the sheet fallback.
+enum CollectorPanel: String, Identifiable {
+    case groups, analytics
+    var id: String { rawValue }
+}
+
+struct CollectorPanelSelection {
+    var expanded: CollectorPanel?
+    var sheet: CollectorPanel?
+
+    mutating func toggle(_ panel: CollectorPanel, canExpand: Bool) {
+        if expanded == panel || sheet == panel { close(); return }
+        expanded = canExpand ? panel : nil
+        sheet = canExpand ? nil : panel
+    }
+    mutating func close() { expanded = nil; sheet = nil }
+    mutating func adapt(canExpand: Bool) {
+        guard !canExpand, let panel = expanded else { return }
+        expanded = nil
+        sheet = panel
+    }
+}
+
 struct PeopleWindowLayout {
     static let compactWidth: CGFloat = 490
     static let panelWidth: CGFloat = 359
