@@ -104,7 +104,7 @@ private struct RecordingMenu: View {
             }
             if tracker.breakPhase != .work {
                 Button("I'm back") { tracker.returnFromBreak() }
-            } else {
+            } else if tracker.isWorking {
                 Button(tracker.breakPromptPending ? "Break suggested — take a break" : "Take a break") {
                     tracker.chooseBreak()
                     openWindow(id: "collector")

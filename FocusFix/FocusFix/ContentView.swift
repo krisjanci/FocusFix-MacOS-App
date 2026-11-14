@@ -205,8 +205,8 @@ struct ContentView: View {
             }
 
             if tracker.isRecording && !onBreak &&
-                (!tracker.isWorking || tracker.breakPromptPending || tracker.latestBreak != nil || tracker.notificationNotice != nil) {
-                BreakControls(tracker: tracker, showsTakeBreak: !tracker.isWorking).tint(teal)
+                (tracker.breakPromptPending || tracker.latestBreak != nil || tracker.notificationNotice != nil) {
+                BreakControls(tracker: tracker, showsTakeBreak: false).tint(teal)
             }
 
             if tracker.timedCheckInPending && !onBreak {
