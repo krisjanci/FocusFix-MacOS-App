@@ -64,9 +64,9 @@ final class QuickTourController: ObservableObject {
         guard isPresented, phase == .start, demoAutomatic else { return }
         demoContext = .work
     }
-    func practiceNotWorkingNotification() {
+    func practiceEndWork() {
         guard isPresented, phase == .start, demoAutomatic else { return }
-        demoContext = .nonWork
+        demoContext = .unknown
     }
     @Published private(set) var isPresented = false
     @Published private(set) var phase: QuickTourPhase = .start
