@@ -166,6 +166,8 @@ import Combine
                 intervals: seconds == 0 ? [] : [.init(start: start, end: start + seconds)])
         }
         stage(3600)
+        precondition(!afterDeletion.needsDeclaredWorkDetails(segment, days: ["2026-11-12": 3600], startedAt: start))
+        precondition(afterDeletion.needsDeclaredWorkDetails(segment, days: ["2026-11-12": 3600], startedAt: start + 0.5))
         await afterDeletion.refresh()
         precondition(workBodies.isEmpty && afterDeletion.declaredWorkSyncHeld)
         workVersion = 1; workOffline = true

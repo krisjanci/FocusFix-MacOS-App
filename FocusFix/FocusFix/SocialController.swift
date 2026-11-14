@@ -136,9 +136,10 @@ final class SocialController: ObservableObject {
         guard ledger != nil, let owner = userID, let origin = account.api?.configuration.origin.absoluteString else { return nil }
         return (owner, origin)
     }
-    func needsDeclaredWorkDetails(_ segmentID: UUID, days: [String: Double]) -> Bool {
+    func needsDeclaredWorkDetails(_ segmentID: UUID, days: [String: Double], startedAt: Double? = nil) -> Bool {
         let snapshot = ledger?.declaredWorkSnapshots?[segmentID.uuidString]
         return snapshot?.ready != true || snapshot?.days != days
+            || (startedAt != nil && snapshot?.startedAt != startedAt)
     }
     func stageDeclaredWork(segmentID: UUID, days: [String: Double], capturedOwner: UUID?, capturedOrigin: String?,
                            startedAt: Double? = nil, observedThrough: Double? = nil, intervals: [DeclaredWorkInterval]? = nil) {

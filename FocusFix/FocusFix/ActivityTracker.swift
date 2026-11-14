@@ -1197,7 +1197,8 @@ final class ActivityTracker: ObservableObject {
                 || dailyProgress.declaredRevisions[contract.segmentID.uuidString] != contract.revisions.count
                 || (dailyProgress.declaredOwners[contract.segmentID.uuidString]?.ownerID == SocialController.shared.userID
                     && SocialController.shared.needsDeclaredWorkDetails(contract.segmentID,
-                        days: dailyProgress.declaredSegments[contract.segmentID.uuidString] ?? [:]))
+                        days: dailyProgress.declaredSegments[contract.segmentID.uuidString] ?? [:],
+                        startedAt: session.startedAt.timeIntervalSince1970))
         }
         progressReconciliation = Task { [weak self] in
             for session in candidates {

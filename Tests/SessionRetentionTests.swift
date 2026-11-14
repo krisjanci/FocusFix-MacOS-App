@@ -8,7 +8,7 @@ struct SessionRetentionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let sessions = root.appendingPathComponent("Sessions")
         let store = ProgressStore(url: root.appendingPathComponent("progress.json"))
-        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let start = Date(timeIntervalSince1970: 1_790_000_000.375)
         let calendar = DailyProgress.calendar(timeZone: TimeZone(secondsFromGMT: 0)!)
         var progress = DailyProgress()
         var total: Double = 0
@@ -33,6 +33,7 @@ struct SessionRetentionTests {
                 precondition(retained != nil)
                 let saved = try SavedSession(folder: retained!)
                 precondition(saved.duration == duration)
+                precondition(saved.startedAt == start)
                 precondition(FileManager.default.fileExists(atPath: retained!.appendingPathComponent("events.csv").path))
             } else {
                 precondition(retained == nil)
@@ -47,6 +48,17 @@ struct SessionRetentionTests {
             let history = try SessionFiles.list(in: sessions)
             precondition(history.count == savedCount)
         }
+        // Rotation carries an earlier context's date; use this segment's capture
+        // timestamp rather than that context or the rounded display metadata.
+        let rotatedContract = RecordingContract(mode: .automatic, startedAt: start,
+            elapsedOrigin: 100, continuing: ContextInterval(id: UUID(), logicalID: UUID(),
+                start: 0, end: nil, context: .work, source: .manualStart,
+                effectiveAtUTC: start.addingTimeInterval(-100), recordedAtUTC: start.addingTimeInterval(-100)))
+        let rotated = try RecordingWriter(root: root, id: "rotated", startedAt: start,
+            continuingContract: rotatedContract)
+        try rotated.finish(startedAt: start, duration: 103.25, reason: "user_stop")
+        let restoredRotated = try SavedSession(folder: rotated.folder)
+        precondition(restoredRotated.startedAt == start)
         precondition(abs(total - DailyProgress.goalSeconds) < 0.00001)
         precondition(progress.day(at: start, calendar: calendar).workSeconds >= DailyProgress.goalSeconds)
         for invalid in [-1.0, Double.nan, Double.infinity] {

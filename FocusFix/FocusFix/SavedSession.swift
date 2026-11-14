@@ -56,7 +56,15 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         } else { recordingContract = nil }
         let formatter = ISO8601DateFormatter()
         let start = (metadata["started_at_utc"] as? String).flatMap { formatter.date(from: $0) }
-        startedAt = start ?? values.creationDate ?? .distantPast
+        // Display timestamps in older metadata omit fractional seconds. The
+        // capture manifest preserves the exact segment start, even after rotation.
+        let capture = try? ResearchCaptureManifest.load(from: folder)
+        let preciseStart = recordingContract.flatMap { contract -> Date? in
+            guard let capture, capture.segmentID == contract.segmentID,
+                  capture.recordingID == contract.recordingID else { return nil }
+            return capture.capturedAtUTC
+        }
+        startedAt = preciseStart ?? start ?? values.creationDate ?? .distantPast
         // JSONSerialization can round a fractional NSNumber one ULP differently
         // from JSONDecoder. Use the contract's decoder for new-schema durations,
         // preserving the strict equality check without accepting mismatched bounds.
