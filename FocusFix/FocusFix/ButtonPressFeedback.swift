@@ -51,7 +51,10 @@ import AppKit
     private func contains(_ event: NSEvent, in marker: ButtonPressMarker) -> Bool {
         guard marker.enabled, let window = marker.window, event.window === window,
               !marker.isHiddenOrHasHiddenAncestor else { return false }
-        return marker.visibleRect.contains(marker.convert(event.locationInWindow, from: nil))
+        let point = marker.convert(event.locationInWindow, from: nil)
+        // AppKit's visibleRect can extend beyond an unclipped view's bounds.
+        // Test both so nearby controls never react to another button's click.
+        return marker.bounds.contains(point) && marker.visibleRect.contains(point)
     }
 
     private func receive(_ event: NSEvent) {
