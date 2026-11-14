@@ -15,6 +15,9 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     let tagColors: [String: String]
     let schemaVersion: Int
     let recordingContract: RecordingContract?
+    private struct DurationMetadata: Decodable {
+        let duration_seconds: Double?
+    }
     var legacyContext: ActivityContext { .unknown }
     // Use the unique session folder name as the library row's identity.
     var id: String { folder.lastPathComponent }
@@ -25,13 +28,17 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         let values = try folder.resourceValues(forKeys: [.creationDateKey])
         let metadataURL = folder.appendingPathComponent("session.json")
         let metadata: [String: Any]
+        let metadataData: Data
         if FileManager.default.fileExists(atPath: metadataURL.path) {
             let properties = try metadataURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard properties.isRegularFile == true, properties.isSymbolicLink != true,
-                  (properties.fileSize ?? Int.max) <= 16 * 1024 * 1024,
-                  let decoded = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any] else { throw RecordingContract.Invalid.contract }
+                  (properties.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw RecordingContract.Invalid.contract }
+            metadataData = try Data(contentsOf: metadataURL)
+            guard let decoded = try JSONSerialization.jsonObject(with: metadataData) as? [String: Any] else {
+                throw RecordingContract.Invalid.contract
+            }
             metadata = decoded
-        } else { metadata = [:] }
+        } else { metadata = [:]; metadataData = Data("{}".utf8) }
         schemaVersion = metadata["schema_version"] as? Int ?? 0
         if schemaVersion < RecordingContract.schemaVersion,
            FileManager.default.fileExists(atPath: folder.appendingPathComponent("context_intervals.json").path) { throw RecordingContract.Invalid.contract }
@@ -50,7 +57,12 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         let formatter = ISO8601DateFormatter()
         let start = (metadata["started_at_utc"] as? String).flatMap { formatter.date(from: $0) }
         startedAt = start ?? values.creationDate ?? .distantPast
-        let seconds = metadata["duration_seconds"] as? Double
+        // JSONSerialization can round a fractional NSNumber one ULP differently
+        // from JSONDecoder. Use the contract's decoder for new-schema durations,
+        // preserving the strict equality check without accepting mismatched bounds.
+        let seconds = recordingContract != nil
+            ? try JSONDecoder().decode(DurationMetadata.self, from: metadataData).duration_seconds
+            : metadata["duration_seconds"] as? Double
         let validDuration = seconds.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         if let contract = recordingContract, contract.finalized {
             guard validDuration == contract.observedThrough - contract.elapsedOrigin else { throw RecordingContract.Invalid.bounds }
