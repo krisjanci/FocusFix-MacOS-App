@@ -98,7 +98,7 @@ struct ContentView: View {
                 Label("System", systemImage: "circle.lefthalf.filled").tag("system")
                 Label("Light", systemImage: "sun.max").tag("light")
                 Label("Dark", systemImage: "moon").tag("dark")
-            }
+            }.pickerStyle(.inline)
         } label: {
             Image(systemName: appearanceSymbol).frame(width: 28, height: 24)
         }
