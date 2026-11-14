@@ -98,13 +98,6 @@ private struct RecordingMenu: View {
             }
         }
         if tracker.isRecording {
-            Text("Context · \(tracker.userContext == .work ? "Work" : tracker.userContext == .nonWork ? "Not working" : "Unknown")")
-            Menu("Activity context") {
-                Button("Work") { tracker.setContext(.work) }
-                Button("Not working") { tracker.setContext(.nonWork) }
-                Button("Unknown") { tracker.setContext(.unknown) }
-            }
-            Divider()
             if tracker.timedCheckInPending {
                 Button("Answer check-in") {
                     openWindow(id: "collector")
