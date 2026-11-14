@@ -21,7 +21,6 @@ struct ContentView: View {
     @State private var fullScreen = false
     @State private var screenContentSize = CGSize(width: 1200, height: 800)
     @Namespace private var panelSwitch
-    @State private var collectorWindow: NSWindow?
     @State private var collectorHeight: CGFloat = 620
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
     // Choose the break appearance only while recording a break or waiting for return.
@@ -31,12 +30,11 @@ struct ContentView: View {
     var body: some View {
         Group {
             if fullScreen {
-                let scale = min(screenContentSize.height / collectorHeight,
-                                max(1, screenContentSize.width - 300) / 490)
+                let scale = CollectorWindowLayout.fullScreenScale(contentHeight: collectorHeight, available: screenContentSize)
                 HStack(spacing: 0) {
                     measuredCollector
                         .scaleEffect(scale, anchor: .topLeading)
-                        .frame(width: 490 * scale, height: screenContentSize.height, alignment: .topLeading)
+                        .frame(width: CollectorWindowLayout.compactWidth * scale, height: screenContentSize.height, alignment: .topLeading)
                     Divider()
                     VStack(spacing: 0) {
                         sidePanel(selectedPanel, permanent: true, close: {})
@@ -53,8 +51,7 @@ struct ContentView: View {
         .clipped()
         .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
-        .background(PeopleWindowBridge(fullScreen: fullScreen, resolved: { window, size in
-            collectorWindow = window
+        .background(PeopleWindowBridge(fullScreen: fullScreen, resolved: { size in
             if screenContentSize != size { screenContentSize = size }
         }))
         .sheet(item: $panelSheet) { panel in
@@ -314,6 +311,7 @@ struct ContentView: View {
                         .frame(width: fullScreen ? 180 : nil, height: fullScreen ? 28 : nil)
                 }.buttonPressFeedback().controlSize(.large)
                     .labelStyle(CollectorSessionsLabelStyle(showTitle: fullScreen))
+                    .accessibilityLabel("Sessions")
                 Button { togglePanel(.analytics) } label: {
                     Label("Analytics", systemImage: "chart.bar.xaxis")
                 }.buttonPressFeedback()
@@ -324,7 +322,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .padding(30).frame(width: 490)
+        .padding(30).frame(width: CollectorWindowLayout.compactWidth)
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
