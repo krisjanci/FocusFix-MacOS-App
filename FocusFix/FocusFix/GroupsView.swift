@@ -64,7 +64,7 @@ struct GroupsView: View {
             }
         }
         .popover(isPresented: $scoringPresented) {
-            Text("Work ranks current weekday streaks since joining: each weekday with 60 minutes of declared work adds one day, and an unprotected missed weekday resets the count to zero. Healthy habits uses the same weekday streak and freeze rules, with a completed 1-minute break qualifying each day. Weekends remain optional for work streaks. Three freezes refill each month, without rollover or consecutive calendar-date use. Freezes add no points or streak days. Late synced work can return an unnecessary freeze. Scoring timezone: \(social.ledger?.timezone ?? ""). Equal scores share a rank; podium symbols celebrate positive scores only.")
+            Text("Work ranks current streaks since joining: each day with 60 minutes of declared work adds one day, and an unprotected missed weekday resets the count to zero. Healthy habits uses the same streak and freeze rules, with a completed 1-minute break qualifying each day. Completed weekends add days to both streaks; missed weekends never break them or spend freezes. Three freezes refill each month, without rollover or consecutive calendar-date use. Freezes add no points or streak days. Late synced work can return an unnecessary freeze. Scoring timezone: \(social.ledger?.timezone ?? ""). Equal scores share a rank; podium symbols celebrate positive scores only.")
                 .font(.callout).padding(20).frame(width: 320).fixedSize(horizontal: false, vertical: true)
         }
         .onChange(of: social.userID) { _, _ in showingChat = false }
