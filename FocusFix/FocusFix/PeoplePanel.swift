@@ -44,6 +44,7 @@ struct GroupAccessCard: View {
 
 struct GroupSelectionControls: View {
     @ObservedObject var social: SocialController
+    @Binding var showingChat: Bool
     var body: some View {
         VStack(spacing: 12) {
             if social.groups.count > 1 {
@@ -59,16 +60,31 @@ struct GroupSelectionControls: View {
                     ForEach(social.groups) { Text($0.name).tag(Optional($0.id)) }
                 }.labelsHidden()
             }
-            Picker("Leaderboard", selection: Binding(get: { social.selection.metric }, set: { metric in
+            Picker("Group section", selection: Binding(get: { showingChat ? "chat" : social.selection.metric.rawValue }, set: { section in
                 let userID = social.userID
                 Task { @MainActor in
                     guard social.userID == userID else { return }
-                    social.selectMetric(metric)
+                    showingChat = section == "chat"
+                    if let metric = LeaderboardMetric(rawValue: section) { social.selectMetric(metric) }
                 }
             })) {
-                ForEach(LeaderboardMetric.allCases) { Text($0.title).tag($0) }
+                ForEach(LeaderboardMetric.allCases) { Text($0.title).tag($0.rawValue) }
+                Text("Chat").tag("chat")
             }.pickerStyle(.segmented).labelsHidden()
         }
+    }
+}
+
+struct GroupChatComingSoon: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "bubble.left.and.bubble.right").font(.system(size: 28)).foregroundStyle(.teal)
+            Text("Group chat").font(.headline)
+            Text("Coming soon").font(.callout).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 180)
+        .background(Color.teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -77,6 +93,7 @@ struct PeoplePanel: View {
     let close: () -> Void
     @Environment(\.openWindow) private var openWindow
     @State private var profilePresented = false
+    @State private var showingChat = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -97,9 +114,13 @@ struct PeoplePanel: View {
                     } else {
                         if let group = social.selectedGroup {
                             GroupHeading(group: group, compact: true, metric: social.selection.metric)
-                            GroupSelectionControls(social: social)
-                            Text(social.selection.metric.explanation).font(.caption).foregroundStyle(.secondary)
-                            GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                            GroupSelectionControls(social: social, showingChat: $showingChat)
+                            if showingChat {
+                                GroupChatComingSoon()
+                            } else {
+                                Text(social.selection.metric.explanation).font(.caption).foregroundStyle(.secondary)
+                                GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                            }
                         } else if social.accessState == .loading {
                             accessCard
                             Spacer()
@@ -124,6 +145,7 @@ struct PeoplePanel: View {
         .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .controlBackgroundColor)).tint(.teal)
         .sheet(isPresented: $profilePresented) { SharingView() }
+        .onChange(of: social.userID) { _, _ in showingChat = false }
         .task { social.start(); await social.refresh() }
     }
     private var accessCard: some View {
