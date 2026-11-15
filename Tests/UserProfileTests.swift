@@ -64,10 +64,27 @@ struct UserProfileTests {
         }
         let legacy = try JSONDecoder().decode(UserProfile.self, from: Data("{\"name\":\"Legacy\",\"symbol\":\"leaf.fill\",\"color\":\"teal\"}".utf8))
         precondition(legacy.groupPhoto == nil)
+        // Adding a shared photo creates the thumbnail; private replacements clear it.
+        let added = try ProfileController.replacingPhoto(in: profile, from: source, shareWithGroups: true)
+        precondition(added.photo != nil && added.groupPhoto != nil)
+        let addedThumbnail = NSBitmapImageRep(data: added.groupPhoto!)!
+        precondition(addedThumbnail.pixelsWide == 64 && addedThumbnail.pixelsHigh == 64)
+        let privateReplacement = try ProfileController.replacingPhoto(in: added, from: source, shareWithGroups: false)
+        precondition(privateReplacement.photo != nil && privateReplacement.groupPhoto == nil)
+        let sharedReplacement = try ProfileController.replacingPhoto(in: added, from: source, shareWithGroups: true)
+        precondition(sharedReplacement.groupPhoto != nil)
+        let privateImport = try ProfileController.replacingPhoto(in: profile, from: source, shareWithGroups: false)
+        precondition(privateImport.photo != nil && privateImport.groupPhoto == nil)
         let invalidImage = root.appendingPathComponent("invalid.png")
         try Data("invalid image".utf8).write(to: invalidImage)
         do { _ = try ProfileController.photo(from: invalidImage); preconditionFailure("Invalid image accepted") } catch { }
-        print("User profile validation, photo import and persistence passed")
+        var unchanged = added
+        do {
+            unchanged = try ProfileController.replacingPhoto(in: unchanged, from: invalidImage, shareWithGroups: true)
+            preconditionFailure("Invalid replacement accepted")
+        } catch { }
+        precondition(unchanged == added)
+        print("User profile validation, atomic photo replacement, group visibility and persistence passed")
     }
     static func tryLoad(_ store: ProfileStore) -> UserProfile? { try! store.load() }
 }
