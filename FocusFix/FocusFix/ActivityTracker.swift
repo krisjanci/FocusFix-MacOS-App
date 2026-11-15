@@ -32,6 +32,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var breakPhase: BreakPolicy.Phase = .work
     @Published private(set) var breakPromptPending = false
     @Published private(set) var currentBreak: BreakRecord?
+    @Published private(set) var completedBreaks: [BreakRecord] = []
     @Published private(set) var latestBreak: BreakRecord?
     @Published private(set) var secondsSinceBreak: Double = 0
     @Published private(set) var notificationNotice: String?
@@ -798,6 +799,7 @@ final class ActivityTracker: ObservableObject {
         breakPromptPending = isRecording && breakPolicy.promptID != nil
         currentBreak = breakPolicy.activeBreak
         latestBreak = breakPolicy.lastBreak
+        completedBreaks = breakPolicy.completedBreaks
         secondsSinceBreak = breakPolicy.sinceLastBreak(at: time)
     }
     // Start a fresh mouse summary when the activity phase changes so phases are not mixed.
@@ -994,11 +996,11 @@ final class ActivityTracker: ObservableObject {
             updateBreakUI(at: time)
         } catch { fail(error) }
     }
-    // Save a correction to what the user actually did during their most recent break.
-    func confirmBreakActivity(_ activity: String) {
+    // Save a correction to the selected completed break in this recording.
+    func confirmBreakActivity(_ activity: String, breakID: String) {
         guard isRecording else { return }
         let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
-        guard let entry = breakPolicy.updateActivity(label, at: now) else { return }
+        guard let entry = breakPolicy.updateActivity(label, breakID: breakID, at: now) else { return }
         do { try writer?.logBreak(entry); updateBreakUI(at: now) }
         catch { fail(error) }
     }
