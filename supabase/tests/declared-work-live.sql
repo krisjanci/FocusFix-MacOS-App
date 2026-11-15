@@ -75,5 +75,57 @@ do $$ begin
  if public.social_state()::text like '%U0hBUkVE%' then raise exception 'Photo opt-out failed'; end if;
 end $$;
 reset role;
+-- Legacy whole-second bounds accept only an unchanged subsecond translation.
+create temporary table legacy_work_check on commit drop as
+ select a,gen_random_uuid() as s,t+10000 as t from work_check;
+grant select on legacy_work_check to authenticated;
+set local role authenticated;
+select set_config('request.jwt.claim.sub',(select a::text from legacy_work_check),true);
+do $$ declare c record; payload jsonb; bad jsonb; before_state jsonb; after_state jsonb; begin
+ select * into c from legacy_work_check;
+ payload:=jsonb_build_array(jsonb_build_object('ownerID',c.a,'segmentID',c.s,'contractVersion',2,'revision',1,
+  'startedAt',c.t,'observedThrough',c.t+60,'intervals',jsonb_build_array(
+   jsonb_build_object('start',c.t,'end',c.t+10),jsonb_build_object('start',c.t+20,'end',c.t+30))));
+ perform public.sync_declared_work(payload,'UTC');
+ before_state:=public.social_state();
+ payload:=jsonb_build_array(jsonb_build_object('ownerID',c.a,'segmentID',c.s,'contractVersion',2,'revision',2,
+  'startedAt',c.t+0.515699,'observedThrough',c.t+60.515699,'intervals',jsonb_build_array(
+   jsonb_build_object('start',c.t+0.515699,'end',c.t+10.515699),
+   jsonb_build_object('start',c.t+20.515699,'end',c.t+30.515699))));
+ -- A fractional start correction must never authorize changed work duration.
+ bad:=jsonb_set(payload,'{0,intervals,0,end}',to_jsonb(c.t+11.515699));
+ begin
+  perform public.sync_declared_work(bad,'UTC');
+  raise exception 'Expanded work accepted with precision repair' using errcode='P0002';
+ exception when raise_exception then if sqlerrm<>'Recording bounds cannot move backwards' then raise; end if; end;
+ bad:=jsonb_set(payload,'{0,startedAt}',to_jsonb(c.t+0.415699));
+ begin
+  perform public.sync_declared_work(bad,'UTC');
+  raise exception 'Nonuniform translation accepted' using errcode='P0002';
+ exception when raise_exception then if sqlerrm<>'Recording bounds cannot move backwards' then raise; end if; end;
+ perform public.sync_declared_work(payload,'UTC');
+ perform public.sync_declared_work(payload,'UTC');
+ after_state:=public.social_state();
+ if before_state->'progress'->'days' is distinct from after_state->'progress'->'days' then
+  raise exception 'Precision repair changed duration credit or breaks'; end if;
+ -- Once precise, even another subsecond start change must be rejected.
+ bad:=jsonb_set(jsonb_set(payload,'{0,revision}','3'),'{0,startedAt}',to_jsonb(c.t+0.415699));
+ begin
+  perform public.sync_declared_work(bad,'UTC');
+  raise exception 'Already precise bounds moved' using errcode='P0002';
+ exception when raise_exception then if sqlerrm<>'Recording bounds cannot move backwards' then raise; end if; end;
+ bad:=jsonb_set(jsonb_set(payload,'{0,revision}','3'),'{0,observedThrough}',to_jsonb(c.t+59.515699));
+ begin
+  perform public.sync_declared_work(bad,'UTC');
+  raise exception 'Observation boundary moved backwards' using errcode='P0002';
+ exception when raise_exception then if sqlerrm<>'Recording bounds cannot move backwards' then raise; end if; end;
+end $$;
+reset role;
+do $$ declare c record; saved public.social_work_segments%rowtype; begin
+ select * into c from legacy_work_check;
+ select * into saved from public.social_work_segments where segment_id=c.s;
+ if saved.started_at<>to_timestamp(c.t+0.515699) or saved.revision<>2 then
+  raise exception 'Repaired start was not persisted'; end if;
+end $$;
 rollback;
 select true as declared_work_retries_corrections_ownership_membership_and_photo_checks_passed;
