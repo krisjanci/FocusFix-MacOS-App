@@ -56,6 +56,17 @@ final class ProfileController: ObservableObject {
         }
         return data
     }
+    // Prepare both images before changing the draft, so an import failure cannot leave
+    // an old shared thumbnail attached to a newly selected private photo.
+    static func replacingPhoto(in profile: UserProfile, from url: URL, shareWithGroups: Bool) throws -> UserProfile {
+        let photo = try photo(from: url)
+        let thumbnail = shareWithGroups ? try groupPhoto(from: photo) : nil
+        var updated = profile
+        updated.photo = photo
+        updated.groupPhoto = thumbnail
+        return updated
+    }
+
     // A separately opted-in, bounded thumbnail keeps group refreshes small.
     static func groupPhoto(from data: Data) throws -> Data {
         guard let image = NSImage(data: data), image.size.width > 0, image.size.height > 0,
