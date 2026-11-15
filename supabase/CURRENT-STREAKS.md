@@ -11,9 +11,14 @@ control and lifetime history. Private helpers are inaccessible to client roles.
 Old clients retain the old fields. An updated client connected to an old server
 shows an unavailable streak (—) instead of relabeling lifetime points.
 
-Each member's Work streak starts with qualifying weekdays after joining that
-group, using their saved scoring timezone. Sixty minutes earns one weekday.
-Today stays provisional; weekends neither earn nor break a streak. Three freezes
+Apply `migrations/202611150002_count_qualifying_weekends.sql` after all prior migrations
+to count completed weekends in work and healthy-habit streaks, including existing
+qualifying history. Deploy this migration for group scores to use the new rules.
+
+Each member's Work streak starts with qualifying days after joining that
+group, using their saved scoring timezone. Sixty minutes earns one day,
+including Saturday and Sunday. Today stays provisional; missed weekends neither
+break a streak nor spend freezes. Three freezes
 refill monthly without rollover; consecutive calendar dates cannot both be frozen.
 A freeze preserves the count without adding a day. An unprotected past weekday
 resets the count to zero. Read-time calculation includes inactive members and
