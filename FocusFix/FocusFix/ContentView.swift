@@ -163,13 +163,6 @@ struct ContentView: View {
                     }
                 }
                 HStack(spacing: 8) {
-                    Button { editingActivity = true } label: {
-                        Label("Edit activity", systemImage: "square.and.pencil")
-                            .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.06), in: Capsule())
-                    }.buttonPressFeedback().buttonStyle(.plain)
-                        .disabled(!tracker.isRecording)
-                        .help("Edit activities for all completed breaks in this session")
                     SessionTagButton(tags: tracker.timerTags,
                         colors: tagLibrary.resolvedColors(for: tracker.timerTags, saved: tracker.timerTagColors)) {
                             if tracker.canOpenWorkSetup() { editingSessionTags = true }
@@ -180,6 +173,14 @@ struct ContentView: View {
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonPressFeedback().buttonStyle(.plain).help("Choose a work target")
                     Spacer(minLength: 0)
+                    if tracker.isRecording && !tracker.completedBreaks.isEmpty {
+                        Button { editingActivity = true } label: {
+                            Label("Edit activity", systemImage: "square.and.pencil")
+                                .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(Color.primary.opacity(0.06), in: Capsule())
+                        }.buttonPressFeedback().buttonStyle(.plain)
+                            .help("Edit activities for all completed breaks in this session")
+                    }
                 }
             }
             .frame(maxWidth: .infinity).padding(26)
