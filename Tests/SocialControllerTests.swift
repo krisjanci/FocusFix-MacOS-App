@@ -194,6 +194,37 @@ import Combine
         let count = workBodies.count
         stage(0); await afterDeletion.refresh()
         precondition(workBodies.count == count)
+        // Retry repairs a rounded durable outbox directly from its owned recording,
+        // without relying on an ownership entry in the separate daily-progress file.
+        let preciseStart = Date(timeIntervalSince1970: floor(start) + 0.515699)
+        var savedContract = RecordingContract(mode: .manual, startedAt: preciseStart, scoringTimeZone: "UTC")
+        try savedContract.finish(at: 60)
+        let recording = root.appendingPathComponent("FocusFix/Sessions/\(UUID())")
+        try FileManager.default.createDirectory(at: recording, withIntermediateDirectories: true)
+        try savedContract.save(to: recording)
+        try ResearchCaptureManifest(recordingID: savedContract.recordingID, segmentID: savedContract.segmentID,
+            capturedAtUTC: preciseStart, identity: nil).save(to: recording)
+        let metadata: [String: Any] = ["schema_version": RecordingContract.schemaVersion,
+            "recording_format": RecordingContract.format, "required_capabilities": RecordingContract.requiredCapabilities,
+            "recording_id": savedContract.recordingID.uuidString, "segment_id": savedContract.segmentID.uuidString,
+            "recording_mode": "manual", "started_at_utc": ISO8601DateFormatter().string(from: preciseStart),
+            "duration_seconds": 60]
+        try JSONSerialization.data(withJSONObject: metadata).write(to: recording.appendingPathComponent("session.json"))
+        try Data("start_seconds,end_seconds,activity_phase\n0,60,work\n".utf8)
+            .write(to: recording.appendingPathComponent("mouse_movement.csv"))
+        afterDeletion.stageDeclaredWork(segmentID: savedContract.segmentID, days: ["2026-11-12": 60],
+            capturedOwner: owner, capturedOrigin: config.origin.absoluteString,
+            startedAt: floor(start), observedThrough: floor(start) + 60,
+            intervals: [.init(start: floor(start), end: floor(start) + 60)])
+        await afterDeletion.retry()
+        let repaired = workBodies.last!.first { $0.segmentID == savedContract.segmentID }!
+        precondition(repaired.startedAt == preciseStart.timeIntervalSince1970 && repaired.revision == 2)
+        precondition(repaired.observedThrough == preciseStart.timeIntervalSince1970 + 60)
+        precondition(repaired.intervals == [.init(start: preciseStart.timeIntervalSince1970, end: preciseStart.timeIntervalSince1970 + 60)])
+        precondition(afterDeletion.ledger?.declaredWorkPending?.isEmpty == true && !afterDeletion.syncFailed)
+        let repairedCount = workBodies.count
+        await afterDeletion.retry()
+        precondition(workBodies.count == repairedCount) // Acknowledged history is not replayed.
         // A successful inbox response must never clear a corrupt-ledger warning:
         // otherwise Enable could overwrite the unreadable original with a new ledger.
         let identity = "\(config.origin.absoluteString)|\(owner)"
