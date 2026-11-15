@@ -14,6 +14,7 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
     @State private var editingSessionTags = false
+    @State private var editingActivity = false
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
     @State private var panels = CollectorPanelSelection()
@@ -162,6 +163,13 @@ struct ContentView: View {
                     }
                 }
                 HStack(spacing: 8) {
+                    Button { editingActivity = true } label: {
+                        Label("Edit activity", systemImage: "square.and.pencil")
+                            .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                    }.buttonPressFeedback().buttonStyle(.plain)
+                        .disabled(!tracker.isRecording)
+                        .help("Edit activities for all completed breaks in this session")
                     SessionTagButton(tags: tracker.timerTags,
                         colors: tagLibrary.resolvedColors(for: tracker.timerTags, saved: tracker.timerTagColors)) {
                             if tracker.canOpenWorkSetup() { editingSessionTags = true }
@@ -205,7 +213,7 @@ struct ContentView: View {
             }
 
             if tracker.isRecording && !onBreak &&
-                (tracker.breakPromptPending || tracker.latestBreak != nil || tracker.notificationNotice != nil) {
+                (tracker.breakPromptPending || tracker.notificationNotice != nil) {
                 BreakControls(tracker: tracker, showsTakeBreak: false).tint(teal)
             }
 
@@ -286,6 +294,7 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
+        .sheet(isPresented: $editingActivity) { BreakActivityEditor(tracker: tracker) }
         .sheet(isPresented: $editingSessionTags) {
             SessionTagEditor(tags: tracker.timerTags, colors: tracker.timerTagColors, library: tagLibrary,
                              confirmationTitle: tracker.isWorking ? "Done" : "Start work") { tags, colors in
