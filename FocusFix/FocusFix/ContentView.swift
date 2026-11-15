@@ -138,10 +138,10 @@ struct ContentView: View {
                     Text(durationText(max(0, record.deadline - tracker.elapsed)))
                         .font(.system(size: 46, weight: .light, design: .rounded)).monospacedDigit()
                     Text(record.plannedActivity).font(.headline)
-                    Text("Break time · \(durationText(tracker.elapsed - record.start))")
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                    Text(tracker.breakPhase == .resting ? "Activity logging paused" : "Tracking resumed · waiting for your return")
-                        .font(.caption).foregroundStyle(.secondary)
+                    if tracker.breakPhase != .resting {
+                        Text("Tracking resumed · waiting for your return")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 } else {
                     SessionClockFace(time: durationText(floor(tracker.declaredWorkSeconds)))
                         .help("Time recorded while you declared work; other activity and breaks are excluded.")
