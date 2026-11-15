@@ -104,43 +104,96 @@ private struct BreakSetupHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-struct BreakReviewView: View {
+struct BreakActivityEditor: View {
     @ObservedObject var tracker: ActivityTracker
-    let record: BreakRecord
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedID: String?
     @State private var activity = "Stretch"
     @State private var custom = ""
-    // Use the chosen activity, or trimmed custom text for Other.
-    private var label: String { (activity == "Other" ? custom : activity).trimmingCharacters(in: .whitespacesAndNewlines) }
-    // Let the user correct what they actually did during their most recent break.
+    private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
+
+    private var selectedBreak: BreakRecord? {
+        tracker.completedBreaks.first { $0.id == selectedID }
+    }
+    private var label: String {
+        (activity == "Other" ? custom : activity).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("What did you do?").font(.title2.weight(.semibold))
-            Text("Planned: \(record.plannedActivity)").foregroundStyle(.secondary)
-            Text("Break length: \(durationText(record.actualSeconds ?? 0))").monospacedDigit()
-            BreakActivityPicker(selection: $activity, custom: $custom)
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Edit activity").font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("Choose a break from this session and update what you did.")
+                    .foregroundStyle(.secondary)
+            }
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(Array(tracker.completedBreaks.enumerated()), id: \.element.id) { index, record in
+                        Button { select(record) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "leaf").foregroundStyle(teal)
+                                    .frame(width: 32, height: 32)
+                                    .background(teal.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Break \(index + 1) · \(record.actualActivity.isEmpty ? record.plannedActivity : record.actualActivity)")
+                                        .font(.callout.weight(.semibold)).lineLimit(2)
+                                    Text(durationText(record.actualSeconds ?? 0))
+                                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: selectedID == record.id ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedID == record.id ? teal : Color.secondary)
+                            }
+                            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(selectedID == record.id ? teal.opacity(0.08) : Color.primary.opacity(0.035),
+                                        in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(selectedID == record.id ? teal.opacity(0.4) : .clear))
+                            .contentShape(RoundedRectangle(cornerRadius: 14))
+                        }.buttonStyle(.plain).buttonPressFeedback()
+                            .accessibilityAddTraits(selectedID == record.id ? .isSelected : [])
+                    }
+                }
+            }.scrollBounceBehavior(.basedOnSize).frame(maxHeight: 240)
+            if let record = selectedBreak {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("What did you do?").font(.headline)
+                    Text("Planned: \(record.plannedActivity)").font(.caption).foregroundStyle(.secondary)
+                    BreakActivityPicker(selection: $activity, custom: $custom)
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
+            } else {
+                ContentUnavailableView("No completed breaks yet", systemImage: "leaf",
+                    description: Text("Your breaks will appear here when you return."))
+            }
             HStack {
-                Button("Later") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Save activity") {
-                    tracker.confirmBreakActivity(label)
+                    guard let record = selectedBreak else { return }
+                    tracker.confirmBreakActivity(label, breakID: record.id)
                     dismiss()
-                }.buttonPressFeedback().buttonStyle(.borderedProminent).disabled(label.isEmpty || !tracker.isRecording)
+                }.buttonPressFeedback().buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(label.isEmpty || selectedBreak == nil || !tracker.isRecording)
             }
-        }.padding(28).frame(width: 400)
-        .onAppear {
-            let value = record.actualActivity.isEmpty ? record.plannedActivity : record.actualActivity
-            activity = BreakActivityPicker.options.contains(value) ? value : "Other"
-            custom = activity == "Other" ? value : ""
-        }
+        }.padding(28).frame(width: 440).tint(teal)
+            .onAppear { if let record = tracker.completedBreaks.last { select(record) } }
+            .onChange(of: tracker.sessionFolder) { _, _ in dismiss() }
+            .onChange(of: tracker.isRecording) { _, recording in if !recording { dismiss() } }
+    }
+
+    private func select(_ record: BreakRecord) {
+        selectedID = record.id
+        let value = record.actualActivity.isEmpty ? record.plannedActivity : record.actualActivity
+        activity = BreakActivityPicker.options.contains(value) ? value : "Other"
+        custom = activity == "Other" ? value : ""
     }
 }
 
 struct BreakControls: View {
     @ObservedObject var tracker: ActivityTracker
     var showsTakeBreak = true
-    @State private var reviewing = false
-    // Keep reminders and review here when the main action row offers Take a break.
+    // Keep reminders here when the main action row offers Take a break.
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if tracker.breakPromptPending {
@@ -158,21 +211,9 @@ struct BreakControls: View {
                     Button("Take a break") { tracker.chooseBreak() }.buttonPressFeedback()
                 }
             }
-            if let last = tracker.latestBreak {
-                HStack {
-                    Text("Last break · \(durationText(last.actualSeconds ?? 0))")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(last.actualActivity.isEmpty ? "Confirm activity" : "Edit activity") { reviewing = true }.buttonPressFeedback()
-                        .font(.caption)
-                }
-            }
             if let notice = tracker.notificationNotice {
                 Text(notice).font(.caption).foregroundStyle(.secondary)
             }
-        }
-        .sheet(isPresented: $reviewing) {
-            if let last = tracker.latestBreak { BreakReviewView(tracker: tracker, record: last) }
         }
     }
 }
