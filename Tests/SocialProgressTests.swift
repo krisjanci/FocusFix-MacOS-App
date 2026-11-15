@@ -39,12 +39,27 @@ import Foundation
         let saved = progress
         progress.reconcile(at: date("2026-10-22T16:00:00Z"), calendar: cal)
         precondition(saved == progress)
-        // Friday and Monday can both be frozen; weekends neither spend nor earn streak days.
+        // Friday and Monday can both be frozen; uncompleted weekends never spend freezes.
         var weekends = DailyProgress()
         weekends.reconcile(at: date("2026-10-22T16:00:00Z"), calendar: cal)
         weekends.addWork(seconds: 3600, endingAt: date("2026-10-22T16:00:00Z"), calendar: cal)
         weekends.reconcile(at: date("2026-10-27T16:00:00Z"), calendar: cal)
         precondition(weekends.frozenDays == ["2026-10-23", "2026-10-26"])
+        // Saturday completion thaws Friday's freeze, including on an idle Sunday.
+        fridayFrozen.addWork(seconds: 3600, endingAt: date("2026-10-24T16:00:00Z"), calendar: cal)
+        precondition(fridayFrozen.streakStatus(at: date("2026-10-24T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 2, frozen: false))
+        precondition(fridayFrozen.streakStatus(at: date("2026-10-25T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 2, frozen: false))
+        // Late weekend work restarts a broken streak and protects Monday.
+        var lateWeekend = DailyProgress()
+        lateWeekend.reconcile(at: monday, calendar: cal)
+        lateWeekend.addWork(seconds: 3600, endingAt: monday, calendar: cal)
+        let tuesday = date("2026-10-27T16:00:00Z")
+        lateWeekend.reconcile(at: tuesday, calendar: cal)
+        precondition(lateWeekend.streak(at: tuesday, calendar: cal) == 0)
+        lateWeekend.addWork(seconds: 3600, endingAt: date("2026-10-24T16:00:00Z"), calendar: cal)
+        lateWeekend.reconcile(at: tuesday, calendar: cal)
+        precondition(lateWeekend.frozenDays == ["2026-10-20", "2026-10-26"])
+        precondition(lateWeekend.streak(at: tuesday, calendar: cal) == 1)
         // Alternating work and missed days exhaust exactly three, with no rollover.
         var monthly = DailyProgress()
         monthly.reconcile(at: monday, calendar: cal)
