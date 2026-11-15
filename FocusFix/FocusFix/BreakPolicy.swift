@@ -56,6 +56,7 @@ struct BreakPolicy {
     private(set) var promptID: String?
     private(set) var activeBreak: BreakRecord?
     private(set) var lastBreak: BreakRecord?
+    private(set) var completedBreaks: [BreakRecord] = []
     private(set) var lastBreakEnd: Double = 0
     private(set) var nextEligible: Double
     private var lastInput: Double = 0
@@ -131,6 +132,7 @@ struct BreakPolicy {
         record.endReason = reason
         let result = entry(at: time, action: "break_end", record: record)
         lastBreak = record
+        completedBreaks.append(record)
         activeBreak = nil
         phase = .work
         lastBreakEnd = time
@@ -138,11 +140,15 @@ struct BreakPolicy {
         resetInput(at: time)
         return result
     }
-    // Correct the reported activity for the most recently completed break.
-    mutating func updateActivity(_ activity: String, at time: Double) -> BreakLogEntry? {
-        guard !activity.isEmpty, var record = lastBreak else { return nil }
-        record.actualActivity = activity
-        lastBreak = record
+    // Corrections retain the original timing and append a new log row for the selected break.
+    // Omitting an ID preserves the most-recent-break behavior for existing callers.
+    mutating func updateActivity(_ activity: String, breakID: String? = nil, at time: Double) -> BreakLogEntry? {
+        let label = String(activity.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
+        guard !label.isEmpty, let id = breakID ?? lastBreak?.id,
+              let index = completedBreaks.firstIndex(where: { $0.id == id }) else { return nil }
+        completedBreaks[index].actualActivity = label
+        let record = completedBreaks[index]
+        if lastBreak?.id == id { lastBreak = record }
         return entry(at: time, action: "activity_updated", record: record)
     }
     // Build a log row describing a break decision or timing transition.
