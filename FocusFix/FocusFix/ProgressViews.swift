@@ -80,7 +80,7 @@ struct DailyProgressDisplay: View {
                 .accessibilityLabel("Daily work goal")
                 .accessibilityValue("\(workMinutes) of 60 minutes")
             HStack {
-                Label(streak > 0 ? "\(streak)-day weekday streak" : "Start a new streak",
+                Label(streak > 0 ? "\(streak)-day streak" : "Start a new streak",
                       systemImage: "flame")
                 Spacer()
                 Label(breakCount > 0 ? "Healthy habit complete" : "Take a 1-min break", systemImage: "leaf")
@@ -98,7 +98,7 @@ struct DailyProgressDisplay: View {
                 Text("You made time to recharge.").font(.caption).foregroundStyle(teal)
             }
             if weekend {
-                Text("Weekends are optional. Your weekday streak takes a break too.")
+                Text("Weekends are optional. Completing today’s goal still adds a streak day.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let notice {
@@ -124,7 +124,7 @@ struct ProgressMenuSummary: View {
         let progress = tracker.dailyProgress
         let day = progress.day(at: date, calendar: calendar)
         let status = progress.streakStatus(at: date, calendar: calendar)
-        Text("Declared work: \(Int(day.workSeconds / 60))/60 min · \(status.count)-day weekday streak")
+        Text("Declared work: \(Int(day.workSeconds / 60))/60 min · \(status.count)-day streak")
         Text("Breaks taken today: \(day.completedBreakIDs.count)")
     }
 }
