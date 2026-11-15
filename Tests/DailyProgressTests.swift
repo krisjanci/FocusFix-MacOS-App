@@ -58,10 +58,29 @@ struct DailyProgressTests {
             precondition(week.streak(at: date("2026-10-\(day)T16:00:00Z"), calendar: cal) == 5)
         }
         week.addWork(seconds: 7200, endingAt: date("2026-10-24T16:00:00Z"), calendar: cal)
-        precondition(week.streak(at: date("2026-10-25T16:00:00Z"), calendar: cal) == 5)
+        precondition(week.streak(at: date("2026-10-25T16:00:00Z"), calendar: cal) == 6)
         week.addWork(seconds: 3600, endingAt: date("2026-10-26T16:00:00Z"), calendar: cal)
-        precondition(week.streak(at: date("2026-10-26T16:00:00Z"), calendar: cal) == 6)
+        precondition(week.streak(at: date("2026-10-26T16:00:00Z"), calendar: cal) == 7)
         precondition(week.streak(at: date("2026-10-28T16:00:00Z"), calendar: cal) == 0)
+
+        // Completed weekend days count once each; idle weekends remain optional.
+        var weekendStart = DailyProgress()
+        let saturday = date("2026-10-24T16:00:00Z")
+        let sunday = date("2026-10-25T16:00:00Z")
+        weekendStart.reconcile(at: saturday, calendar: cal)
+        weekendStart.addWork(seconds: 3599, endingAt: saturday, calendar: cal)
+        precondition(weekendStart.streak(at: saturday, calendar: cal) == 0)
+        weekendStart.addWork(seconds: 1, endingAt: saturday, calendar: cal)
+        precondition(weekendStart.streakStatus(at: saturday, calendar: cal) == WorkStreakStatus(count: 1, frozen: false))
+        weekendStart.addWork(seconds: 7200, endingAt: sunday, calendar: cal)
+        precondition(weekendStart.streak(at: sunday, calendar: cal) == 2)
+        weekendStart.reconcile(at: date("2026-10-27T16:00:00Z"), calendar: cal)
+        precondition(weekendStart.frozenDays == ["2026-10-26"])
+        precondition(weekendStart.streakStatus(at: date("2026-10-27T16:00:00Z"), calendar: cal) == WorkStreakStatus(count: 2, frozen: true))
+        precondition(weekendStart.streakStatus(at: date("2026-10-28T16:00:00Z"), calendar: cal).count == 0)
+        var sundayStart = DailyProgress()
+        sundayStart.addWork(seconds: 3600, endingAt: sunday, calendar: cal)
+        precondition(sundayStart.streak(at: sunday, calendar: cal) == 1)
 
         var midnight = DailyProgress()
         let end = date("2026-10-20T04:30:00Z") // 00:30 local
