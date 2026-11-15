@@ -81,15 +81,27 @@ struct ProfileEditor: View {
                             .help("Edit your name")
                             .disabled(account.session != nil && !account.profileLoaded)
                     }
-                    Text(account.session == nil ? "Profile on this Mac" : "Private account profile")
+                    Text(account.session == nil ? "Profile on this Mac" : "Account profile")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !editing, account.session != nil, let savedProfile, savedProfile.photo != nil {
+                Label(savedProfile.groupPhoto == nil ? "Photo is private" : "Photo shared with group members",
+                      systemImage: savedProfile.groupPhoto == nil ? "lock.fill" : "person.2.fill")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button(savedProfile.groupPhoto == nil ? "Share photo with my groups…" : "Change photo visibility…") {
+                    beginEditing()
+                    if draft.groupPhoto == nil, let photo = draft.photo {
+                        do { draft.groupPhoto = try ProfileController.groupPhoto(from: photo) }
+                        catch { photoError = "This photo could not be prepared for groups." }
+                    }
+                }.buttonPressFeedback().disabled(account.busy || !account.profileLoaded)
             }
             if editing {
                 HStack {
                     if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil }.buttonPressFeedback() }
                 }
-                Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your private account profile. Choose a photo under 10 MB.")
+                Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your account profile. Choose a photo under 10 MB and review group visibility below.")
                     .font(.caption).foregroundStyle(.secondary)
                 if account.session != nil, draft.photo != nil {
                     Toggle("Show my photo to members of my groups", isOn: Binding(
@@ -100,7 +112,7 @@ struct ProfileEditor: View {
                                 catch { photoError = "This photo could not be prepared for groups." }
                             } else { draft.groupPhoto = nil }
                         }))
-                    Text("Your photo always appears for you. This shares a small thumbnail with your current group members; turn it off and save to stop sharing it.")
+                    Text("When enabled, saving shares a small photo thumbnail with members of your groups. Turn it off and save to keep your photo private. Group photos update on the next refresh.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let error = photoError { Text(error).font(.caption).foregroundStyle(.red) }
@@ -142,9 +154,10 @@ struct ProfileEditor: View {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
-            let sharing = draft.groupPhoto != nil
-            draft.photo = try ProfileController.photo(from: url)
-            draft.groupPhoto = sharing ? try draft.photo.map { try ProfileController.groupPhoto(from: $0) } : nil
+            // Newly added account photos are shared with groups unless switched off
+            // before saving. Replacing an existing photo preserves its visibility.
+            let sharing = account.session != nil && (draft.photo == nil || draft.groupPhoto != nil)
+            draft = try ProfileController.replacingPhoto(in: draft, from: url, shareWithGroups: sharing)
             photoError = nil
         } catch { photoError = "This photo could not be opened. Choose a PNG, JPEG, HEIC or TIFF under 10 MB." }
     }
