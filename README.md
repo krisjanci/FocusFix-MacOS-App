@@ -32,6 +32,8 @@ A public download is not posted yet. A release still needs the database migratio
 
 Source is licensed under [GPL-3.0-only](LICENSE). [Open a GitHub issue](https://github.com/krisjanci/FocusFix-MacOS-App/issues) for general support. Issues are public; do not post recordings, credentials, or personal information. Technical recording details are in [RECORDING-CONTRACT.md](RECORDING-CONTRACT.md).
 
+Completed Saturday and Sunday goals add a day to work and healthy-habit streaks. Missed weekends stay optional and use no freezes. Group scores require the `202611150002_count_qualifying_weekends.sql` migration; saved qualifying weekend history counts on recalculation.
+
 Group work streaks sync observed declared-work intervals with retry-safe replacements, including historical corrections. Positive, unfrozen streaks have a gentle burning animation that respects Reduce Motion. Account buttons use FocusFix teal. Group rows show the same shared thumbnail to you and other members. Newly added account photos have **Show my photo to members of my groups** enabled before saving; switch it off to keep the photo private. Existing private photos stay private, including when replaced. The profile displays photo visibility even when you are not editing; choose **Share photo with my groups…** and save to share an existing photo. Imports prepare the private photo and bounded 64-pixel thumbnail together, so failed imports cannot leave mismatched images. Group photos update on the next group refresh.
 
 Groups include **Work streak**, **Healthy habits**, and **Chat** tabs in both the side panel and the Groups window. Chat displays **Coming soon** only: it adds no requests, subscriptions, database tables, or message storage.
