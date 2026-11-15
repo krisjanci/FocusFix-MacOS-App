@@ -6,6 +6,7 @@ struct GroupsView: View {
     @State private var profilePresented = false
     @State private var sheet: GroupSheet?
     @State private var scoringPresented = false
+    @State private var showingChat = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -26,9 +27,13 @@ struct GroupsView: View {
                 } else {
                     if let group = social.selectedGroup {
                         GroupHeading(group: group, metric: social.selection.metric)
-                        GroupSelectionControls(social: social)
-                        Text(social.selection.metric.explanation).font(.callout).foregroundStyle(.secondary)
-                        GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                        GroupSelectionControls(social: social, showingChat: $showingChat)
+                        if showingChat {
+                            GroupChatComingSoon()
+                        } else {
+                            Text(social.selection.metric.explanation).font(.callout).foregroundStyle(.secondary)
+                            GroupLeaderboard(group: group, metric: social.selection.metric, currentUser: social.userID, scrolls: false)
+                        }
                     } else {
                         if social.accessState == .loading { accessCard }
                         else {
@@ -62,6 +67,7 @@ struct GroupsView: View {
             Text("Work ranks current weekday streaks since joining: each weekday with 60 minutes of declared work adds one day, and an unprotected missed weekday resets the count to zero. Healthy habits uses the same weekday streak and freeze rules, with a completed 1-minute break qualifying each day. Weekends remain optional for work streaks. Three freezes refill each month, without rollover or consecutive calendar-date use. Freezes add no points or streak days. Late synced work can return an unnecessary freeze. Scoring timezone: \(social.ledger?.timezone ?? ""). Equal scores share a rank; podium symbols celebrate positive scores only.")
                 .font(.callout).padding(20).frame(width: 320).fixedSize(horizontal: false, vertical: true)
         }
+        .onChange(of: social.userID) { _, _ in showingChat = false }
         .task { social.start(); await social.refresh() }
     }
     private var accessCard: some View {
