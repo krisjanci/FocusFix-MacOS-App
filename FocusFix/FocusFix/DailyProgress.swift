@@ -52,9 +52,9 @@ struct DailyProgress: Codable, Equatable {
             let key = Self.key(for: cursor, calendar: calendar)
             let month = String(key.prefix(7))
             let yesterday = calendar.date(byAdding: .day, value: -1, to: cursor)!
-            if !Self.isWeekend(cursor, calendar: calendar) {
-                if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { alive = true }
-                else if alive && previousFrozen != Self.key(for: yesterday, calendar: calendar) && spent[month, default: 0] < 3 {
+            if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { alive = true }
+            else if !Self.isWeekend(cursor, calendar: calendar) {
+                if alive && previousFrozen != Self.key(for: yesterday, calendar: calendar) && spent[month, default: 0] < 3 {
                     frozenDays.insert(key); previousFrozen = key; spent[month, default: 0] += 1
                 } else { alive = false }
             }
@@ -74,7 +74,7 @@ struct DailyProgress: Codable, Equatable {
         return calendar
     }
 
-    // The goal follows Monday–Friday even in regions with different weekend conventions.
+    // Saturday and Sunday are optional rest days, but completed goals still count.
     static func isWeekend(_ date: Date, calendar: Calendar) -> Bool {
         let weekday = calendar.component(.weekday, from: date)
         return weekday == 1 || weekday == 7
@@ -145,10 +145,9 @@ struct DailyProgress: Codable, Equatable {
         var count = 0
         let today = cursor
         while true {
-            if !Self.isWeekend(cursor, calendar: calendar) {
-                if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { count += 1 }
-                else if cursor != today && !frozenDays.contains(Self.key(for: cursor, calendar: calendar)) { return count }
-            }
+            if day(at: cursor, calendar: calendar).workSeconds >= Self.goalSeconds { count += 1 }
+            else if !Self.isWeekend(cursor, calendar: calendar), cursor != today,
+                    !frozenDays.contains(Self.key(for: cursor, calendar: calendar)) { return count }
             guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else { return count }
             cursor = previous
         }
@@ -161,7 +160,7 @@ struct DailyProgress: Codable, Equatable {
         current.reconcile(at: date, calendar: calendar)
         let count = current.streak(at: date, calendar: calendar)
         guard count > 0 else { return WorkStreakStatus(count: 0, frozen: false) }
-        if !Self.isWeekend(date, calendar: calendar), current.day(at: date, calendar: calendar).workSeconds >= Self.goalSeconds {
+        if current.day(at: date, calendar: calendar).workSeconds >= Self.goalSeconds {
             return WorkStreakStatus(count: count, frozen: false)
         }
         var cursor = calendar.startOfDay(for: date)
@@ -170,7 +169,7 @@ struct DailyProgress: Codable, Equatable {
                 return WorkStreakStatus(count: count, frozen: false)
             }
             cursor = previous
-        } while Self.isWeekend(cursor, calendar: calendar)
+        } while Self.isWeekend(cursor, calendar: calendar) && current.day(at: cursor, calendar: calendar).workSeconds < Self.goalSeconds
         return WorkStreakStatus(count: count, frozen: current.frozenDays.contains(Self.key(for: cursor, calendar: calendar)))
     }
 
@@ -185,7 +184,7 @@ struct WorkStreakStatus: Equatable {
     let frozen: Bool
     var description: String {
         if count == 0 { return "No current streak · complete 60 minutes of declared work to start" }
-        return "\(count)-day weekday streak\(frozen ? " · protected by a freeze" : "")"
+        return "\(count)-day streak\(frozen ? " · protected by a freeze" : "")"
     }
 }
 
