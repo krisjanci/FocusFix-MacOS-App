@@ -96,7 +96,7 @@ struct LeaderboardRow: View {
         .background(isCurrentUser ? Color.teal.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metric == .work
-            ? "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.workStreak.map { "\($0)-day weekday streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.workStreakFrozen == true ? ", protected by a freeze" : "")"
+            ? "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.workStreak.map { "\($0)-day streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.workStreakFrozen == true ? ", protected by a freeze" : "")"
             : "\(member.name)\(isCurrentUser ? ", you" : ""), \(member.habitsStreak.map { "\($0)-day healthy-habit streak, rank \(metric.rank(member))" } ?? "current streak unavailable")\(member.habitsStreakFrozen == true ? ", protected by a freeze" : "")")
     }
 }
