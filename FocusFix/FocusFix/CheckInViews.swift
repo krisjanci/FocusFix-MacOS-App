@@ -47,6 +47,10 @@ struct SessionCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SessionStartDraft
     @State private var notice: String?
+    @Namespace private var targetSelection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var minutesFocused: Bool
+    private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     init(tracker: ActivityTracker) {
         self.tracker = tracker
@@ -57,29 +61,61 @@ struct SessionCheckInView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Work target").font(.title2.weight(.semibold))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Work target").font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("Give your next stretch of work a little direction.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             if draft.asksForFatigue { FatigueSlider(rating: $draft.fatigue) }
             if draft.planning {
-                Picker("Work target", selection: $draft.durationChoice) {
-                    Text("30 min").tag(30)
-                    Text("60 min").tag(60)
-                    Text("90 min").tag(90)
-                    Text("Custom").tag(0)
-                }
-                if draft.durationChoice == 0 {
-                    HStack {
-                        TextField("Minutes", text: $draft.customMinutes)
-                            .textFieldStyle(.roundedBorder).frame(width: 80)
-                            .accessibilityLabel("Work target minutes")
-                        Text("minutes · 1–480").font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 4) {
+                        ForEach([30, 60, 90, 0], id: \.self) { choice in
+                            Button {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                                    draft.durationChoice = choice
+                                }
+                                minutesFocused = choice == 0
+                            } label: {
+                                Text(choice == 0 ? "Custom" : "\(choice) min")
+                                    .font(.callout.weight(.semibold))
+                                    .frame(maxWidth: .infinity).padding(.vertical, 11)
+                                    .foregroundStyle(draft.durationChoice == choice ? Color.white : Color.primary)
+                                    .background {
+                                        if draft.durationChoice == choice {
+                                            RoundedRectangle(cornerRadius: 10).fill(teal)
+                                                .matchedGeometryEffect(id: "target", in: targetSelection)
+                                        }
+                                    }
+                                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                            }.buttonStyle(.plain)
+                                .accessibilityLabel(choice == 0 ? "Custom duration" : "\(choice) minutes")
+                                .accessibilityAddTraits(draft.durationChoice == choice ? .isSelected : [])
+                        }
+                    }.padding(4).background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityElement(children: .contain).accessibilityLabel("Target duration")
+                    if draft.durationChoice == 0 {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("How many minutes would you like to work?").font(.callout.weight(.medium))
+                            HStack {
+                                TextField("Enter minutes", text: $draft.customMinutes)
+                                    .textFieldStyle(.roundedBorder).frame(width: 120)
+                                    .focused($minutesFocused)
+                                    .accessibilityLabel("Work target minutes")
+                                Text("minutes · 1–480").font(.caption).foregroundStyle(.secondary)
+                            }
+                            if !draft.validPlan {
+                                Text("Enter a whole number from 1 to 480.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    if !draft.validPlan {
-                        Text("Enter a whole number from 1 to 480.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    Label {
+                        Text("Work time includes quiet reading. Breaks and check-ins don't count. You choose when to stop.")
+                            .fixedSize(horizontal: false, vertical: true)
+                    } icon: { Image(systemName: "info.circle") }
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(18).background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
             }
             if !draft.planning { Button("Add work target") { draft.addPlan() }.buttonPressFeedback() }
             if tracker.isWorking, draft.planning {
@@ -96,7 +132,7 @@ struct SessionCheckInView: View {
                 Button(tracker.isWorking ? "Done" : "Start work") { start() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent).disabled(draft.selection() == nil)
             }
-        }.padding(28).frame(width: 440)
+        }.padding(28).frame(width: 440).tint(teal)
     }
 
     private func start(skippingFatigue: Bool = false) {
