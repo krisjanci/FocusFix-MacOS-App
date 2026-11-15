@@ -35,6 +35,7 @@ final class SocialController: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
     private var inFlight: Set<UUID> = []
     private var started = false
+    private var repairedWorkOutbox = false
 
     var enabled: Bool { ledger != nil }
     var declaredWorkSyncHeld: Bool { declaredWorkSyncVersion == 0 && ledger?.declaredWorkPending?.isEmpty == false }
@@ -76,8 +77,10 @@ final class SocialController: ObservableObject {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
         ledger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
+        repairedWorkOutbox = false
     }
     func retry() async {
+        repairedWorkOutbox = false
         if !enabled { identity = nil; alignAccount() }
         await refresh()
     }
@@ -237,6 +240,8 @@ final class SocialController: ObservableObject {
         }
     }
     private func syncDeclaredWork(api: AccountAPI, session: AccountSession, token: UUID) async throws {
+        await repairWorkOutbox(token: token)
+        guard generation == token, userID == session.user.id else { throw CancellationError() }
         guard let ledger else { return }
         let sent = Array((ledger.declaredWorkPending ?? [:]).values.filter(\.ready)
             .sorted { $0.segmentID.uuidString < $1.segmentID.uuidString }.prefix(50))
@@ -257,6 +262,45 @@ final class SocialController: ObservableObject {
         self.ledger?.accept(state, sent: [])
         groups = state.groups; invitations = state.invitations ?? []
         selection.reconcile(groups: groups); saveSelection()
+    }
+
+    // Recover the outbox itself, even when the separate daily-progress ledger
+    // no longer has an ownership entry that would trigger history reconciliation.
+    private func repairWorkOutbox(token: UUID) async {
+        guard !repairedWorkOutbox, let pending = ledger?.declaredWorkPending,
+              !pending.isEmpty, let scope = declaredWorkScope else { return }
+        repairedWorkOutbox = true
+        let directory = storageDirectory
+        let calendar = calendar
+        let incomplete = Set(pending.filter { !$0.value.ready }.keys)
+        let repairs = await Task.detached(priority: .utility) {
+            var repairs: [(DeclaredWorkPending, SavedSession, RecordingCoverage)] = []
+            guard let root = try? directory?.appendingPathComponent("FocusFix/Sessions") ?? SessionFiles.root(),
+                  let sessions = try? SessionFiles.list(in: root) else { return repairs }
+            for session in sessions {
+                guard let contract = session.recordingContract, contract.finalized,
+                      let previous = pending[contract.segmentID.uuidString],
+                      previous.ownerID == scope.owner, previous.origin == scope.origin, previous.contractVersion == 2,
+                      incomplete.contains(contract.segmentID.uuidString) || previous.startedAt != session.startedAt.timeIntervalSince1970,
+                      let coverage = try? RecordingCoverage.load(session: session) else { continue }
+                repairs.append((previous, session, coverage))
+            }
+            return repairs
+        }.value
+        guard generation == token else { return }
+        for (previous, session, coverage) in repairs {
+            guard ledger?.declaredWorkPending?[previous.segmentID.uuidString] == previous,
+                  let contract = session.recordingContract else { continue }
+            let replacement = DeclaredWorkPending(ownerID: previous.ownerID, origin: previous.origin,
+                segmentID: contract.segmentID, contractVersion: 2,
+                days: DailyProgress.declaredAllocation(slices: coverage.workSlices, startedAt: session.startedAt,
+                    origin: contract.elapsedOrigin, calendar: calendar),
+                startedAt: session.startedAt.timeIntervalSince1970,
+                observedThrough: session.startedAt.timeIntervalSince1970 + contract.observedThrough - contract.elapsedOrigin,
+                intervals: DeclaredWorkInterval.observed(coverage.workSlices, startedAt: session.startedAt, origin: contract.elapsedOrigin))
+            _ = ledger?.stageDeclaredWork(replacement, owner: scope.owner, origin: scope.origin)
+        }
+        if !repairs.isEmpty { persist() }
     }
 
     // Inbox access never activates progress sharing or creates a local ledger.
