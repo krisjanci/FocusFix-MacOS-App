@@ -19,7 +19,7 @@ begin
  insert into public.social_member_days(group_id,user_id,day,seconds) values(g,a,'2026-10-21',3600);
  select * into result from public.social_group_work_streak(a,g,'2026-10-21T16:00:00Z');
  if result.streak<>2 or result.frozen then raise exception 'New work did not thaw streak'; end if;
- -- A weekend neither adds days nor hides the preceding protected Friday.
+ -- An uncompleted weekend preserves the preceding protected Friday.
  insert into public.social_member_days(group_id,user_id,day,seconds) values(g,b,'2026-10-22',3600);
  select * into result from public.social_group_work_streak(b,g,'2026-10-26T16:00:00Z');
  if result.streak<>1 or not result.frozen then raise exception 'Weekend freeze failed'; end if;
@@ -60,6 +60,46 @@ begin
  if has_function_privilege('authenticated','public.social_group_work_streak(uuid,uuid,timestamptz)','execute')
  or has_function_privilege('authenticated','public.social_state_daily_points(text,jsonb)','execute') then raise exception 'Private helper exposed'; end if;
  perform set_config('focusfix.current_streak_checks_passed','true',true);
+end $$;
+-- Weekend qualifications apply independently to work and healthy habits.
+do $$
+declare a uuid:=gen_random_uuid(); g uuid:=gen_random_uuid(); result record; saturday date;
+begin
+ insert into auth.users(id,email) values(a,'weekend-streak@example.invalid');
+ insert into public.social_accounts(user_id,timezone,activated_at) values(a,'America/New_York','2026-10-22');
+ insert into public.social_groups(id,owner,name) values(g,a,'Weekend streaks');
+ insert into public.social_members(group_id,user_id,joined_at) values(g,a,'2026-10-22T12:00Z');
+ insert into public.social_member_days(group_id,user_id,day,seconds,healthy) values(g,a,'2026-10-22',3600,true),(g,a,'2026-10-24',7200,true);
+ -- Saturday thaws Friday; an idle Sunday stays optional, using the scoring timezone.
+ for result in select * from public.social_group_work_streak(a,g,'2026-10-26T03:30Z')
+  union all select * from public.social_group_habit_streak(a,g,'2026-10-26T03:30Z') loop
+  if result.streak<>2 or result.frozen then raise exception 'Saturday missing or idle Sunday hid thaw'; end if;
+ end loop;
+ insert into public.social_member_days(group_id,user_id,day,seconds,healthy) values(g,a,'2026-10-25',3600,true);
+ for result in select * from public.social_group_work_streak(a,g,'2026-10-26T03:30Z')
+  union all select * from public.social_group_habit_streak(a,g,'2026-10-26T03:30Z') loop
+  if result.streak<>3 or result.frozen then raise exception 'Sunday did not add a day'; end if;
+ end loop;
+ -- A weekend can start a streak after missed weekdays, with normal Monday protection.
+ delete from public.social_member_days where group_id=g and day<'2026-10-24';
+ for result in select * from public.social_group_work_streak(a,g,'2026-10-27T16:00Z')
+  union all select * from public.social_group_habit_streak(a,g,'2026-10-27T16:00Z') loop
+  if result.streak<>2 or not result.frozen then raise exception 'Weekend-start streak did not protect Monday'; end if;
+ end loop;
+ for result in select * from public.social_group_work_streak(a,g,'2026-10-28T16:00Z')
+  union all select * from public.social_group_habit_streak(a,g,'2026-10-28T16:00Z') loop
+  if result.streak<>0 or result.frozen then raise exception 'Weekend credit bypassed missed-weekday reset'; end if;
+ end loop;
+ -- Account-wide freeze reconciliation must recognize weekend starts as well.
+ saturday:=((now() at time zone 'America/New_York')::date-extract(isodow from now() at time zone 'America/New_York')::int)-8;
+ update public.social_accounts set activated_at=saturday::timestamp at time zone 'America/New_York' where user_id=a;
+ insert into public.social_days(user_id,day,seconds) values(a,saturday,3600);
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform public.social_state('sync','{"timezone":"America/New_York"}');
+ if not (select saturday+2=any(frozen) from public.social_accounts where user_id=a) then
+  raise exception 'Account-wide ledger ignored weekend start'; end if;
+ if has_function_privilege('authenticated','public.social_group_habit_streak(uuid,uuid,timestamptz)','execute') then
+  raise exception 'Habit helper exposed'; end if;
 end $$;
 -- The marker is set only after all assertions. Running this SELECT alone cannot pass.
 select current_setting('focusfix.current_streak_checks_passed',true)='true' as current_streak_regressions_passed;
