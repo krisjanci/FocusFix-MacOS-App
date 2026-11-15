@@ -69,6 +69,34 @@ struct BreakPolicyTests {
         precondition(stopped.record!.endReason == "session_sleep_or_inactive_session")
         near(stopped.record!.actualSeconds!, 50) // Truncated, not a fabricated return.
 
+        // Every completed break remains independently editable, including during a later break.
+        let firstID = earlyEnd.record!.id
+        let latestID = stopped.record!.id
+        let nextEligible = early.nextEligible
+        let lastEnd = early.lastBreakEnd
+        precondition(early.completedBreaks.count == 2)
+        _ = early.begin(at: 400, seconds: 300, activity: "Water / snack")
+        let activeID = early.activeBreak!.id
+        let olderCorrection = early.updateActivity("  Walk  ", breakID: firstID, at: 410)!
+        precondition(olderCorrection.action == "activity_updated")
+        precondition(olderCorrection.record!.id == firstID)
+        precondition(olderCorrection.record!.actualActivity == "Walk")
+        precondition(olderCorrection.record!.plannedActivity == "Stretch")
+        near(olderCorrection.record!.actualSeconds!, 120)
+        precondition(early.lastBreak!.id == latestID && early.lastBreak!.actualActivity.isEmpty)
+        precondition(early.activeBreak!.id == activeID && early.phase == .resting)
+        near(early.nextEligible, nextEligible)
+        near(early.lastBreakEnd, lastEnd)
+        precondition(early.updateActivity("Rest my eyes", breakID: latestID, at: 411) != nil)
+        precondition(early.lastBreak!.actualActivity == "Rest my eyes")
+        precondition(early.completedBreaks[0].actualActivity == "Walk")
+        precondition(early.completedBreaks[1].actualActivity == "Rest my eyes")
+        precondition(early.updateActivity("  ", breakID: firstID, at: 412) == nil)
+        precondition(early.updateActivity("Walk", breakID: "missing", at: 412) == nil)
+        precondition(early.updateActivity("Walk", breakID: activeID, at: 412) == nil)
+        precondition(early.updateActivity(String(repeating: "a", count: 121), breakID: firstID, at: 413)!.record!.actualActivity.count == 120)
+        precondition(BreakPolicy().completedBreaks.isEmpty)
+
         // Pause gaps must not become zero activity rows or long key holds.
         var before = MouseAccumulator(initialPosition: .zero)
         let preBreakRows = before.stop(at: 1.5)
@@ -88,6 +116,9 @@ struct BreakPolicyTests {
             try writer.logBreak(entry)
         }
         let csv = try String(contentsOf: writer.folder.appendingPathComponent("breaks.csv"), encoding: .utf8)
+        try writer.logBreak(olderCorrection)
+        let updatedCSV = try String(contentsOf: writer.folder.appendingPathComponent("breaks.csv"), encoding: .utf8)
+        precondition(updatedCSV.contains(olderCorrection.csv))
         precondition(csv.split(separator: "\n").count == 10)
         precondition(csv.contains("\"activity_updated\"") && csv.contains("420.000000,120.000000"))
         precondition(BreakLogEntry.text("Water, \"tea\"") == "\"Water, \"\"tea\"\"\"")
