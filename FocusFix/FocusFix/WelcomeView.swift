@@ -37,7 +37,7 @@ struct WelcomeView: View {
                         onModeChange: { launch.showAccount(create: $0) })
                 case .profileSetup:
                     Text("Make it yours").font(.title2.weight(.semibold))
-                    Text("Choose a name and avatar for your private account profile, or do this later.")
+                    Text("Choose a name and photo for your account profile, or do this later. Review photo sharing with group members before saving.")
                         .font(.callout).foregroundStyle(.secondary)
                     if !account.profileLoaded {
                         if account.busy { ProgressView("Loading your profile…") }
