@@ -178,26 +178,23 @@ private struct BurningStreakFlame: View {
             let time = animated ? context.date.timeIntervalSinceReferenceDate : 0
             let heat = (sin(time * 9) + sin(time * 15 + 1)) / 2
             ZStack {
-                StreakFireContour(time: time)
-                    .fill(LinearGradient(colors: [.yellow, .orange, .red], startPoint: .bottom, endPoint: .top))
-                    .shadow(color: .orange.opacity(frozen ? 0.12 : 0.26 + heat * 0.08), radius: 2)
-                    .padding(.horizontal, frozen ? size * 0.16 : 0)
-                    .padding(.vertical, frozen ? size * 0.10 : 0)
                 if frozen {
-                    // Warm fire remains visible through a faceted, translucent ice block.
-                    RoundedRectangle(cornerRadius: size * 0.16)
-                        .fill(LinearGradient(colors: [.cyan.opacity(0.20), .blue.opacity(0.12), .cyan.opacity(0.32)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                    RoundedRectangle(cornerRadius: size * 0.16)
-                        .strokeBorder(.cyan.opacity(0.85), lineWidth: 1)
+                    FrozenStreakContour()
+                        .fill(LinearGradient(colors: [Color(red: 0.70, green: 0.96, blue: 1),
+                                                      Color(red: 0.15, green: 0.70, blue: 0.98),
+                                                      Color(red: 0.12, green: 0.37, blue: 0.90)],
+                                             startPoint: .bottom, endPoint: .top))
                     Path { path in
-                        path.move(to: CGPoint(x: size * 0.12, y: size * 0.40))
-                        path.addLine(to: CGPoint(x: size * 0.29, y: size * 0.14))
-                        path.addLine(to: CGPoint(x: size * 0.70, y: size * 0.10))
-                        path.move(to: CGPoint(x: size * 0.72, y: size * 0.91))
-                        path.addLine(to: CGPoint(x: size * 0.88, y: size * 0.71))
+                        path.move(to: CGPoint(x: size * 0.50, y: size * 1.18 * 0.12))
+                        path.addLine(to: CGPoint(x: size * 0.56, y: size * 1.18 * 0.27))
+                        path.addLine(to: CGPoint(x: size * 0.71, y: size * 1.18 * 0.45))
                     }
-                    .stroke(.white.opacity(0.80), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+                    .stroke(.white.opacity(0.63), style: StrokeStyle(lineWidth: max(0.7, size * 0.025),
+                                                                   lineCap: .round, lineJoin: .miter))
+                } else {
+                    StreakFireContour(time: time)
+                        .fill(LinearGradient(colors: [.yellow, .orange, .red], startPoint: .bottom, endPoint: .top))
+                        .shadow(color: .orange.opacity(0.26 + heat * 0.08), radius: 2)
                 }
             }
             .frame(width: size, height: size * 1.18)
@@ -224,6 +221,32 @@ private struct StreakFireContour: Shape {
         path.addCurve(to: point(0.79, 0.44 - rise), control1: point(0.67, 0.13), control2: point(0.74, 0.31))
         path.addQuadCurve(to: point(0.78, 0.29 - rise), control: point(0.82, 0.36))
         path.addCurve(to: point(0.50, 0.98), control1: point(1.11, 0.65), control2: point(0.94, 0.98))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// The same planted flame, frozen into a few sharp facets instead of an ice block.
+private struct FrozenStreakContour: Shape {
+    func path(in rect: CGRect) -> Path {
+        func point(_ x: Double, _ y: Double) -> CGPoint {
+            CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
+        }
+        var path = Path()
+        path.move(to: point(0.50, 0.98))
+        path.addCurve(to: point(0.12, 0.65), control1: point(0.17, 0.98), control2: point(0.05, 0.83))
+        path.addLine(to: point(0.08, 0.53))
+        path.addLine(to: point(0.17, 0.57))
+        path.addLine(to: point(0.24, 0.36))
+        path.addLine(to: point(0.28, 0.58))
+        path.addCurve(to: point(0.45, 0.03), control1: point(0.47, 0.41), control2: point(0.49, 0.22))
+        path.addLine(to: point(0.62, 0.22))
+        path.addLine(to: point(0.59, 0.25))
+        path.addLine(to: point(0.79, 0.45))
+        path.addLine(to: point(0.80, 0.29))
+        path.addLine(to: point(0.94, 0.55))
+        path.addLine(to: point(0.89, 0.58))
+        path.addCurve(to: point(0.50, 0.98), control1: point(1.02, 0.80), control2: point(0.83, 0.98))
         path.closeSubpath()
         return path
     }
