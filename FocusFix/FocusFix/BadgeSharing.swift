@@ -40,14 +40,64 @@ struct BadgeShare: Identifiable {
 private struct BadgeShareCard: View {
     let badge: FocusBadge
     var body: some View {
-        VStack(spacing: 12) {
-            Text("FocusFix").font(.system(size: 28, weight: .semibold)).foregroundStyle(Color(red: 0.01, green: 0.37, blue: 0.36))
+        VStack(spacing: 20) {
+            HStack(spacing: 12) {
+                FocusFixLaunchLogo(ready: true).frame(width: 48, height: 48)
+                Text("FocusFix")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(red: 0.01, green: 0.30, blue: 0.30))
+            }
             BadgeArtwork(badge: badge).frame(width: 390, height: 390)
-            Text(badge.name).font(.system(size: 30, weight: .bold)).foregroundStyle(.black)
-            Text(badge.description).font(.system(size: 18)).foregroundStyle(.black.opacity(0.65))
+            Text(badge.name)
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(Color(red: 0.05, green: 0.15, blue: 0.23))
+                .lineLimit(1)
         }
         .frame(width: 600, height: 600)
-        .background(Color(red: 0.96, green: 0.99, blue: 0.98))
+        .background(BadgeShareSpaceBackground())
+    }
+}
+
+// Keep orbital details and stars at the edges so artwork and lettering stay clear.
+private struct BadgeShareSpaceBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.93, green: 0.96, blue: 1),
+                                    Color(red: 0.96, green: 0.99, blue: 0.98),
+                                    Color(red: 0.94, green: 0.93, blue: 0.99)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            RadialGradient(colors: [.white.opacity(0.8), .white.opacity(0)],
+                           center: .center, startRadius: 90, endRadius: 300)
+            Canvas { context, size in
+                let ink = Color(red: 0.23, green: 0.39, blue: 0.52)
+                let stars: [(CGFloat, CGFloat, CGFloat)] = [
+                    (0.08, 0.12, 2), (0.18, 0.23, 1.3), (0.88, 0.10, 1.5),
+                    (0.94, 0.29, 2), (0.07, 0.43, 1.2), (0.92, 0.56, 1.3),
+                    (0.12, 0.72, 2), (0.85, 0.77, 1.4), (0.07, 0.91, 1.2),
+                    (0.91, 0.94, 2), (0.22, 0.93, 1), (0.77, 0.08, 1)
+                ]
+                for (x, y, radius) in stars {
+                    let point = CGPoint(x: x * size.width, y: y * size.height)
+                    context.fill(Path(ellipseIn: CGRect(x: point.x - radius, y: point.y - radius,
+                                                       width: radius * 2, height: radius * 2)),
+                                 with: .color(ink.opacity(0.28)))
+                }
+                for (x, y) in [(0.13, 0.12), (0.89, 0.68), (0.12, 0.85)] {
+                    let point = CGPoint(x: x * size.width, y: y * size.height)
+                    var star = Path()
+                    star.move(to: CGPoint(x: point.x - 5, y: point.y))
+                    star.addLine(to: CGPoint(x: point.x + 5, y: point.y))
+                    star.move(to: CGPoint(x: point.x, y: point.y - 5))
+                    star.addLine(to: CGPoint(x: point.x, y: point.y + 5))
+                    context.stroke(star, with: .color(ink.opacity(0.32)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
+                }
+                let orbit = CGRect(x: -size.width * 0.63, y: size.height * 0.16,
+                                   width: size.width * 0.78, height: size.height * 0.78)
+                context.stroke(Path(ellipseIn: orbit), with: .color(ink.opacity(0.10)), lineWidth: 1)
+                let planet = CGRect(x: size.width * 0.86, y: size.height * 0.17, width: 27, height: 27)
+                context.stroke(Path(ellipseIn: planet), with: .color(ink.opacity(0.18)), lineWidth: 1)
+            }
+        }.clipped()
     }
 }
 
