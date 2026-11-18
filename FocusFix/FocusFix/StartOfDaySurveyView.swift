@@ -22,8 +22,7 @@ struct StartOfDaySurveyView: View {
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Your latest sleep").font(.headline)
-                        DatePicker("Went to bed", selection: $bedtime, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
-                        DatePicker("Woke up", selection: $wakeTime, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                        SleepTimePicker(bedtime: $bedtime, wakeTime: $wakeTime)
                         if bedtime >= wakeTime || wakeTime > Date() || wakeTime.timeIntervalSince(bedtime) > 24 * 3600 {
                             Text("Wake time must be after bedtime and no later than now, within 24 hours.")
                                 .font(.caption).foregroundStyle(.secondary)
