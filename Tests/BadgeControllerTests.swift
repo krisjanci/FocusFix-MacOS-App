@@ -24,9 +24,10 @@ import Foundation
         precondition(sent.count == 1, "Repeated publications must not repeat notifications")
         controller.dismissCelebration(FocusBadge.all[1])
         precondition(controller.celebration == nil && controller.hasUnread, "Celebrating does not mark a badge as seen")
-        let restored = BadgeController(defaults: defaults, deliverNotification: { _ in fatalError("No duplicate notification") })
+        var restoredSent: [String] = []
+        let restored = BadgeController(defaults: defaults, deliverNotification: { restoredSent.append($0.id) })
         restored.start(tracker: tracker)
-        precondition(restored.hasUnread && restored.isEarned(FocusBadge.all[1]))
+        precondition(restored.hasUnread && restored.isEarned(FocusBadge.all[1]) && restoredSent.isEmpty)
         restored.openCollection()
         precondition(!restored.hasUnread)
         let reread = BadgeController(defaults: defaults, deliverNotification: { _ in })
