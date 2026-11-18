@@ -51,7 +51,10 @@ struct ContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
-        .modifier(BadgeCelebrationHost(badges: badges))
+        .modifier(BadgeCelebrationHost(badges: badges, showsCelebration: panels.sheet == nil &&
+            !sharingPresented && !editingSessionTags && !editingActivity &&
+            !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
+            !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented))
         .onChange(of: badges.collectionRequest) { _, _ in showBadgeCollection() }
         .onAppear { if badges.collectionRequested { showBadgeCollection() } }
         .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: panels.expanded)
@@ -60,6 +63,7 @@ struct ContentView: View {
         .background(PeopleWindowBridge(expanded: panels.expanded != nil, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
         .sheet(item: $panels.sheet) { panel in
             sidePanel(panel, close: { panels.close() }).frame(width: 380, height: 580)
+                .modifier(BadgeCelebrationHost(badges: badges))
         }
         .onChange(of: tour.isPresented) { _, shown in
             if shown { panels.close() }
@@ -91,7 +95,7 @@ struct ContentView: View {
     @ViewBuilder private func sidePanel(_ panel: CollectorPanel, close: @escaping () -> Void) -> some View {
         switch panel {
         case .groups: PeoplePanel(social: social, close: close)
-        case .analytics: AnalyticsPanel(close: close)
+        case .analytics: AnalyticsPanel(close: close, anchorsCelebration: panels.sheet == .analytics)
         }
     }
 
