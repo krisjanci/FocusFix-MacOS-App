@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AnalyticsPanel: View {
     let close: () -> Void
+    var anchorsCelebration = false
     @ObservedObject private var badges = BadgeController.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingBadges = false
@@ -19,6 +20,7 @@ struct AnalyticsPanel: View {
                     }
                     Text(showingBadges ? "BADGES" : "ANALYTICS")
                         .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
+                        .anchorPreference(key: AnalyticsBadgeAnchor.self, value: .bounds) { anchorsCelebration ? $0 : nil }
                     Spacer()
                     Button(action: close) { Image(systemName: "sidebar.right") }
                         .buttonPressFeedback().buttonStyle(.plain).help("Collapse Analytics")
