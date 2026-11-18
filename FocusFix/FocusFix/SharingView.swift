@@ -1,4 +1,4 @@
-// Profile contains identity, personal surveys and practice tools.
+// Profile contains identity and practice tools; privacy controls live in Settings.
 import SwiftUI
 
 struct SharingView: View {
@@ -13,8 +13,6 @@ struct SharingView: View {
                     Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 }
                 ProfileEditor()
-                Divider()
-                PersonalSurveySettings()
                 Divider()
                 AccountControls()
                 Divider()
