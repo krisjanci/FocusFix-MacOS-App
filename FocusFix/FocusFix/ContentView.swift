@@ -18,6 +18,7 @@ struct ContentView: View {
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
     @State private var panels = CollectorPanelSelection()
+    @ObservedObject private var badges = BadgeController.shared
     @State private var collectorWindow: NSWindow?
     @State private var collectorHeight: CGFloat = 620
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
@@ -50,6 +51,9 @@ struct ContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
+        .modifier(BadgeCelebrationHost(badges: badges))
+        .onChange(of: badges.collectionRequest) { _, _ in showBadgeCollection() }
+        .onAppear { if badges.collectionRequested { showBadgeCollection() } }
         .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: panels.expanded)
         .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
@@ -71,6 +75,12 @@ struct ContentView: View {
         let chrome = collectorWindow.map { $0.frame.height - ($0.contentView?.frame.height ?? $0.frame.height) } ?? 28
         let available = (collectorWindow?.screen?.visibleFrame.height ?? 900) - chrome
         return max(collectorHeight, min(620, available))
+    }
+
+    private func showBadgeCollection() {
+        if panels.expanded != .analytics && panels.sheet != .analytics {
+            togglePanel(.analytics)
+        }
     }
 
     private func togglePanel(_ panel: CollectorPanel) {
@@ -282,11 +292,15 @@ struct ContentView: View {
                     Image(systemName: "folder").accessibilityLabel("Sessions")
                 }.buttonPressFeedback().controlSize(.large)
                 Button { togglePanel(.analytics) } label: {
-                    Label("Analytics", systemImage: "chart.bar.xaxis")
+                    HStack(spacing: 6) {
+                        Label("Analytics", systemImage: "chart.bar.xaxis")
+                        if badges.hasUnread { BadgeUnreadDot() }
+                    }
+                    .anchorPreference(key: AnalyticsBadgeAnchor.self, value: .bounds) { $0 }
                 }.buttonPressFeedback()
                 .buttonStyle(.plain)
                 .foregroundStyle(panels.expanded == .analytics ? teal : Color.secondary)
-                .accessibilityLabel(panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel")
+                .accessibilityLabel((panels.expanded == .analytics ? "Collapse Analytics panel" : "Expand Analytics panel") + (badges.hasUnread ? ", new badges" : ""))
                 .help("Analytics")
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
