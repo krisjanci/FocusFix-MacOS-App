@@ -165,7 +165,17 @@ import Combine
                 startedAt: start, observedThrough: start + 3600,
                 intervals: seconds == 0 ? [] : [.init(start: start, end: start + seconds)])
         }
+        let durableFile = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("FocusFix/Social"), includingPropertiesForKeys: nil).first { $0.pathExtension == "json" }!
+        let beforeStage = try Data(contentsOf: durableFile)
         stage(3600)
+        let afterStage = try Data(contentsOf: durableFile)
+        precondition(beforeStage == afterStage, "Per-second work must not rewrite the full ledger")
+        let replayed = SocialController(account: account, storageDirectory: root, selectionDefaults: preferences)
+        // Alignment loads the journal before issuing any network request.
+        offline = true
+        await replayed.refresh()
+        offline = false
+        precondition(replayed.ledger?.declaredWorkPending?[segment.uuidString]?.days == ["2026-11-12": 3600])
         precondition(!afterDeletion.needsDeclaredWorkDetails(segment, days: ["2026-11-12": 3600], startedAt: start))
         precondition(afterDeletion.needsDeclaredWorkDetails(segment, days: ["2026-11-12": 3600], startedAt: start + 0.5))
         await afterDeletion.refresh()
