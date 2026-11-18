@@ -1,20 +1,101 @@
 import SwiftUI
 
-// Illustrative artwork only: this placeholder never reads recordings or fetches data.
 struct AnalyticsPanel: View {
     let close: () -> Void
+    @ObservedObject private var badges = BadgeController.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showingBadges = false
+    @State private var selectedBadge: FocusBadge?
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                Text("ANALYTICS").font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
-                Spacer()
-                Button(action: close) { Image(systemName: "sidebar.right") }.buttonPressFeedback()
-                    .buttonStyle(.plain).help("Collapse Analytics")
-                    .accessibilityLabel("Collapse Analytics")
+        ZStack {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    if showingBadges {
+                        Button { showingBadges = false } label: {
+                            Image(systemName: "arrow.left").frame(width: 28, height: 22)
+                        }.buttonStyle(.bordered).accessibilityLabel("Back to graph analytics")
+                    }
+                    Text(showingBadges ? "BADGES" : "ANALYTICS")
+                        .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: close) { Image(systemName: "sidebar.right") }
+                        .buttonPressFeedback().buttonStyle(.plain).help("Collapse Analytics")
+                        .accessibilityLabel("Collapse Analytics")
+                }
+                if showingBadges {
+                    collection
+                } else {
+                    Text("Your focus, over time").font(.title2.weight(.semibold))
+                    graphs
+                    Spacer(minLength: 0)
+                    Button { openBadges() } label: {
+                        HStack {
+                            Label("Badges", systemImage: "seal")
+                            if badges.hasUnread { BadgeUnreadDot() }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                        }.padding(16).frame(maxWidth: .infinity)
+                            .background(teal.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain).buttonPressFeedback()
+                    .accessibilityLabel(badges.hasUnread ? "Badges, new badges" : "Badges")
+                }
             }
-            Text("Your focus, over time").font(.title2.weight(.semibold))
+            .blur(radius: selectedBadge == nil ? 0 : 7)
+            .allowsHitTesting(selectedBadge == nil)
+            .accessibilityHidden(selectedBadge != nil)
+            if let badge = selectedBadge {
+                Button { selectedBadge = nil } label: {
+                    Color.primary.opacity(0.06).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("Dismiss badge details")
+                VStack(spacing: 12) {
+                    BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(width: 240, height: 240)
+                    Text(badge.name).font(.title2.weight(.semibold))
+                    Text(badges.isEarned(badge) ? badge.description : badge.requirement)
+                        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    if !badges.isEarned(badge) { Label("Locked", systemImage: "lock.fill").font(.caption) }
+                }.padding(20).allowsHitTesting(false).accessibilityElement(children: .combine)
+            }
+        }
+        .padding(18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selectedBadge)
+        .onExitCommand { if selectedBadge != nil { selectedBadge = nil } else if showingBadges { showingBadges = false } }
+        .onChange(of: badges.collectionRequest) { _, _ in openBadges() }
+        .onAppear { if badges.collectionRequested { openBadges() } }
+    }
+
+    private func openBadges() {
+        selectedBadge = nil; showingBadges = true
+        badges.openCollection()
+    }
+    private var collection: some View {
+        ScrollView {
+            LazyVStack(spacing: 14) {
+                ForEach(FocusBadge.all) { badge in
+                    Button { selectedBadge = badge } label: {
+                        VStack(spacing: 4) {
+                            BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(height: 210)
+                            Text(badge.name).font(.headline)
+                            if badges.isEarned(badge) {
+                                Label("Earned", systemImage: "checkmark.seal.fill").foregroundStyle(teal)
+                            } else {
+                                Label(badge.days == 0 ? "Sign in to unlock" : "\(badge.days)-day work streak", systemImage: "lock.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }.font(.caption).padding(.vertical, 12).frame(maxWidth: .infinity)
+                            .background(teal.opacity(badges.isEarned(badge) ? 0.06 : 0.025), in: RoundedRectangle(cornerRadius: 16))
+                            .contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                    .accessibilityLabel("\(badge.name), \(badges.isEarned(badge) ? "earned" : "locked")")
+                    .accessibilityHint("Show badge description")
+                }
+            }
+        }
+    }
+    // Illustrative artwork only; badge data does not enable graph analytics.
+    private var graphs: some View {
             ZStack {
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -59,9 +140,5 @@ struct AnalyticsPanel: View {
                 .padding(.horizontal, 12)
                 .accessibilityElement(children: .combine)
             }
-            Spacer(minLength: 0)
-        }
-        .padding(18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
