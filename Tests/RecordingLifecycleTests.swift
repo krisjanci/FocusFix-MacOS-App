@@ -72,6 +72,16 @@ import Foundation
         precondition(rotated.recordingContract!.segmentID != first.contract.segmentID)
         precondition(rotated.recordingContract!.intervals[0].logicalID == context.logicalID)
         precondition(rotated.recordingContract!.intervals[0].start == 2)
+        // A crash after finalizing the contract but before metadata replacement is recoverable.
+        let halfFinishedRoot = root.appendingPathComponent("half-finished")
+        let halfFinished = try RecordingWriter(root: SessionFiles.pendingRoot(in: halfFinishedRoot), id: "half-finished", startedAt: midnight)
+        try halfFinished.checkpoint(at: 2)
+        var finalContract = halfFinished.contract
+        try finalContract.finish(at: 2); try finalContract.save(to: halfFinished.folder)
+        let finalizedCount = try SessionFiles.recoverPending(in: halfFinishedRoot)
+        precondition(finalizedCount == 1)
+        let finalizedSessions = try SessionFiles.list(in: halfFinishedRoot)
+        precondition(finalizedSessions.first?.duration == 2)
         // A damaged pending entry must not stop independent checkpoint recovery.
         for reverse in [false, true] {
             let mixed = root.appendingPathComponent("mixed-\(reverse)")
