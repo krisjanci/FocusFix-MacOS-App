@@ -46,6 +46,7 @@ struct BadgeCelebrationHost: ViewModifier {
                 .opacity(1 - flight).allowsHitTesting(false)
             BadgeArtwork(badge: badge).frame(width: 250, height: 250)
                 .modifier(BadgeFlight(progress: flight, start: start, destination: destination, arc: !reduceMotion))
+                .opacity(reduceMotion ? 1 - flight : 1)
                 .allowsHitTesting(false)
             VStack(spacing: 8) {
                 Text(badge.name).font(.title.weight(.semibold))
@@ -86,7 +87,7 @@ private struct BadgeFlight: GeometryEffect {
     let arc: Bool
     var animatableData: CGFloat { get { progress } set { progress = newValue } }
     func effectValue(size: CGSize) -> ProjectionTransform {
-        let scale = arc ? 1 - progress * 0.96 : 1 - progress
+        let scale = arc ? 1 - progress * 0.96 : 1
         let x = arc ? start.x + (destination.x - start.x) * progress : start.x
         let y = arc ? start.y + (destination.y - start.y) * progress - sin(progress * .pi) * 130 : start.y
         return ProjectionTransform(CGAffineTransform(translationX: x, y: y)
