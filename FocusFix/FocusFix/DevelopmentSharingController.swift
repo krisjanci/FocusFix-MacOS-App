@@ -229,6 +229,21 @@ final class DevelopmentSharingController: ObservableObject {
             var session = try await account.validSession()
             guard token == generation, capturedConsent == consent, session.user.id == consent.owner else { return }
             if !(await api.developmentObjectExists(path: path, session: session)) {
+                // Only an absent direct child of an accessible recordings root is permanent.
+                // Permission errors, unavailable storage and malformed archives still retry.
+                let rootInfo = try recordings.resourceValues(forKeys: [.isDirectoryKey])
+                guard rootInfo.isDirectory == true, UUID(uuidString: upload.id) != nil else { throw RecordingContract.Invalid.contract }
+                let source = recordings.appendingPathComponent(upload.id, isDirectory: true)
+                do { _ = try source.resourceValues(forKeys: [.isDirectoryKey]) }
+                catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+                    guard token == generation, capturedConsent == consent else { return }
+                    let previous = state
+                    state.pending.removeFirst()
+                    do { try persist() } catch { state = previous; throw error }
+                    retryAt = .distantPast
+                    if !state.pending.isEmpty { Task { self.checkDue() } }
+                    return
+                }
                 let data = try await Task.detached {
                     try DevelopmentArchive.prepare(id: upload.id, root: recordings, consent: consent, destination: file)
                 }.value
