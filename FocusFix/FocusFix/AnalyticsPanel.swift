@@ -45,9 +45,10 @@ struct AnalyticsPanel: View {
             .blur(radius: selectedBadge == nil ? 0 : 7)
             .allowsHitTesting(selectedBadge == nil)
             .accessibilityHidden(selectedBadge != nil)
+            .padding(18)
             if let badge = selectedBadge {
                 Button { selectedBadge = nil } label: {
-                    Color.primary.opacity(0.06).contentShape(Rectangle())
+                    Color(nsColor: .windowBackgroundColor).opacity(0.78).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Dismiss badge details")
                 VStack(spacing: 12) {
                     BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(width: 240, height: 240)
@@ -58,7 +59,7 @@ struct AnalyticsPanel: View {
                 }.padding(20).allowsHitTesting(false).accessibilityElement(children: .combine)
             }
         }
-        .padding(18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selectedBadge)
         .onExitCommand { if selectedBadge != nil { selectedBadge = nil } else if showingBadges { showingBadges = false } }
