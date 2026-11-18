@@ -85,12 +85,6 @@ struct ProfileEditor: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !editing, account.session != nil, let savedProfile, savedProfile.photo != nil {
-                Label(savedProfile.groupPhoto == nil ? "Photo is private" : "Photo shared with group members",
-                      systemImage: savedProfile.groupPhoto == nil ? "lock.fill" : "person.2.fill")
-                    .font(.caption).foregroundStyle(.secondary)
-                SettingsLink { Text("Photo visibility settings…") }.buttonPressFeedback()
-            }
             if editing {
                 HStack {
                     if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil }.buttonPressFeedback() }
