@@ -1,4 +1,4 @@
-// Profile contains identity and practice tools. Recording and participation live in Settings.
+// Profile contains identity, personal surveys and practice tools.
 import SwiftUI
 
 struct SharingView: View {
@@ -13,6 +13,8 @@ struct SharingView: View {
                     Button("Done") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
                 }
                 ProfileEditor()
+                Divider()
+                PersonalSurveySettings()
                 Divider()
                 AccountControls()
                 Divider()
@@ -48,6 +50,8 @@ struct PrivacyResearchSettings: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Label("Privacy & Data Sharing", systemImage: "hand.raised").font(.title2.weight(.semibold))
+                PersonalSurveySettings()
+                Divider()
                 Toggle("Allow activity recording", isOn: Binding(get: { recordingEnabled }, set: { value in
                     if value { recordingConsentPresented = true }
                     else { tracker.disableRecording(); recordingEnabled = false }
@@ -87,5 +91,33 @@ struct PrivacyResearchSettings: View {
         }
         .onAppear { recordingEnabled = RecordingNotice().enabled; login.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in login.refresh() }
+    }
+}
+
+struct PersonalSurveySettings: View {
+    @ObservedObject private var preferences = SurveyPreferences.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Survey check-ins", isOn: Binding(
+                get: { preferences.personalSurveysEnabled },
+                set: { preferences.setPersonalSurveysEnabled($0) }))
+            HStack {
+                Text("Prompts per day")
+                Spacer()
+                Text("\(preferences.promptsPerDay)").monospacedDigit()
+            }
+            Slider(value: Binding(
+                get: { Double(preferences.promptsPerDay) },
+                set: { preferences.setPromptsPerDay(Int($0.rounded())) }), in: 1...5, step: 1) {
+                    Text("Prompts per day")
+                } minimumValueLabel: { Text("1") } maximumValueLabel: { Text("5") }
+                .accessibilityValue("\(preferences.promptsPerDay) prompts per day")
+                .disabled(!preferences.personalSurveysEnabled)
+            Text("Up to \(preferences.promptsPerDay) check-ins per day at random times, at least 30 minutes apart. Prompts appear only while recording, outside breaks. Each asks about fatigue and productivity. Changes apply immediately.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("Personal check-ins do not enroll you in a study or enable sharing.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
