@@ -269,7 +269,7 @@ final class RecordingWriter {
             "tags": tags, "tag_colors": tagColors,
             "survey_options": surveyOptions.metadata,
             "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
-            "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Deferred while another check-in is open. Break start or session stop cancels the work-period opportunity. Skip/Snooze of a break reminder does not reset it.",
+            "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Unanswered requests repeat every 600 seconds without creating another check-in. Opening pauses repeats; dismissal leaves the check-in pending. Breaks defer pending reminders; session stop cancels them. Break start cancels only an unrequested opportunity. Skip/Snooze of a break reminder does not reset it.",
             "survey_prompt_logging": "survey_prompts.csv records scheduled/requested/opened/answered/skipped/cancelled/break_setup/break_started/session_stopped. requested is not proof of banner delivery or viewing. Unopened check-ins have no surveys.csv response; join by check_in_id. reference_break_id identifies the preceding break, not a future break.",
             "check_in_version": SurveyEntry.version,
             "fatigue_question": SurveyEntry.fatigueQuestion,
@@ -295,7 +295,7 @@ final class RecordingWriter {
         if let studyConfiguration {
             if studyConfiguration.scope == .personal {
                 fields["survey_options_policy"] = "Personal survey changes rotate the recording segment; no session-start or pre-break surveys. Turning off cancels pending and open prompts."
-                fields["timed_check_in_policy"] = "Persisted randomized local-day schedule; up to the selected 1–5 prompts per calendar day while recording outside breaks. Actual notification requests remain at least 1800 seconds apart across days and restarts. Missed opportunities coalesce without catch-up bursts. Requested prompts consume the quota, including skipped or unanswered ones."
+                fields["timed_check_in_policy"] = "Persisted randomized local-day schedule; up to the selected 1–5 prompts per calendar day while recording outside breaks. New check-ins remain at least 1800 seconds apart across days and restarts. Unanswered check-ins repeat the same notification every 600 seconds while eligible, without consuming another daily slot. Opening suspends reminders; dismissing restarts the ten-minute wait, and answering or Skip ends that check-in. Breaks defer pending reminders. Missed opportunities coalesce without catch-up bursts. Requested prompts consume the quota, including skipped or unanswered ones."
                 fields["survey_logging"] = "Optional custom fatigue and self-reported productivity ratings, not validated or objective measures. Personal check-ins refer to the preceding recall window in study_check_ins.jsonl. Skipped/cancelled ratings are blank, not zero."
             }
             fields["study_check_in_schedule"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(studyConfiguration))
