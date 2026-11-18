@@ -8,7 +8,9 @@ struct AnalyticsBadgeAnchor: PreferenceKey {
 
 struct BadgeCelebrationHost: ViewModifier {
     @ObservedObject var badges: BadgeController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    var reduceMotionOverride: Bool? = nil
+    private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
     @State private var flight: CGFloat = 0
     @State private var dismissing = false
     @State private var comingSoon = false
