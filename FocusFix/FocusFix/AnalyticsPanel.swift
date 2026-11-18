@@ -15,7 +15,7 @@ struct AnalyticsPanel: View {
                     if showingBadges {
                         Button { showingBadges = false } label: {
                             Image(systemName: "arrow.left").frame(width: 28, height: 22)
-                        }.buttonStyle(.bordered).accessibilityLabel("Back to graph analytics")
+                        }.buttonStyle(.bordered).keyboardShortcut(.cancelAction).accessibilityLabel("Back to graph analytics")
                     }
                     Text(showingBadges ? "BADGES" : "ANALYTICS")
                         .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
@@ -44,12 +44,13 @@ struct AnalyticsPanel: View {
             }
             .blur(radius: selectedBadge == nil ? 0 : 7)
             .allowsHitTesting(selectedBadge == nil)
+            .disabled(selectedBadge != nil)
             .accessibilityHidden(selectedBadge != nil)
             .padding(18)
             if let badge = selectedBadge {
                 Button { selectedBadge = nil } label: {
                     Color(nsColor: .windowBackgroundColor).opacity(0.78).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel("Dismiss badge details")
+                }.buttonStyle(.plain).keyboardShortcut(.cancelAction).accessibilityLabel("Dismiss badge details")
                 VStack(spacing: 12) {
                     BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(width: 240, height: 240)
                     Text(badge.name).font(.title2.weight(.semibold))
