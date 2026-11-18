@@ -1,5 +1,11 @@
 import Foundation
 
+enum CheckInPromptCopy {
+    static let title = "Time for a check-in"
+    static let question = "Would you like to check in on your fatigue and productivity?"
+}
+
+
 nonisolated struct StudyCheckInConfiguration: Codable, Equatable {
     enum Scope: String, Codable { case personal, synthetic, reviewedStudy = "reviewed_study" }
     let version: String
