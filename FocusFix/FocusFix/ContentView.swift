@@ -251,19 +251,22 @@ struct ContentView: View {
                 }
             }
 
+            if tracker.timedCheckInPending && !onBreak {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(CheckInPromptCopy.title).font(.callout.weight(.medium))
+                    Text(CheckInPromptCopy.question).font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Answer") { tracker.openTimedCheckIn() }.buttonPressFeedback()
+                        Button("Skip") { tracker.skipTimedCheckIn() }.buttonPressFeedback()
+                    }
+                }
+            }
+
             if tracker.isRecording && !onBreak &&
                 (tracker.breakPromptPending || tracker.notificationNotice != nil) {
                 BreakControls(tracker: tracker, showsTakeBreak: false).tint(teal)
             }
 
-            if tracker.timedCheckInPending && !onBreak {
-                HStack {
-                    Text("Check-in available").font(.callout)
-                    Spacer()
-                    Button("Answer") { tracker.openTimedCheckIn() }.buttonPressFeedback()
-                    Button("Skip") { tracker.skipTimedCheckIn() }.buttonPressFeedback()
-                }
-            }
 
             if tracker.notificationPermission.needsAttention && !onBreak {
                 VStack(alignment: .leading, spacing: 8) {
