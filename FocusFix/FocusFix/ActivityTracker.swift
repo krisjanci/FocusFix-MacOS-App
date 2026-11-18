@@ -72,7 +72,7 @@ final class ActivityTracker: ObservableObject {
     private var studyPrompt: StudyPromptSnapshot?
     private var studyBudget = StudyPromptBudget()
     var studyRecallDescription: String? {
-        studyPrompt.map { "Think about the \(Int($0.recallEnd - $0.recallStart)) seconds before this prompt was requested. Context then: \($0.contextAtPrompt.rawValue)." }
+        studyPrompt.map { "Think about the \(Int($0.recallEnd - $0.recallStart)) seconds before the original check-in at \($0.requestedAtUTC.formatted(date: .omitted, time: .shortened)). Context then: \($0.contextAtPrompt.rawValue)." }
     }
     // Whether a survey sheet is currently taking attention away from work.
     private var checkInOpen: Bool { breakCheckIn != nil || timedCheckInSheet != nil }
@@ -630,6 +630,16 @@ final class ActivityTracker: ObservableObject {
                     timedCheckInPending = true
                     breakNotifications.sendCheckIn(session: sessionFolder?.lastPathComponent ?? "", token: item.id)
                 }
+                if sessionStudyConfiguration != nil,
+                   let item = timedCheckInPolicy.repeatReminder(at: elapsed,
+                       canPrompt: breakPolicy.phase == .work && !checkInOpen) {
+                    try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "reminded", time: elapsed))
+                    if let studyPrompt {
+                        try writer?.logStudyPrompt(StudyPromptLogEntry(prompt: studyPrompt,
+                            action: "reminded", elapsed: elapsed, recordedAtUTC: Date()))
+                    }
+                    breakNotifications.sendCheckIn(session: sessionFolder?.lastPathComponent ?? "", token: item.id)
+                }
                 if breakPolicy.phase != .resting { append(mouse.advance(to: elapsed)) }
             }
             try writer?.checkpoint(at: elapsed)
@@ -863,8 +873,8 @@ final class ActivityTracker: ObservableObject {
         updateProgress(at: time)
         defer { updateProgress(at: time, persist: true) }
         do {
-            // Don't stack a due work check-in on top of the pre-break ratings.
-            if timedCheckInPolicy.hasPending { try finishTimedCheckIn(action: "break_setup", at: time) }
+            // Keep unanswered check-ins pending, but silence them during break setup.
+            if timedCheckInPolicy.hasPending { breakNotifications.clearCheckIn() }
             append(mouse.stop(at: time))
             breakCheckIn = CheckInPrompt(elapsed: time)
             resetMouse(at: time, phase: "check_in")
@@ -916,7 +926,8 @@ final class ActivityTracker: ObservableObject {
             try finishBreakCheckIn(status: fatigue == nil ? .skipped : .answered, at: time,
                 breakID: entry.record?.id ?? "", fatigue: fatigue, productivity: productivity)
             try writer?.logBreak(entry)
-            try finishTimedCheckIn(action: "break_started", at: time)
+            if timedCheckInPolicy.hasPending { breakNotifications.clearCheckIn() }
+            else { try finishTimedCheckIn(action: "break_started", at: time) }
             keys = KeyTiming()
             returnPoint = CGEvent(source: nil)?.location ?? .zero
             returnWindowStart = time
@@ -1083,7 +1094,8 @@ final class ActivityTracker: ObservableObject {
         sessionStudyConfiguration = nil; studyPrompt = nil
     }
     private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
-        guard let configuration = sessionStudyConfiguration, sessionSurveyOptions.duringWork else { return }
+        guard !timedCheckInPolicy.hasPending,
+              let configuration = sessionStudyConfiguration, sessionSurveyOptions.duringWork else { return }
         let delay: Double
         if configuration.scope == .personal {
             let date = Date()
@@ -1140,13 +1152,14 @@ final class ActivityTracker: ObservableObject {
     }
     // Close the opportunity, log its outcome and restore the work activity phase.
     private func finishTimedCheckIn(action: String, at time: Double, fatigue: Int? = nil, productivity: Int? = nil) throws {
-        guard let item = timedCheckInPolicy.finish() else { return }
+        let dismissed = action == "cancelled"
+        guard let item = dismissed ? timedCheckInPolicy.dismiss(at: time) : timedCheckInPolicy.finish() else { return }
         updateProgress(at: time)
         defer { updateProgress(at: time, persist: true) }
         let sheet = timedCheckInSheet
         // Clear the state first so I/O errors and late notification clicks cannot resubmit it.
         timedCheckInSheet = nil
-        timedCheckInPending = false
+        timedCheckInPending = dismissed
         timedCheckInPresented = false
         breakNotifications.clearCheckIn()
         if let sheet {
@@ -1163,8 +1176,8 @@ final class ActivityTracker: ObservableObject {
         }
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: action, time: time))
         if let studyPrompt { try writer?.logStudyPrompt(StudyPromptLogEntry(prompt: studyPrompt, action: action, elapsed: time, recordedAtUTC: Date())) }
-        studyPrompt = nil
-        if ["answered", "skipped", "cancelled"].contains(action), isRecording, sessionStudyConfiguration != nil {
+        if !dismissed { studyPrompt = nil }
+        if ["answered", "skipped"].contains(action), isRecording, sessionStudyConfiguration != nil {
             try scheduleTimedCheckIn(at: time)
         }
     }
