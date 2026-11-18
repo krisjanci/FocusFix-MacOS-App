@@ -20,6 +20,7 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test StartOfDaySurveyTests "$source_dir/StartOfDaySurvey.swift" "$source_dir/StartOfDayController.swift"
 run_test AutomaticRecordingPreferencesTests "$source_dir/AutomaticRecordingPreferences.swift" "$source_dir/RecordingNotice.swift" "$source_dir/LoginLaunch.swift"
 run_test RecordingLifecycleTests "$source_dir/SystemIdleTime.swift" "$source_dir/RecordingLifecycle.swift" "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test ContextEditingTests "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
