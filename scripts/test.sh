@@ -57,7 +57,7 @@ run_test ResearchDeliveryTests "$source_dir/UserProfile.swift" "$source_dir/Acco
 run_test ResearchSharingTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/ResearchSharing.swift"
 run_test UserProfileTests "$source_dir/UserProfile.swift" "$source_dir/ProfileController.swift"
 run_test BadgeControllerTests "Tests/BadgeTestSupport.swift" "$source_dir/Badges.swift" "$source_dir/BadgeController.swift" "$source_dir/DailyProgress.swift" "$source_dir/BreakNotifications.swift" "$source_dir/NotificationAccess.swift"
-run_test BadgeSharingTests "$source_dir/Badges.swift" "$source_dir/DailyProgress.swift" "$source_dir/BadgeArtwork.swift" "$source_dir/BadgeSharing.swift"
+run_test BadgeSharingTests "$source_dir/LaunchScreen.swift" "$source_dir/Badges.swift" "$source_dir/DailyProgress.swift" "$source_dir/BadgeArtwork.swift" "$source_dir/BadgeSharing.swift"
 run_test BadgeAwardsTests "$source_dir/Badges.swift" "$source_dir/DailyProgress.swift"
 run_test DailyProgressTests "$source_dir/DailyProgress.swift" "$source_dir/BreakPolicy.swift" \
     "$source_dir/RecordingData.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
