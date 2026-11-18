@@ -3,6 +3,7 @@ import SwiftUI
 import AppKit
 
 @MainActor private enum PreviewState {
+    static let options = CommandLine.arguments + (Bundle.main.object(forInfoDictionaryKey: "BadgePreviewOptions") as? [String] ?? [])
     static let badges = BadgeController(defaults: .standard, deliverNotification: { _ in })
 }
 
@@ -10,8 +11,8 @@ private struct PreviewContent: View {
     @ObservedObject var badges = PreviewState.badges
     @State private var expanded = false
     @State private var nextDays = 10
-    @State private var dark = CommandLine.arguments.contains("--dark")
-    let narrow = CommandLine.arguments.contains("--narrow")
+    @State private var dark = PreviewState.options.contains("--dark")
+    let narrow = PreviewState.options.contains("--narrow")
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 22) {
@@ -46,13 +47,13 @@ private struct PreviewContent: View {
             }
         }.frame(height: 620)
         .background(Color(nsColor: .windowBackgroundColor))
-        .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion"), showsCelebration: !expanded || !narrow))
+        .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: PreviewState.options.contains("--reduce-motion"), showsCelebration: !expanded || !narrow))
         .sheet(isPresented: Binding(get: { expanded && narrow }, set: { expanded = $0 })) {
             VStack(spacing: 0) {
                 AnalyticsPanel(close: { expanded = false }, anchorsCelebration: true, badges: badges).frame(width: 380, height: 580)
                 Button("Earn next badge (synthetic)") { earnNext() }.padding(8)
             }
-            .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion")))
+            .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: PreviewState.options.contains("--reduce-motion")))
             .environment(\.colorScheme, dark ? .dark : .light)
         }
         .onAppear { badges.start(tracker: ActivityTracker.shared) }
@@ -71,16 +72,27 @@ private struct PreviewContent: View {
     }
 }
 
+private final class BadgePreviewDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
 @main struct BadgePreview {
     static var window: NSWindow?
     @MainActor static func main() throws {
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
+        let delegate = BadgePreviewDelegate()
+        app.delegate = delegate
+        let menu = NSMenu()
+        let applicationItem = NSMenuItem()
+        let applicationMenu = NSMenu()
+        applicationMenu.addItem(withTitle: "Quit Badge Preview", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        applicationItem.submenu = applicationMenu; menu.addItem(applicationItem); app.mainMenu = menu
         let account = AccountController.shared
         let user = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         account.session = .init(user: .init(id: user))
         var awards = BadgeAwards()
-        let rank = CommandLine.arguments.contains("--legendary") ? 7 : 1
+        let rank = PreviewState.options.contains("--legendary") ? 7 : 1
         _ = awards.award(streak: FocusBadge.all[rank].days, joinedKey: "joined|https://badges.invalid|\(user)", historical: true)
         awards.pending = [FocusBadge.all[rank].id]
         // The dedicated preview bundle owns these preferences, separate from FocusFix.
@@ -93,6 +105,6 @@ private struct PreviewContent: View {
         window.center(); window.makeKeyAndOrderFront(nil)
         self.window = window
         app.activate(ignoringOtherApps: true)
-        app.run()
+        withExtendedLifetime(delegate) { app.run() }
     }
 }
