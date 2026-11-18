@@ -14,6 +14,14 @@ Automatic recording is optional in **Settings → Privacy & Data Sharing** and h
 
 FocusFix records timing and counts for generic keyboard activity, delete-key use, clicks, scrolling, app switches, and one-second mouse movement summaries. It does not save typed words, individual letter keys, app names, window titles, URLs, screenshots, or exact cursor paths. Detailed timing can still be sensitive. See the [privacy page](https://krisjanci.github.io/FocusFix-Website/privacy.html).
 
+## Start of day survey
+
+In **Profile → Privacy & Data Sharing settings**, enable **Start of day survey** (off by default). On the first opening of the main FocusFix screen each local calendar day, a full-window check-in asks when you went to bed and woke up, how rested you feel, mental fatigue, and current stress. It works independently of recording, accounts, and the timed check-ins, including when FocusFix launches at login. Onboarding and open dialogs finish first. Each slider requires an explicit response; the sleep dates can be adjusted for overnight or daytime sleep. Time in bed is not a measurement of time asleep.
+
+**Skip today**, answering, or an unanswered prompt followed by a relaunch will not prompt again that day. A running app checks again when its main window is reopened or activated on another day. Merely crossing midnight does not interrupt your work. Turning the option off closes the prompt and keeps saved responses.
+
+Responses stay in a separate local `start-of-day.json` file and are not added to recording uploads. **Export daily surveys** saves a CSV with local day, time zone, UTC timestamps, time in bed, and ratings, so it can be compared with activity exports and personal fatigue/productivity check-ins. Unanswered ratings remain blank. **Delete daily surveys** removes the local responses while retaining today's prompt marker; exported copies remain separate. This supplies context for future correlation analysis; it does not generate fatigue or productivity predictions.
+
 ## Personal survey check-ins
 
 Open **Settings → Privacy & Data Sharing** and turn on **Survey check-ins**. The **Prompts per day** slider selects 1–5 (default 2). Surveys start off; the frequency controls appear only when check-ins are enabled. Each optional check-in asks for mental fatigue and self-reported productivity using two sliders.
