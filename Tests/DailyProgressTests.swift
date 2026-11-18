@@ -6,7 +6,48 @@ struct DailyProgressTests {
     static func date(_ value: String) -> Date { ISO8601DateFormatter().date(from: value)! }
     static func near(_ a: Double, _ b: Double) { precondition(abs(a - b) < 0.00001, "\(a) != \(b)") }
     static func check(_ value: Bool) { precondition(value) }
+    static func reconciliationCache() throws {
+        let cal = calendar
+        let start = date("2025-01-01T17:00:00Z")
+        var value = DailyProgress(); value.reconcile(at: start, calendar: cal)
+        for offset in stride(from: 0, through: 690, by: 2) {
+            value.addWork(seconds: 3600, endingAt: cal.date(byAdding: .day, value: offset, to: start)!, calendar: cal)
+        }
+        func verify(_ progress: inout DailyProgress, at day: Date, calendar: Calendar) throws {
+            // JSON decoding removes only the ephemeral cache, yielding a cold reference.
+            var cold = try JSONDecoder().decode(DailyProgress.self, from: JSONEncoder().encode(progress))
+            progress.reconcile(at: day, calendar: calendar); cold.reconcile(at: day, calendar: calendar)
+            precondition(progress == cold)
+            precondition(progress.streakStatus(at: day, calendar: calendar) == cold.streakStatus(at: day, calendar: calendar))
+            precondition(progress.tokensRemaining(at: day, calendar: calendar) == cold.tokensRemaining(at: day, calendar: calendar))
+        }
+        let today = date("2026-11-18T17:00:00Z")
+        try verify(&value, at: today, calendar: cal)
+        let passes = value.reconciliationPasses
+        for _ in 0..<100 { value.reconcile(at: today, calendar: cal) }
+        precondition(value.reconciliationPasses == passes, "Unchanged history must not be walked again")
+        value.addWork(seconds: 1, endingAt: today, calendar: cal)
+        try verify(&value, at: today, calendar: cal)
+        precondition(value.reconciliationPasses == passes, "Today's work cannot change historical freezes")
+        value.addWork(seconds: 3600, endingAt: date("2026-11-16T17:00:00Z"), calendar: cal)
+        try verify(&value, at: today, calendar: cal)
+        precondition(value.reconciliationPasses == passes + 1)
+        try value.replaceDeclaredWork(segmentID: "late", days: ["2026-11-17": 3600])
+        try verify(&value, at: today, calendar: cal)
+        try value.replaceDeclaredWork(segmentID: "late", days: [:])
+        try verify(&value, at: today, calendar: cal)
+        for day in ["2026-10-30T17:00:00Z", "2026-10-31T17:00:00Z", "2026-11-01T17:00:00Z", "2026-11-02T17:00:00Z", "2027-01-01T17:00:00Z"] {
+            try verify(&value, at: date(day), calendar: cal)
+        }
+        try verify(&value, at: today, calendar: DailyProgress.calendar(timeZone: TimeZone(identifier: "Pacific/Auckland")!))
+        value.protectionStart = "2026-10-01"
+        try verify(&value, at: today, calendar: cal)
+        value.frozenDays = []
+        try verify(&value, at: today, calendar: cal)
+        print("PASS: reconciliation cache parity, invalidation, weekends, DST, months, timezone and historical corrections")
+    }
     static func main() throws {
+        try reconciliationCache()
         let cal = calendar
         let monday = date("2026-10-19T16:00:00Z")
         var progress = DailyProgress()
