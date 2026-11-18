@@ -40,9 +40,8 @@ private struct PreviewContent: View {
             }
         }.frame(height: 620)
         .background(Color(nsColor: .windowBackgroundColor))
-        .modifier(BadgeCelebrationHost(badges: badges))
+        .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion")))
         .environment(\.colorScheme, dark ? .dark : .light)
-        .environment(\.accessibilityReduceMotion, CommandLine.arguments.contains("--reduce-motion"))
     }
 }
 
