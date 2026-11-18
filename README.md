@@ -14,6 +14,14 @@ Automatic recording is optional in **Settings → Privacy & Data Sharing** and h
 
 FocusFix records timing and counts for generic keyboard activity, delete-key use, clicks, scrolling, app switches, and one-second mouse movement summaries. It does not save typed words, individual letter keys, app names, window titles, URLs, screenshots, or exact cursor paths. Detailed timing can still be sensitive. See the [privacy page](https://krisjanci.github.io/FocusFix-Website/privacy.html).
 
+## Personal survey check-ins
+
+Click your profile picture and turn on **Survey check-ins**, or use the same control in Settings. The **Prompts per day** slider selects 1–5 (default 2). Surveys start off. Each optional check-in asks for mental fatigue and self-reported productivity using two sliders.
+
+FocusFix saves random opportunities across the remainder of each local calendar day. It requests up to your chosen number while recording and outside breaks, with at least 30 minutes between requests, including across midnight and app restarts. Missed times coalesce into one opportunity rather than a burst. Days with limited recording time may have fewer prompts. Requested prompts count even if skipped or unanswered. Changing the count preserves requests already made that day; turning surveys off immediately clears pending and open check-ins. Settings and today's schedule survive relaunches.
+
+Personal check-ins do not enroll you in a study or enable sharing. Existing recording and sharing choices still apply. The separate reviewed-study configuration remains gated.
+
 ## Accounts and optional sharing
 
 Guest use keeps recordings on the Mac. An optional account supports a saved profile and private groups. Signing in never opts you into recording sharing.
