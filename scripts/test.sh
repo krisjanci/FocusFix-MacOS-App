@@ -30,11 +30,17 @@ run_test StudyCheckInTests "$source_dir/SurveyPreferences.swift" "$source_dir/Su
 run_test DeclaredWorkProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test ResearchArchiveContractTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test DevelopmentSharingTests "$source_dir/DevelopmentSharing.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
+run_test DevelopmentDeliveryTests "$source_dir/DevelopmentSharing.swift" "$source_dir/DevelopmentSharingController.swift" \
+    "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift" \
+    "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
+run_test SessionLibraryLoadingTests
 run_test ExperimentalActivityPolicyTests "$source_dir/ExperimentalActivityPolicy.swift"
 run_test AutomaticTrackingIntegrationTests "$source_dir/RecordingLifecycle.swift" "$source_dir/DailyProgress.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
+    "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
+run_test RecordingEfficiencyTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
     "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
 run_test GroupPresentationTests "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
 run_test QuickTourTests "$source_dir/QuickTour.swift" "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
