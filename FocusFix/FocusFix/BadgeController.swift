@@ -8,6 +8,7 @@ final class BadgeController: ObservableObject {
     @Published private(set) var awards: BadgeAwards
     @Published var collectionRequest = UUID()
     private(set) var collectionRequested = false
+    private let deliverNotification: (FocusBadge) -> Void
     private let defaults: UserDefaults
     private let storageKey = "focusfix.badges.v1"
     private var subscriptions: Set<AnyCancellable> = []
@@ -27,8 +28,9 @@ final class BadgeController: ObservableObject {
         guard let key = awards.pending.first(where: { visibleKeys.contains($0) }) else { return nil }
         return FocusBadge.all.first { $0.id == key || ($0.id == "joined" && key == joinedKey) }
     }
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, deliverNotification: ((FocusBadge) -> Void)? = nil) {
         self.defaults = defaults
+        self.deliverNotification = deliverNotification ?? Self.notify
         awards = defaults.data(forKey: storageKey).flatMap { try? JSONDecoder().decode(BadgeAwards.self, from: $0) } ?? BadgeAwards()
     }
     func start(tracker: ActivityTracker) {
@@ -65,18 +67,20 @@ final class BadgeController: ObservableObject {
         issue(streak: max(best, progress.streakStatus(at: Date(), calendar: calendar).count), historical: historical)
     }
     private func issue(streak: Int, historical: Bool = false) {
+        let previous = awards
         let added = awards.award(streak: streak, joinedKey: joinedKey, historical: historical)
-        save()
-        for badge in added {
-            let content = UNMutableNotificationContent()
-            content.title = "You've gained a badge!"; content.body = badge.name
-            content.userInfo = ["focusfix_badge": badge.id]
-            Task {
-                let center = UNUserNotificationCenter.current()
-                let settings = await center.notificationSettings()
-                guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-                try? await center.add(UNNotificationRequest(identifier: "focusfix-badge-\(UUID().uuidString)", content: content, trigger: nil))
-            }
+        if previous != awards { save() }
+        for badge in added { deliverNotification(badge) }
+    }
+    private static func notify(_ badge: FocusBadge) {
+        let content = UNMutableNotificationContent()
+        content.title = "You've gained a badge!"; content.body = badge.name
+        content.userInfo = ["focusfix_badge": badge.id]
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+            try? await center.add(UNNotificationRequest(identifier: "focusfix-badge-\(UUID().uuidString)", content: content, trigger: nil))
         }
     }
     func isEarned(_ badge: FocusBadge) -> Bool {
