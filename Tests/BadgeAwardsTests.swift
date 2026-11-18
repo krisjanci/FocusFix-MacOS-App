@@ -54,6 +54,25 @@ struct BadgeAwardsTests {
         // Adding badge storage must not require changes to the existing progress format.
         let restored = try JSONDecoder().decode(DailyProgress.self, from: JSONEncoder().encode(progress))
         precondition(restored == progress)
+        // Cached and cold ledgers must award the same badges across DST/month
+        // boundaries and after late corrections that change historical continuity.
+        var cachedHistory = DailyProgress()
+        cachedHistory.reconcile(at: start, calendar: calendar)
+        for offset in 0..<35 {
+            try cachedHistory.replaceDeclaredWork(segmentID: "fixture-\(offset)",
+                days: [DailyProgress.key(for: day(offset), calendar: calendar): 3600])
+        }
+        for offset in [11, 13, 14, 34, 45] {
+            cachedHistory.reconcile(at: day(offset), calendar: calendar)
+            let coldHistory = try JSONDecoder().decode(DailyProgress.self, from: JSONEncoder().encode(cachedHistory))
+            var cachedAwards = BadgeAwards(), coldAwards = BadgeAwards()
+            let cachedBest = max(BadgeAwards.historicalBest(cachedHistory, calendar: calendar), cachedHistory.streakStatus(at: day(offset), calendar: calendar).count)
+            let coldBest = max(BadgeAwards.historicalBest(coldHistory, calendar: calendar), coldHistory.streakStatus(at: day(offset), calendar: calendar).count)
+            _ = cachedAwards.award(streak: cachedBest, joinedKey: nil)
+            _ = coldAwards.award(streak: coldBest, joinedKey: nil)
+            precondition(cachedAwards == coldAwards)
+            try cachedHistory.replaceDeclaredWork(segmentID: "fixture-\(offset)", days: [:])
+        }
         print("Badge award tests passed")
     }
 }
