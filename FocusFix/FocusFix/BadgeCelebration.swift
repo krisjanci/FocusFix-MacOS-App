@@ -33,6 +33,9 @@ struct BadgeCelebrationHost: ViewModifier {
                     }
                 }
             }
+            .background(BadgeEscapeHandler(enabled: badge != nil && active && showsCelebration) {
+                if let badge { dismiss(badge) }
+            })
             .onAppear { active = NSApp.isActive }
             .onChange(of: badge?.id) { _, _ in flight = 0; dismissing = false; comingSoon = false }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in active = true }
@@ -58,16 +61,9 @@ struct BadgeCelebrationHost: ViewModifier {
                 Text(badge.description).font(.callout).foregroundStyle(.secondary)
             }.frame(width: size.width).position(x: size.width / 2, y: start.y + 148)
                 .opacity(1 - flight).allowsHitTesting(false).accessibilityElement(children: .combine)
-            Button { comingSoon = true } label: {
-                HStack(spacing: 9) {
-                    LinkedInMark().frame(width: 20, height: 20)
-                    Text(comingSoon ? "Coming soon" : "Share to LinkedIn").font(.callout.weight(.medium))
-                }.padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
-                    .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.primary.opacity(0.12)))
-            }.buttonStyle(.plain).disabled(dismissing)
+            BadgeLinkedInButton(comingSoon: $comingSoon)
+                .disabled(dismissing)
                 .position(x: size.width / 2, y: start.y + 210).opacity(1 - flight)
-                .accessibilityLabel(comingSoon ? "LinkedIn sharing coming soon" : "Share to LinkedIn")
         }
         .frame(width: size.width, height: size.height)
         .contentShape(Rectangle())
@@ -97,6 +93,21 @@ private struct BadgeFlight: GeometryEffect {
         let y = arc ? start.y + (destination.y - start.y) * progress - sin(progress * .pi) * 130 : start.y
         return ProjectionTransform(CGAffineTransform(translationX: x, y: y)
             .scaledBy(x: scale, y: scale).translatedBy(x: -size.width / 2, y: -size.height / 2))
+    }
+}
+
+struct BadgeLinkedInButton: View {
+    @Binding var comingSoon: Bool
+    var body: some View {
+        Button { comingSoon = true } label: {
+            HStack(spacing: 9) {
+                LinkedInMark().frame(width: 20, height: 20)
+                Text(comingSoon ? "Coming soon" : "Share to LinkedIn").font(.callout.weight(.medium))
+            }.padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.primary.opacity(0.12)))
+        }.buttonStyle(.plain)
+            .accessibilityLabel(comingSoon ? "LinkedIn sharing coming soon" : "Share to LinkedIn")
     }
 }
 
