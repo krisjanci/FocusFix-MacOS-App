@@ -77,16 +77,23 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         clearCheckIn()
         // On launch/start/stop also remove leftovers from earlier app runs.
         let reminderCategories: Set<String> = ["break_prompt", "break_finished", "work_check_in"]
-        center.getPendingNotificationRequests { [center] requests in
-            center.removePendingNotificationRequests(withIdentifiers: requests.filter {
-                reminderCategories.contains($0.content.categoryIdentifier)
-            }.map(\.identifier))
+        center.getPendingNotificationRequests { [weak self] requests in
+            let ids = requests.filter { reminderCategories.contains($0.content.categoryIdentifier) }.map(\.identifier)
+            Task { @MainActor [weak self] in self?.removeStaleReminders(ids, delivered: false) }
         }
-        center.getDeliveredNotifications { [center] notifications in
-            center.removeDeliveredNotifications(withIdentifiers: notifications.filter {
-                reminderCategories.contains($0.request.content.categoryIdentifier)
-            }.map { $0.request.identifier })
+        center.getDeliveredNotifications { [weak self] notifications in
+            let ids = notifications.filter { reminderCategories.contains($0.request.content.categoryIdentifier) }.map { $0.request.identifier }
+            Task { @MainActor [weak self] in self?.removeStaleReminders(ids, delivered: true) }
         }
+    }
+    // Notification queries finish asynchronously. Keep reminders registered after clear() began.
+    static func staleReminderIDs(_ candidates: [String], activeBreakIDs: Set<String>, activeCheckInID: String?) -> [String] {
+        candidates.filter { !activeBreakIDs.contains($0) && $0 != activeCheckInID }
+    }
+    private func removeStaleReminders(_ candidates: [String], delivered: Bool) {
+        let ids = Self.staleReminderIDs(candidates, activeBreakIDs: breakIDs, activeCheckInID: checkInID)
+        if delivered { center.removeDeliveredNotifications(withIdentifiers: ids) }
+        else { center.removePendingNotificationRequests(withIdentifiers: ids) }
     }
     // Remove break reminders without clearing a separate survey reminder.
     func clearBreaks() {
