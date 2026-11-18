@@ -6,6 +6,8 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
+    var launchReady = true
+    @ObservedObject private var dailySurvey = StartOfDayController.shared
     @ObservedObject private var profile = ProfileController.shared
     @ObservedObject private var account = AccountController.shared
     @ObservedObject private var tour = QuickTourController.shared
@@ -51,16 +53,31 @@ struct ContentView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
-        .modifier(BadgeCelebrationHost(badges: badges, showsCelebration: panels.sheet == nil &&
+        .modifier(BadgeCelebrationHost(badges: badges, showsCelebration: dailySurvey.presented == nil && !dailySurvey.isDue() && panels.sheet == nil &&
             !sharingPresented && !editingSessionTags && !editingActivity &&
             !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
             !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented))
+        .blur(radius: dailySurvey.presented == nil ? 0 : 8)
+        .disabled(dailySurvey.presented != nil)
+        .accessibilityHidden(dailySurvey.presented != nil)
+        .overlay {
+            if dailySurvey.presented != nil {
+                StartOfDaySurveyView(survey: dailySurvey)
+            }
+        }
+        .task(id: "\(launchReady)-\(dailySurvey.enabled)-\(surveyCanAppear)") { showDailySurveyIfReady() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            showDailySurveyIfReady()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            if let window = note.object as? NSWindow, window === collectorWindow { showDailySurveyIfReady() }
+        }
         .onChange(of: badges.collectionRequest) { _, _ in showBadgeCollection() }
         .onAppear { if badges.collectionRequested { showBadgeCollection() } }
         .animation(reduceMotion ? nil : .easeInOut(duration: PeopleWindowAnimation.duration), value: panels.expanded)
         .modifier(CollectorWindowResizeLock())
         .onPreferenceChange(CollectorHeightKey.self) { if $0 > 0 { collectorHeight = $0 } }
-        .background(PeopleWindowBridge(expanded: panels.expanded != nil, reduceMotion: reduceMotion, resolved: { collectorWindow = $0 }))
+        .background(PeopleWindowBridge(expanded: panels.expanded != nil, reduceMotion: reduceMotion, resolved: { collectorWindow = $0; showDailySurveyIfReady() }))
         .sheet(item: $panels.sheet) { panel in
             sidePanel(panel, close: { panels.close() }).frame(width: 380, height: 580)
                 .modifier(BadgeCelebrationHost(badges: badges))
@@ -73,6 +90,18 @@ struct ContentView: View {
                   let screen = window.screen else { return }
             panels.adapt(canExpand: PeopleWindowLayout.canExpand(in: screen.visibleFrame))
         }
+    }
+
+    private var surveyCanAppear: Bool {
+        launchReady && !tour.isPresented && !RecordingNotice().needsFirstLaunchChoice &&
+        panels.sheet == nil && !sharingPresented && !editingSessionTags && !editingActivity &&
+        !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
+        !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented
+    }
+
+    private func showDailySurveyIfReady() {
+        guard surveyCanAppear, NSApp.isActive, collectorWindow?.isKeyWindow == true else { return }
+        dailySurvey.showIfDue()
     }
 
     private var expandedPanelHeight: CGFloat {
