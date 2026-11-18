@@ -2,6 +2,9 @@ import Foundation
 
 @main struct BadgeControllerTests {
     @MainActor static func main() async throws {
+        let content = BadgeController.notificationContent(for: FocusBadge.all[1])
+        precondition(content.title == "You've gained a badge!" && content.body == "Full Week")
+        precondition(content.userInfo["focusfix_badge"] as? String == "work-5")
         let suite = "focusfix-badge-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
