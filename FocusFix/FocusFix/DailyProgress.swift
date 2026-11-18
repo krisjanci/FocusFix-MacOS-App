@@ -16,9 +16,25 @@ struct DailyProgress: Codable, Equatable {
     private(set) var declaredRevisions: [String: Int] = [:]
     private(set) var declaredOwners: [String: DeclaredWorkOwner] = [:]
     private(set) var days: [String: ProgressDay] = [:]
-    var protectionStart: String?
+    var protectionStart: String? { didSet { if protectionStart != oldValue { reconciliationDay = nil } } }
     var reconciledThrough: String?
-    var frozenDays: Set<String> = []
+    var frozenDays: Set<String> = [] { didSet { reconciliationDay = nil } }
+    // Ephemeral: decoded ledgers always recompute; no persisted cache can hide corrections.
+    private var reconciliationDay: String?
+    private var reconciliationCalendar: Calendar?
+#if FOCUSFIX_SYNTHETIC_TESTS
+    private(set) var reconciliationPasses = 0
+#endif
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.version == rhs.version && lhs.declaredSegments == rhs.declaredSegments
+            && lhs.declaredRevisions == rhs.declaredRevisions && lhs.declaredOwners == rhs.declaredOwners
+            && lhs.days == rhs.days && lhs.protectionStart == rhs.protectionStart
+            && lhs.reconciledThrough == rhs.reconciledThrough && lhs.frozenDays == rhs.frozenDays
+    }
+    private mutating func changedWork(on day: String) {
+        if let cached = reconciliationDay, day < cached { reconciliationDay = nil }
+    }
 
     enum CodingKeys: String, CodingKey { case version, days, protectionStart, reconciledThrough, frozenDays, declaredSegments, declaredRevisions, declaredOwners }
     init() {}
@@ -37,6 +53,10 @@ struct DailyProgress: Codable, Equatable {
     mutating func reconcile(at date: Date, calendar: Calendar) {
         let today = Self.key(for: date, calendar: calendar)
         if protectionStart == nil { protectionStart = today }
+        if reconciliationDay == today, reconciliationCalendar == calendar, reconciledThrough == today { return }
+#if FOCUSFIX_SYNTHETIC_TESTS
+        reconciliationPasses += 1
+#endif
         guard let start = protectionStart else { return }
         // Rebuild deterministically: late offline work replaces a freeze, returning its token.
         frozenDays = []
@@ -61,6 +81,8 @@ struct DailyProgress: Codable, Equatable {
             cursor = calendar.date(byAdding: .day, value: 1, to: cursor)!
         }
         reconciledThrough = today
+        reconciliationDay = today
+        reconciliationCalendar = calendar
     }
 
     func tokensRemaining(at date: Date, calendar: Calendar) -> Int {
@@ -98,6 +120,7 @@ struct DailyProgress: Codable, Equatable {
             let boundary = min(end, interval.end)
             guard boundary > cursor else { return }
             let key = Self.key(for: cursor, calendar: calendar)
+            changedWork(on: key)
             days[key, default: ProgressDay()].workSeconds += boundary.timeIntervalSince(cursor)
             cursor = boundary
         }
@@ -114,6 +137,7 @@ struct DailyProgress: Codable, Equatable {
         declaredSegments[segmentID] = replacement
         version = 2
         guard previous != replacement else { return }
+        for day in Set(previous.keys).union(replacement.keys) where previous[day] != replacement[day] { changedWork(on: day) }
         for (day, seconds) in previous { days[day, default: ProgressDay()].workSeconds = max(0, days[day, default: ProgressDay()].workSeconds - seconds) }
         for (day, seconds) in replacement { days[day, default: ProgressDay()].workSeconds += seconds }
         declaredSegments[segmentID] = replacement
