@@ -76,8 +76,17 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         clearBreaks()
         clearCheckIn()
         // On launch/start/stop also remove leftovers from earlier app runs.
-        center.removeAllPendingNotificationRequests()
-        center.removeAllDeliveredNotifications()
+        let reminderCategories: Set<String> = ["break_prompt", "break_finished", "work_check_in"]
+        center.getPendingNotificationRequests { [center] requests in
+            center.removePendingNotificationRequests(withIdentifiers: requests.filter {
+                reminderCategories.contains($0.content.categoryIdentifier)
+            }.map(\.identifier))
+        }
+        center.getDeliveredNotifications { [center] notifications in
+            center.removeDeliveredNotifications(withIdentifiers: notifications.filter {
+                reminderCategories.contains($0.request.content.categoryIdentifier)
+            }.map { $0.request.identifier })
+        }
     }
     // Remove break reminders without clearing a separate survey reminder.
     func clearBreaks() {
@@ -127,6 +136,15 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
+        if info["focusfix_badge"] != nil {
+            Task { @MainActor in
+                if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+                    BadgeController.shared.requestCollection()
+                }
+                completionHandler()
+            }
+            return
+        }
         let session = info["session"] as? String ?? ""
         let token = info["token"] as? String ?? ""
         let action = response.actionIdentifier
