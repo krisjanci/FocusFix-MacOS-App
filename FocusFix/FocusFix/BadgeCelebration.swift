@@ -21,6 +21,7 @@ struct BadgeCelebrationHost: ViewModifier {
         content
             .blur(radius: badge != nil && active ? 8 * (1 - flight) : 0)
             .allowsHitTesting(badge == nil || !active)
+            .disabled(badge != nil && active)
             .accessibilityHidden(badge != nil && active)
             .overlayPreferenceValue(AnalyticsBadgeAnchor.self) { anchor in
                 GeometryReader { geometry in
@@ -31,6 +32,7 @@ struct BadgeCelebrationHost: ViewModifier {
                     }
                 }
             }
+            .onAppear { active = NSApp.isActive }
             .onChange(of: badge?.id) { _, _ in flight = 0; dismissing = false; comingSoon = false }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in active = true }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in active = false }
@@ -41,7 +43,7 @@ struct BadgeCelebrationHost: ViewModifier {
         return ZStack(alignment: .topLeading) {
             Button { dismiss(badge) } label: {
                 Color(nsColor: .windowBackgroundColor).opacity(0.35 * (1 - flight)).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("Dismiss badge celebration")
+            }.buttonStyle(.plain).keyboardShortcut(.cancelAction).accessibilityLabel("Dismiss badge celebration")
             Text("You've gained a badge!")
                 .font(.title2.weight(.semibold)).frame(width: size.width)
                 .position(x: size.width / 2, y: max(30, start.y - 150))
