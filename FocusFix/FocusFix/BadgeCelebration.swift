@@ -20,9 +20,9 @@ struct BadgeCelebrationHost: ViewModifier {
         let badge = badges.celebration
         content
             .blur(radius: badge != nil ? 8 * (1 - flight) : 0)
-            .allowsHitTesting(badge == nil)
-            .disabled(badge != nil)
-            .accessibilityHidden(badge != nil)
+            .allowsHitTesting(badge == nil || !showsCelebration)
+            .disabled(badge != nil && showsCelebration)
+            .accessibilityHidden(badge != nil && showsCelebration)
             .overlayPreferenceValue(AnalyticsBadgeAnchor.self) { anchor in
                 GeometryReader { geometry in
                     if let badge, showsCelebration {
