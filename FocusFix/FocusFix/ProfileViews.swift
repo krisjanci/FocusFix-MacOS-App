@@ -89,37 +89,19 @@ struct ProfileEditor: View {
                 Label(savedProfile.groupPhoto == nil ? "Photo is private" : "Photo shared with group members",
                       systemImage: savedProfile.groupPhoto == nil ? "lock.fill" : "person.2.fill")
                     .font(.caption).foregroundStyle(.secondary)
-                Button(savedProfile.groupPhoto == nil ? "Share photo with my groups…" : "Change photo visibility…") {
-                    beginEditing()
-                    if draft.groupPhoto == nil, let photo = draft.photo {
-                        do { draft.groupPhoto = try ProfileController.groupPhoto(from: photo) }
-                        catch { photoError = "This photo could not be prepared for groups." }
-                    }
-                }.buttonPressFeedback().disabled(account.busy || !account.profileLoaded)
+                SettingsLink { Text("Photo visibility settings…") }.buttonPressFeedback()
             }
             if editing {
                 HStack {
                     if draft.photo != nil { Button("Remove photo") { draft.photo = nil; draft.groupPhoto = nil }.buttonPressFeedback() }
                 }
-                Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your account profile. Choose a photo under 10 MB and review group visibility below.")
+                Text(account.session == nil ? "Photos stay on this Mac. Choose an image under 10 MB; it is cropped to a square." : "Saving sends this name and avatar to your account profile. Choose a photo under 10 MB. Manage group photo visibility in Privacy & Data Sharing settings.")
                     .font(.caption).foregroundStyle(.secondary)
-                if account.session != nil, draft.photo != nil {
-                    Toggle("Show my photo to members of my groups", isOn: Binding(
-                        get: { draft.groupPhoto != nil },
-                        set: { share in
-                            if share, let photo = draft.photo {
-                                do { draft.groupPhoto = try ProfileController.groupPhoto(from: photo) }
-                                catch { photoError = "This photo could not be prepared for groups." }
-                            } else { draft.groupPhoto = nil }
-                        }))
-                    Text("When enabled, saving shares a small photo thumbnail with members of your groups. Turn it off and save to keep your photo private. Group photos update on the next refresh.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
                 if let error = photoError { Text(error).font(.caption).foregroundStyle(.red) }
                 HStack {
                     Button("Save profile") {
                         if account.session != nil {
-                            Task { if await account.saveProfile(draft) { editing = false; onSaved() } }
+                            saveAccountProfile()
                         } else if controller.save(draft) { editing = false; onSaved() }
                     }.buttonPressFeedback().buttonStyle(.borderedProminent)
                         .disabled((try? draft.validated()) == nil || account.busy)
@@ -144,6 +126,22 @@ struct ProfileEditor: View {
         editing = true
     }
 
+    private func saveAccountProfile() {
+        guard let session = account.session, let api = account.api else { return }
+        let preference = GroupPhotoVisibilityPreference(accountID: session.user.id,
+            origin: api.configuration.origin.absoluteString)
+        var updated = draft
+        do {
+            // Settings may have changed while the profile editor was open.
+            updated.groupPhoto = preference.isEnabled(for: account.profile)
+                ? try updated.photo.map { try ProfileController.groupPhoto(from: $0) } : nil
+        } catch {
+            photoError = "This photo could not be prepared for groups."
+            return
+        }
+        Task { if await account.saveProfile(updated) { editing = false; onSaved() } }
+    }
+
     private func choosePhoto() {
         let panel = NSOpenPanel()
         panel.title = "Choose profile photo"
@@ -154,11 +152,72 @@ struct ProfileEditor: View {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
-            // Newly added account photos are shared with groups unless switched off
-            // before saving. Replacing an existing photo preserves its visibility.
-            let sharing = account.session != nil && (draft.photo == nil || draft.groupPhoto != nil)
+            // New photos default to sharing; Privacy & Data Sharing can opt out
+            // before adding one. Saved photos preserve their current visibility.
+            let preference = account.session.flatMap { session in
+                account.api.map { GroupPhotoVisibilityPreference(accountID: session.user.id,
+                    origin: $0.configuration.origin.absoluteString) }
+            }
+            let sharing = preference?.isEnabled(for: savedProfile) ?? false
             draft = try ProfileController.replacingPhoto(in: draft, from: url, shareWithGroups: sharing)
             photoError = nil
         } catch { photoError = "This photo could not be opened. Choose a PNG, JPEG, HEIC or TIFF under 10 MB." }
+    }
+}
+
+struct ProfilePhotoPrivacySettings: View {
+    @ObservedObject private var account = AccountController.shared
+    @State private var sharing = true
+    @State private var error: String?
+
+    private var preference: GroupPhotoVisibilityPreference? {
+        guard let session = account.session, let api = account.api else { return nil }
+        return GroupPhotoVisibilityPreference(accountID: session.user.id, origin: api.configuration.origin.absoluteString)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Show my profile photo to members of my groups", isOn: Binding(
+                get: { sharing }, set: { updateVisibility($0) }))
+                .disabled(account.session == nil || !account.profileLoaded || account.busy)
+            Text(account.session == nil
+                 ? "Sign in to manage group photo visibility. New account photos are shared with group members by default."
+                 : "On by default for new photos. Only a small thumbnail is shown to group members. Changes save immediately; group photos update on the next refresh.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }
+        .onAppear { refresh() }
+        .onChange(of: account.profile) { _, _ in refresh() }
+        .onChange(of: account.session?.user.id) { _, _ in refresh() }
+    }
+
+    private func refresh() {
+        sharing = preference?.isEnabled(for: account.profile) ?? true
+        error = nil
+    }
+
+    private func updateVisibility(_ enabled: Bool) {
+        guard let preference else { return }
+        guard var profile = account.profile, let photo = profile.photo else {
+            preference.save(enabled)
+            sharing = enabled
+            return
+        }
+        do {
+            profile.groupPhoto = enabled ? try ProfileController.groupPhoto(from: photo) : nil
+        } catch {
+            self.error = "This photo could not be prepared for groups."
+            return
+        }
+        sharing = enabled
+        error = nil
+        Task { @MainActor in
+            if await account.saveProfile(profile) {
+                preference.save(enabled)
+            } else {
+                sharing = preference.isEnabled(for: account.profile)
+                error = account.notice ?? "Photo visibility could not be saved. Try again."
+            }
+        }
     }
 }
