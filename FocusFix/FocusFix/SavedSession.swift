@@ -147,22 +147,32 @@ nonisolated enum SessionFiles {
         let pending = pendingRoot(in: root)
         guard FileManager.default.fileExists(atPath: pending.path) else { return 0 }
         var count = 0
+        var failures = 0
         for folder in try FileManager.default.contentsOfDirectory(at: pending, includingPropertiesForKeys: nil) {
-            try validate(folder, in: pending, active: nil)
-            guard var contract = try? RecordingContract.load(from: folder) else { continue }
-            let url = folder.appendingPathComponent("session.json")
-            let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-            guard properties.isRegularFile == true, properties.isSymbolicLink != true else { continue }
-            guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else { continue }
-            if !contract.finalized { try contract.finish(at: contract.observedThrough); try contract.save(to: folder) }
-            metadata["duration_seconds"] = contract.observedThrough - contract.elapsedOrigin
-            metadata["status"] = "crash_recovered_observed_only"
-            // Raw CSV tails beyond the checkpoint remain original bytes; readers must exclude them.
-            metadata["recovery_policy"] = "Only data strictly before observedThrough are eligible; ignore any uncheckpointed raw tail. No downtime filled."
-            try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
-            let destination = root.appendingPathComponent(folder.lastPathComponent)
-            try FileManager.default.moveItem(at: folder, to: destination)
-            count += 1
+            do {
+                try validate(folder, in: pending, active: nil)
+                var contract = try RecordingContract.load(from: folder)
+                let url = folder.appendingPathComponent("session.json")
+                let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard properties.isRegularFile == true, properties.isSymbolicLink != true else { throw RecordingContract.Invalid.contract }
+                guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else { throw RecordingContract.Invalid.contract }
+                _ = try SavedSession(folder: folder)
+                if !contract.finalized { try contract.finish(at: contract.observedThrough); try contract.save(to: folder) }
+                metadata["duration_seconds"] = contract.observedThrough - contract.elapsedOrigin
+                metadata["status"] = "crash_recovered_observed_only"
+                // Raw CSV tails beyond the checkpoint remain original bytes; readers must exclude them.
+                metadata["recovery_policy"] = "Only data strictly before observedThrough are eligible; ignore any uncheckpointed raw tail. No downtime filled."
+                try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
+                let destination = root.appendingPathComponent(folder.lastPathComponent)
+                try FileManager.default.moveItem(at: folder, to: destination)
+                count += 1
+            } catch { failures += 1 }
+        }
+        if failures > 0 {
+            throw NSError(domain: "FocusFix.Recovery", code: failures, userInfo: [
+                NSLocalizedDescriptionKey: "An interrupted recording could not be finalized; original files were kept.",
+                "recoveredCount": count
+            ])
         }
         return count
     }
