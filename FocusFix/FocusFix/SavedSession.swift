@@ -155,7 +155,13 @@ nonisolated enum SessionFiles {
                 let url = folder.appendingPathComponent("session.json")
                 let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 guard properties.isRegularFile == true, properties.isSymbolicLink != true else { throw RecordingContract.Invalid.contract }
-                guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else { throw RecordingContract.Invalid.contract }
+                guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
+                      metadata["schema_version"] as? Int == RecordingContract.schemaVersion,
+                      metadata["recording_format"] as? String == RecordingContract.format,
+                      metadata["required_capabilities"] as? [String] == RecordingContract.requiredCapabilities,
+                      metadata["recording_id"] as? String == contract.recordingID.uuidString,
+                      metadata["segment_id"] as? String == contract.segmentID.uuidString,
+                      metadata["recording_mode"] as? String == contract.mode.rawValue else { throw RecordingContract.Invalid.contract }
                 if !contract.finalized { try contract.finish(at: contract.observedThrough); try contract.save(to: folder) }
                 metadata["duration_seconds"] = contract.observedThrough - contract.elapsedOrigin
                 metadata["status"] = "crash_recovered_observed_only"
@@ -261,7 +267,11 @@ nonisolated enum SessionFiles {
         for session in sessions { try validate(session.folder, in: root, active: active) }
         var result = DeletionResult()
         for session in sessions {
-            do { try remove(session.folder); result.deleted.append(session) }
+            do {
+                try validate(session.folder, in: root, active: active)
+                try remove(session.folder)
+                result.deleted.append(session)
+            }
             catch { result.failures.append("\(session.id): \(error.localizedDescription)") }
         }
         return result
