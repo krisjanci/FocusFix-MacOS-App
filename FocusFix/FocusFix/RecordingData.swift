@@ -293,6 +293,11 @@ final class RecordingWriter {
         fields["time_zone"] = contract.scoringTimeZone
         fields["started_at_local"] = localTime.string(from: startedAt)
         if let studyConfiguration {
+            if studyConfiguration.scope == .personal {
+                fields["survey_options_policy"] = "Personal survey changes rotate the recording segment; no session-start or pre-break surveys. Turning off cancels pending and open prompts."
+                fields["timed_check_in_policy"] = "Persisted randomized local-day schedule; up to the selected 1–5 prompts per calendar day while recording outside breaks. Actual notification requests remain at least 1800 seconds apart across days and restarts. Missed opportunities coalesce without catch-up bursts. Requested prompts consume the quota, including skipped or unanswered ones."
+                fields["survey_logging"] = "Optional custom fatigue and self-reported productivity ratings, not validated or objective measures. Personal check-ins refer to the preceding recall window in study_check_ins.jsonl. Skipped/cancelled ratings are blank, not zero."
+            }
             fields["study_check_in_schedule"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(studyConfiguration))
             fields["study_check_in_logging"] = "study_check_ins.jsonl joins immutable prompt IDs to context and preceding recall bounds. Scheduled/requested/opened/answered/skipped/cancelled are distinct. Never use check-in interaction or future data as preceding predictors."
         }
