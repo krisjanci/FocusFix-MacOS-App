@@ -3,7 +3,7 @@ import SwiftUI
 struct AnalyticsPanel: View {
     let close: () -> Void
     var anchorsCelebration = false
-    @ObservedObject private var badges = BadgeController.shared
+    @ObservedObject var badges: BadgeController = .shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingBadges = false
     @State private var selectedBadge: FocusBadge?
