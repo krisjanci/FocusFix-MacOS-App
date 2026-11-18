@@ -1,0 +1,47 @@
+import Foundation
+
+@main struct BadgeControllerTests {
+    @MainActor static func main() async throws {
+        let suite = "focusfix-badge-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let tracker = ActivityTracker()
+        var sent: [String] = []
+        let controller = BadgeController(defaults: defaults, deliverNotification: { sent.append($0.id) })
+        controller.start(tracker: tracker)
+        precondition(!controller.hasUnread && controller.celebration == nil)
+        precondition(!controller.isEarned(FocusBadge.all[0]))
+        let calendar = DailyProgress.calendar()
+        let today = calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!
+        var progress = DailyProgress()
+        progress.reconcile(at: calendar.date(byAdding: .day, value: -4, to: today)!, calendar: calendar)
+        for offset in -4...0 {
+            progress.addWork(seconds: 3600, endingAt: calendar.date(byAdding: .day, value: offset, to: today)!, calendar: calendar)
+        }
+        tracker.dailyProgress = progress
+        precondition(sent == ["work-5"] && controller.celebration?.id == "work-5" && controller.hasUnread)
+        tracker.dailyProgress = progress
+        precondition(sent.count == 1, "Repeated publications must not repeat notifications")
+        controller.dismissCelebration(FocusBadge.all[1])
+        precondition(controller.celebration == nil && controller.hasUnread, "Celebrating does not mark a badge as seen")
+        let restored = BadgeController(defaults: defaults, deliverNotification: { _ in fatalError("No duplicate notification") })
+        restored.start(tracker: tracker)
+        precondition(restored.hasUnread && restored.isEarned(FocusBadge.all[1]))
+        restored.openCollection()
+        precondition(!restored.hasUnread)
+        let reread = BadgeController(defaults: defaults, deliverNotification: { _ in })
+        precondition(!reread.hasUnread)
+        let account = AccountController.shared
+        account.session = .init(user: .init(id: UUID()))
+        for _ in 0..<10 { await Task.yield() }
+        precondition(controller.isEarned(FocusBadge.all[0]) && controller.hasUnread)
+        precondition(sent == ["work-5", "joined"])
+        controller.openCollection()
+        precondition(!controller.hasUnread && controller.celebration == nil)
+        account.session = nil
+        for _ in 0..<10 { await Task.yield() }
+        precondition(!controller.isEarned(FocusBadge.all[0]))
+        precondition(controller.isEarned(FocusBadge.all[1]))
+        print("Badge controller tests passed: live awards, duplicate prevention, durable unread/queues, sign-in and guest boundaries")
+    }
+}
