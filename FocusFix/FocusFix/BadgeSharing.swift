@@ -54,6 +54,7 @@ private struct BadgeShareCard: View {
 struct BadgeSharePanel: View {
     let share: BadgeShare
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var browserFailed = false
     @State private var copied = false
     init(share: BadgeShare, browserFailed: Bool = false) {
@@ -84,5 +85,7 @@ struct BadgeSharePanel: View {
             }
             Button("Done") { dismiss() }.keyboardShortcut(.cancelAction).frame(maxWidth: .infinity, alignment: .trailing)
         }.padding(24).frame(width: 470)
+            .foregroundStyle(.primary)
+            .background(colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.98))
     }
 }
