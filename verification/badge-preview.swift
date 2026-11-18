@@ -2,9 +2,14 @@
 import SwiftUI
 import AppKit
 
+@MainActor private enum PreviewState {
+    static let badges = BadgeController(defaults: .standard, deliverNotification: { _ in })
+}
+
 private struct PreviewContent: View {
-    @ObservedObject var badges = BadgeController.shared
+    @ObservedObject var badges = PreviewState.badges
     @State private var expanded = false
+    @State private var nextDays = 10
     @State private var dark = CommandLine.arguments.contains("--dark")
     let narrow = CommandLine.arguments.contains("--narrow")
     var body: some View {
@@ -14,6 +19,7 @@ private struct PreviewContent: View {
                     Text("FocusFix").font(.largeTitle.weight(.semibold))
                     Spacer()
                     Button("Appearance") { dark.toggle() }
+                    Button("Earn next") { earnNext() }
                 }
                 Text("Synthetic preview · no recording or account access").font(.caption).foregroundStyle(.secondary)
                 VStack(spacing: 24) {
@@ -33,15 +39,35 @@ private struct PreviewContent: View {
                         }.anchorPreference(key: AnalyticsBadgeAnchor.self, value: .bounds) { $0 }
                     }.buttonStyle(.plain)
                 }
-            }.padding(30).frame(width: narrow ? 380 : 490)
-            if expanded {
+            }.padding(30).frame(width: 490)
+            if expanded && !narrow {
                 Divider()
-                AnalyticsPanel { expanded = false }.frame(width: 359)
+                AnalyticsPanel(close: { expanded = false }, badges: badges).frame(width: 359)
             }
         }.frame(height: 620)
         .background(Color(nsColor: .windowBackgroundColor))
-        .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion")))
+        .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion"), showsCelebration: !expanded || !narrow))
+        .sheet(isPresented: Binding(get: { expanded && narrow }, set: { expanded = $0 })) {
+            VStack(spacing: 0) {
+                AnalyticsPanel(close: { expanded = false }, anchorsCelebration: true, badges: badges).frame(width: 380, height: 580)
+                Button("Earn next badge (synthetic)") { earnNext() }.padding(8)
+            }
+            .modifier(BadgeCelebrationHost(badges: badges, reduceMotionOverride: CommandLine.arguments.contains("--reduce-motion")))
+            .environment(\.colorScheme, dark ? .dark : .light)
+        }
+        .onAppear { badges.start(tracker: ActivityTracker.shared) }
         .environment(\.colorScheme, dark ? .dark : .light)
+    }
+    private func earnNext() {
+        let calendar = DailyProgress.calendar()
+        let today = calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!
+        var progress = DailyProgress()
+        progress.reconcile(at: calendar.date(byAdding: .day, value: 1 - nextDays, to: today)!, calendar: calendar)
+        for offset in (1 - nextDays)...0 {
+            progress.addWork(seconds: 3600, endingAt: calendar.date(byAdding: .day, value: offset, to: today)!, calendar: calendar)
+        }
+        ActivityTracker.shared.dailyProgress = progress
+        nextDays = FocusBadge.all.first { $0.days > nextDays }?.days ?? 100
     }
 }
 
