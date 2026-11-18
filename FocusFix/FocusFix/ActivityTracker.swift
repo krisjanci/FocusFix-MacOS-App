@@ -155,6 +155,7 @@ final class ActivityTracker: ObservableObject {
         }
         studyBudget = SurveyPreferences.shared.loadBudget()
         SurveyPreferences.shared.onRevoke = { [weak self] in self?.revokeStudyCheckIns() }
+        SurveyPreferences.shared.onPersonalChange = { [weak self] in self?.personalSurveyPreferencesChanged() }
         installLifecycleObservers()
     }
     // Connect macOS notification actions to the same controls used by the app.
@@ -601,6 +602,9 @@ final class ActivityTracker: ObservableObject {
             updateProgress(at: elapsed)
             if suspendedBy.isEmpty {
                 if !checkInOpen { try advanceBreakClock(at: elapsed) }
+                if sessionStudyConfiguration?.scope == .personal, timedCheckInPolicy.current?.requestedAt == nil {
+                    try scheduleTimedCheckIn(at: elapsed)
+                }
                 if let configuration = sessionStudyConfiguration,
                    studyBudget.eligible(at: Date(), configuration: configuration),
                    let item = timedCheckInPolicy.tick(at: elapsed,
@@ -608,6 +612,11 @@ final class ActivityTracker: ObservableObject {
                     let requestDate = Date()
                     guard studyBudget.request(at: requestDate, configuration: configuration) else { return }
                     try SurveyPreferences.shared.saveBudget(studyBudget)
+                    if configuration.scope == .personal {
+                        var schedule = try SurveyPreferences.shared.personalSchedule(at: requestDate, budget: studyBudget)
+                        schedule.requested(at: requestDate)
+                        try SurveyPreferences.shared.savePersonalSchedule(schedule)
+                    }
                     if let contract = writer?.contract {
                         studyPrompt = StudyPromptSnapshot(id: item.id, scheduleVersion: configuration.version,
                             configurationScope: configuration.scope, recordingID: contract.recordingID, contextAtPrompt: userContext,
@@ -1047,7 +1056,19 @@ final class ActivityTracker: ObservableObject {
             else if action == UNNotificationDefaultActionIdentifier { openMainWindow?() }
         }
     }
-    // Schedule one ratings opportunity 10 minutes after session start or an actual break return.
+    // Apply personal controls immediately, including cancellation of an open prompt.
+    // Rotate the recording so saved survey options describe the answers in that segment.
+    private func personalSurveyPreferencesChanged() {
+        revokeStudyCheckIns()
+        sessionSurveyOptions = SurveyPreferences.shared.snapshot
+        sessionStudyConfiguration = SurveyPreferences.shared.activeConfiguration
+        guard isRecording else { return }
+        do {
+            let time = now
+            try rotateRecording(at: time, reason: "survey_preferences_changed")
+            try scheduleTimedCheckIn(at: time)
+        } catch { fail(error) }
+    }
     private func revokeStudyCheckIns() {
         sessionCheckInPresented = false; sessionCheckIn = nil
         if isRecording {
@@ -1062,7 +1083,19 @@ final class ActivityTracker: ObservableObject {
     }
     private func scheduleTimedCheckIn(at time: Double, afterBreak: String = "") throws {
         guard let configuration = sessionStudyConfiguration, sessionSurveyOptions.duringWork else { return }
-        let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak, delay: configuration.minimumSpacingSeconds)
+        let delay: Double
+        if configuration.scope == .personal {
+            let date = Date()
+            let schedule = try SurveyPreferences.shared.personalSchedule(at: date, budget: studyBudget)
+            guard let due = schedule.next else {
+                _ = timedCheckInPolicy.finish()
+                return
+            }
+            delay = due.timeIntervalSince(date)
+            // Tick checks for local-day changes, but keeps an existing opportunity stable.
+            if let current = timedCheckInPolicy.current, abs(current.due - (time + delay)) < 2 { return }
+        } else { delay = configuration.minimumSpacingSeconds }
+        let item = timedCheckInPolicy.schedule(from: time, afterBreak: afterBreak, delay: delay)
         try writer?.logSurveyPrompt(SurveyPromptEntry(item: item, action: "scheduled", time: time))
     }
     // Open the requested survey and mark its interaction time separately from work.
