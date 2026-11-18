@@ -85,7 +85,7 @@ import Foundation
         // A damaged pending entry must not stop independent checkpoint recovery.
         for reverse in [false, true] {
             let mixed = root.appendingPathComponent("mixed-\(reverse)")
-            let names = reverse ? ["z-valid", "a-missing", "b-malformed", "c-invalid"] : ["a-valid", "z-missing", "y-malformed", "x-invalid"]
+            let names = reverse ? ["z-valid", "a-missing", "b-malformed", "c-invalid", "d-invalid-metadata"] : ["a-valid", "z-missing", "y-malformed", "x-invalid", "w-invalid-metadata"]
             let mixedPending = SessionFiles.pendingRoot(in: mixed)
             var original: [URL: Data] = [:]
             for (index, name) in names.enumerated() {
@@ -95,6 +95,7 @@ import Foundation
                 if index == 1 { try FileManager.default.removeItem(at: metadata) }
                 if index == 2 { try Data("{broken".utf8).write(to: metadata) }
                 if index == 3 { try Data("invalid contract".utf8).write(to: fixture.folder.appendingPathComponent("context_intervals.json")) }
+                if index == 4 { try Data("{}".utf8).write(to: metadata) }
                 if index > 0 {
                     for file in try FileManager.default.contentsOfDirectory(at: fixture.folder, includingPropertiesForKeys: nil) {
                         original[file] = try Data(contentsOf: file)
