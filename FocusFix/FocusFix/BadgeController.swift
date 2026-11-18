@@ -7,6 +7,7 @@ final class BadgeController: ObservableObject {
     static let shared = BadgeController()
     @Published private(set) var awards: BadgeAwards
     @Published var collectionRequest = UUID()
+    private(set) var collectionRequested = false
     private let defaults: UserDefaults
     private let storageKey = "focusfix.badges.v1"
     private var subscriptions: Set<AnyCancellable> = []
@@ -83,6 +84,7 @@ final class BadgeController: ObservableObject {
         return awards.earned.contains(key)
     }
     func openCollection() {
+        collectionRequested = false
         awards.unread.subtract(visibleKeys)
         // Opening the collection acknowledges queued celebrations as well.
         awards.pending.removeAll { visibleKeys.contains($0) }
@@ -93,6 +95,7 @@ final class BadgeController: ObservableObject {
         awards.pending.removeAll { $0 == key }; save()
     }
     func requestCollection() {
+        collectionRequested = true
         collectionRequest = UUID()
         ActivityTracker.shared.openMainWindow?()
         NSApp.activate(ignoringOtherApps: true)
