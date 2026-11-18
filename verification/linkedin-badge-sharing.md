@@ -23,3 +23,9 @@
 Computer use was stopped twice during the Show badge image/Finder check. Its handler calls `NSWorkspace.shared.activateFileViewerSelecting` with the prepared PNG URL, but Finder selection and attaching that image to a draft have not been visually verified. Do not treat that end-to-end image handoff as passed. Browser-prefill support may change; Copy caption is the fallback.
 
 No release, packaging, deployment, or publishing command was run.
+
+## Share-card visual revision
+
+The exported card now shows the badge name once below the artwork, without the repeated description. The header reuses `FocusFixLaunchLogo(ready: true)` at 48 points beside the rounded FocusFix wordmark. A pale blue/mint/lilac background adds sparse stars, an orbital arc, and an outlined planet around the edges. Dark header/title lettering and a light central area preserve contrast across badge colors.
+
+The revised exporter passed BadgeSharingTests for all eight badges, and the Debug app build passed with code signing disabled (`/tmp/focusfix-badge-restyle-build.log`). The joining and 100-day exports were visually inspected at 1200 × 1200: the logo, one-line badge name, and full artwork are visible without clipping or decorative overlap. Preview images: `/tmp/focusfix-restyled-badges/FocusFix-joined.png` and `/tmp/focusfix-restyled-badges/FocusFix-work-100.png`. No release was made. The earlier Finder handoff limitation is separate from this visual revision.
