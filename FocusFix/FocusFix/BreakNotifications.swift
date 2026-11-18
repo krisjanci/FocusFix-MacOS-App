@@ -109,8 +109,8 @@ final class BreakNotifications: NSObject, UNUserNotificationCenterDelegate {
         let id = "focusfix-\(session)-\(token)-check-in"
         checkInID = id
         let content = UNMutableNotificationContent()
-        content.title = "Time for a check-in"
-        content.body = "Mental fatigue and productivity"
+        content.title = CheckInPromptCopy.title
+        content.body = CheckInPromptCopy.question
         content.categoryIdentifier = "work_check_in"
         content.userInfo = ["session": session, "token": token]
         Task {
