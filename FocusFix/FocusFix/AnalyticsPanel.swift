@@ -7,6 +7,7 @@ struct AnalyticsPanel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingBadges = false
     @State private var selectedBadge: FocusBadge?
+    @State private var linkedInComingSoon = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -54,17 +55,24 @@ struct AnalyticsPanel: View {
                     Color(nsColor: .windowBackgroundColor).opacity(0.78).contentShape(Rectangle())
                 }.buttonStyle(.plain).keyboardShortcut(.cancelAction).accessibilityLabel("Dismiss badge details")
                 VStack(spacing: 12) {
-                    BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(width: 240, height: 240)
-                    Text(badge.name).font(.title2.weight(.semibold))
-                    Text(badges.isEarned(badge) ? badge.description : badge.requirement)
-                        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if !badges.isEarned(badge) { Label("Locked", systemImage: "lock.fill").font(.caption) }
-                }.padding(20).allowsHitTesting(false).accessibilityElement(children: .combine)
+                    VStack(spacing: 12) {
+                        BadgeArtwork(badge: badge, earned: badges.isEarned(badge)).frame(width: 240, height: 240)
+                        Text(badge.name).font(.title2.weight(.semibold))
+                        Text(badges.isEarned(badge) ? badge.description : badge.requirement)
+                            .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        if !badges.isEarned(badge) { Label("Locked", systemImage: "lock.fill").font(.caption) }
+                    }.allowsHitTesting(false).accessibilityElement(children: .combine)
+                    if badges.isEarned(badge) { BadgeLinkedInButton(comingSoon: $linkedInComingSoon) }
+                }.padding(20)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selectedBadge)
+        .background(BadgeEscapeHandler(enabled: badges.celebration == nil && (selectedBadge != nil || showingBadges)) {
+            if selectedBadge != nil { selectedBadge = nil } else { showingBadges = false }
+        })
+        .onChange(of: selectedBadge?.id) { _, _ in linkedInComingSoon = false }
         .onExitCommand { if selectedBadge != nil { selectedBadge = nil } else if showingBadges { showingBadges = false } }
         .onChange(of: badges.collectionRequest) { _, _ in openBadges() }
         .onAppear { if badges.collectionRequested { openBadges() } }
