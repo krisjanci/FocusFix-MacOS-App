@@ -7,7 +7,6 @@ struct AnalyticsPanel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingBadges = false
     @State private var selectedBadge: FocusBadge?
-    @State private var linkedInComingSoon = false
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     var body: some View {
@@ -62,7 +61,7 @@ struct AnalyticsPanel: View {
                             .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         if !badges.isEarned(badge) { Label("Locked", systemImage: "lock.fill").font(.caption) }
                     }.allowsHitTesting(false).accessibilityElement(children: .combine)
-                    if badges.isEarned(badge) { BadgeLinkedInButton(comingSoon: $linkedInComingSoon) }
+                    if badges.isEarned(badge) { BadgeLinkedInButton(badge: badge) }
                 }.padding(20)
             }
         }
@@ -72,7 +71,6 @@ struct AnalyticsPanel: View {
         .background(BadgeEscapeHandler(enabled: badges.celebration == nil && (selectedBadge != nil || showingBadges)) {
             if selectedBadge != nil { selectedBadge = nil } else { showingBadges = false }
         })
-        .onChange(of: selectedBadge?.id) { _, _ in linkedInComingSoon = false }
         .onExitCommand { if selectedBadge != nil { selectedBadge = nil } else if showingBadges { showingBadges = false } }
         .onChange(of: badges.collectionRequest) { _, _ in openBadges() }
         .onAppear { if badges.collectionRequested { openBadges() } }
