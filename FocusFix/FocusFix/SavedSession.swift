@@ -156,7 +156,6 @@ nonisolated enum SessionFiles {
                 let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 guard properties.isRegularFile == true, properties.isSymbolicLink != true else { throw RecordingContract.Invalid.contract }
                 guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else { throw RecordingContract.Invalid.contract }
-                _ = try SavedSession(folder: folder)
                 if !contract.finalized { try contract.finish(at: contract.observedThrough); try contract.save(to: folder) }
                 metadata["duration_seconds"] = contract.observedThrough - contract.elapsedOrigin
                 metadata["status"] = "crash_recovered_observed_only"
@@ -234,19 +233,38 @@ nonisolated enum SessionFiles {
         try inspect(in: root).sessions
     }
     static func inspect(in root: URL) throws -> (sessions: [SavedSession], unreadable: Int) {
+        try Task.checkCancellation()
         guard FileManager.default.fileExists(atPath: root.path) else { return ([], 0) }
         let folders = try FileManager.default.contentsOfDirectory(at: root,
             includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
             .filter { url in
+                try Task.checkCancellation()
                 let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
                 return values.isDirectory == true && values.isSymbolicLink != true
             }
         var sessions: [SavedSession] = [], unreadable = 0
         for folder in folders {
+            try Task.checkCancellation()
             do { sessions.append(try SavedSession(folder: folder)) }
             catch { unreadable += 1 }
         }
         return (sessions.sorted { $0.startedAt > $1.startedAt }, unreadable)
+    }
+
+    struct DeletionResult {
+        var deleted: [SavedSession] = []
+        var failures: [String] = []
+    }
+    static func deleteSelected(_ sessions: [SavedSession], root: URL, active: URL?,
+                               remove: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws -> DeletionResult {
+        // Revalidate the entire selection before any recoverable Trash moves.
+        for session in sessions { try validate(session.folder, in: root, active: active) }
+        var result = DeletionResult()
+        for session in sessions {
+            do { try remove(session.folder); result.deleted.append(session) }
+            catch { result.failures.append("\(session.id): \(error.localizedDescription)") }
+        }
+        return result
     }
 
     // Only operate on a direct session directory, never the storage root or a symlink.
@@ -429,5 +447,30 @@ nonisolated enum SessionFiles {
                 "Choose an export location outside FocusFix's session storage."])
         }
         return target
+    }
+}
+
+// One latest-request owner for library scans. Cancelling a wrapper also cancels its
+// worker; requests superseded before execution never start detached disk work.
+@MainActor
+final class SessionLibraryLoader {
+    typealias Listing = (sessions: [SavedSession], unreadable: Int)
+    private var task: Task<Void, Never>?
+    func cancel() { task?.cancel() }
+    func load(root: URL, inspect: @escaping @Sendable (URL) throws -> Listing = { try SessionFiles.inspect(in: $0) },
+              completion: @escaping (Result<Listing, Error>) -> Void) {
+        task?.cancel()
+        task = Task {
+            guard !Task.isCancelled else { return }
+            let worker = Task.detached(priority: .utility) { try Task.checkCancellation(); return try inspect(root) }
+            do {
+                let listing = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
+                guard !Task.isCancelled else { return }
+                completion(.success(listing))
+            } catch {
+                guard !Task.isCancelled else { return }
+                completion(.failure(error))
+            }
+        }
     }
 }
