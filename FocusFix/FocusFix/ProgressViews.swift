@@ -161,6 +161,7 @@ private struct WorkStreakCalendar: View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let today = context.date
             let progress = reconciledProgress(at: today)
+            let joined = joinedDate(in: progress, fallback: today)
             let start = calendar.dateInterval(of: .month, for: month)!.start
             let dayCount = calendar.range(of: .day, in: .month, for: start)!.count
             let offset = (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
@@ -174,12 +175,13 @@ private struct WorkStreakCalendar: View {
                 Text("60 minutes of declared work earns a streak day.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button { moveMonth(-1) } label: { Image(systemName: "chevron.left") }
+                    Button { moveMonth(-1, joined: joined, today: today) } label: { Image(systemName: "chevron.left") }
                         .accessibilityLabel("Previous month")
+                        .disabled(calendar.isDate(start, equalTo: joined, toGranularity: .month) || start < calendar.startOfDay(for: joined))
                     Spacer()
                     Text(start.formatted(.dateTime.month(.wide).year())).font(.subheadline.weight(.semibold))
                     Spacer()
-                    Button { moveMonth(1) } label: { Image(systemName: "chevron.right") }
+                    Button { moveMonth(1, joined: joined, today: today) } label: { Image(systemName: "chevron.right") }
                         .accessibilityLabel("Next month")
                         .disabled(calendar.isDate(start, equalTo: today, toGranularity: .month))
                 }
@@ -195,7 +197,7 @@ private struct WorkStreakCalendar: View {
                             Color.clear.frame(height: 34).accessibilityHidden(true)
                         } else {
                             let date = calendar.date(byAdding: .day, value: index - offset, to: start)!
-                            dayCell(date, progress: progress, today: today)
+                            dayCell(date, progress: progress, today: today, joined: joined)
                         }
                     }
                 }
@@ -206,6 +208,8 @@ private struct WorkStreakCalendar: View {
                     }
                     Label("Freeze used", systemImage: "snowflake").foregroundStyle(.blue)
                 }.font(.caption)
+                Label("Joined FocusFix · \(joined.formatted(date: .abbreviated, time: .omitted))", systemImage: "flag.fill")
+                    .font(.caption).foregroundStyle(.teal)
                 Text("Missed weekends are optional and use no freezes.")
                     .font(.caption).foregroundStyle(.secondary)
                 if !calendar.isDate(start, equalTo: today, toGranularity: .month) {
@@ -223,26 +227,33 @@ private struct WorkStreakCalendar: View {
             .accessibilityHidden(true)
     }
 
-    private func dayCell(_ date: Date, progress: DailyProgress, today: Date) -> some View {
+    private func dayCell(_ date: Date, progress: DailyProgress, today: Date, joined: Date) -> some View {
         let future = calendar.startOfDay(for: date) > calendar.startOfDay(for: today)
-        let complete = !future && progress.day(at: date, calendar: calendar).workSeconds >= DailyProgress.goalSeconds
-        let frozen = !future && !complete && progress.frozenDays.contains(DailyProgress.key(for: date, calendar: calendar))
+        let beforeJoining = calendar.startOfDay(for: date) < calendar.startOfDay(for: joined)
+        let isJoined = calendar.isDate(date, inSameDayAs: joined)
+        let complete = !beforeJoining && !future && progress.day(at: date, calendar: calendar).workSeconds >= DailyProgress.goalSeconds
+        let frozen = !beforeJoining && !future && !complete && progress.frozenDays.contains(DailyProgress.key(for: date, calendar: calendar))
         let isToday = calendar.isDate(date, inSameDayAs: today)
-        let detail = complete ? "Work goal met" : frozen ? "Freeze used" : future ? "Future day" : "Work goal not met"
-        return HStack(spacing: 3) {
-            Text("\(calendar.component(.day, from: date))").monospacedDigit()
-            if complete { calendarFlame }
-            else if frozen { Image(systemName: "snowflake").font(.caption2).foregroundStyle(.blue) }
+        let detail = beforeJoining ? "Before joining FocusFix" : complete ? "Work goal met" : frozen ? "Freeze used" : future ? "Future day" : "Work goal not met"
+        return VStack(spacing: 1) {
+            HStack(spacing: 3) {
+                Text("\(calendar.component(.day, from: date))").monospacedDigit()
+                if complete { calendarFlame }
+                else if frozen { Image(systemName: "snowflake").font(.caption2).foregroundStyle(.blue) }
+            }
+            if isJoined {
+                Text("Joined").font(.system(size: 8, weight: .semibold)).foregroundStyle(.teal)
+            }
         }
         .font(.caption.weight(isToday ? .bold : .regular))
         .frame(maxWidth: .infinity).frame(height: 34)
-        .foregroundStyle(future ? Color.secondary.opacity(0.5) : Color.primary)
-        .background(complete ? Color.orange.opacity(0.12) : frozen ? Color.blue.opacity(0.12) : Color.clear,
+        .foregroundStyle(future || beforeJoining ? Color.secondary.opacity(0.5) : Color.primary)
+        .background(complete ? Color.orange.opacity(0.12) : frozen ? Color.blue.opacity(0.12) : isJoined ? Color.teal.opacity(0.12) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 7))
         .overlay(RoundedRectangle(cornerRadius: 7).stroke(isToday ? Color.accentColor : Color.clear, lineWidth: 1))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted))\(isToday ? ", today" : ""), \(detail)")
-        .help("\(date.formatted(date: .complete, time: .omitted)): \(detail)")
+        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted))\(isToday ? ", today" : "")\(isJoined ? ", joined FocusFix" : ""), \(detail)")
+        .help("\(date.formatted(date: .complete, time: .omitted))\(isJoined ? ": Joined FocusFix" : ""): \(detail)")
     }
 
     private func reconciledProgress(at date: Date) -> DailyProgress {
@@ -251,9 +262,23 @@ private struct WorkStreakCalendar: View {
         return progress
     }
 
-    private func moveMonth(_ amount: Int) {
+    // The local work ledger records its start on first launch, including guest use.
+    private func joinedDate(in progress: DailyProgress, fallback: Date) -> Date {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        let firstDay = ([progress.protectionStart].compactMap { $0 } + Array(progress.days.keys)).min()
+        return firstDay.flatMap { formatter.date(from: $0) } ?? calendar.startOfDay(for: fallback)
+    }
+
+    private func moveMonth(_ amount: Int, joined: Date, today: Date) {
         let start = calendar.dateInterval(of: .month, for: month)!.start
-        if let next = calendar.date(byAdding: .month, value: amount, to: start) { month = next }
+        let earliest = calendar.dateInterval(of: .month, for: joined)!.start
+        let latest = calendar.dateInterval(of: .month, for: today)!.start
+        if let next = calendar.date(byAdding: .month, value: amount, to: start),
+           next >= earliest, next <= latest { month = next }
     }
 }
 
