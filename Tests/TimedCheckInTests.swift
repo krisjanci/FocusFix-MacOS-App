@@ -14,7 +14,7 @@ struct TimedCheckInTests {
         let requested = policy.tick(at: 602, canPrompt: true)!
         precondition(requested.id == first.id && requested.requestedAt == 602)
         precondition(requested.due == 600 && policy.hasPending)
-        precondition(policy.tick(at: 1200, canPrompt: true) == nil) // Not every 10 minutes.
+        precondition(policy.tick(at: 1200, canPrompt: true) == nil) // Initial requests remain one-shot; repeats use repeatReminder.
         precondition(policy.open(token: "stale", at: 605) == nil)
         precondition(policy.open(token: first.id, at: 601) == nil)
         let opened = policy.open(token: first.id, at: 610)!
@@ -24,6 +24,30 @@ struct TimedCheckInTests {
         precondition(answered.id == first.id)
         precondition(policy.finish() == nil && !policy.hasPending)
         precondition(policy.tick(at: 1800, canPrompt: true) == nil)
+
+        // Repeats retain identity and original timing; skips/answers stop them.
+        var repeating = TimedCheckInPolicy()
+        let opportunity = repeating.schedule(from: 0)
+        _ = repeating.tick(at: 600, canPrompt: true)
+        precondition(repeating.repeatReminder(at: 1199.99, canPrompt: true) == nil)
+        precondition(repeating.repeatReminder(at: 1200, canPrompt: false) == nil)
+        let reminder = repeating.repeatReminder(at: 1200, canPrompt: true)!
+        precondition(reminder.id == opportunity.id && reminder.requestedAt == 600)
+        precondition(repeating.repeatReminder(at: 1201, canPrompt: true) == nil)
+        precondition(repeating.repeatReminder(at: 1800, canPrompt: true)?.id == opportunity.id)
+        // A long break defers the reminder and emits only one when eligible again.
+        precondition(repeating.repeatReminder(at: 4000, canPrompt: false) == nil)
+        precondition(repeating.repeatReminder(at: 4100, canPrompt: true) != nil)
+        precondition(repeating.repeatReminder(at: 4101, canPrompt: true) == nil)
+        precondition(repeating.open(token: opportunity.id, at: 4200) != nil)
+        precondition(repeating.repeatReminder(at: 5000, canPrompt: true) == nil)
+        precondition(repeating.dismiss(at: 5100)?.openedAt == 4200)
+        precondition(repeating.repeatReminder(at: 5699, canPrompt: true) == nil)
+        precondition(repeating.repeatReminder(at: 5700, canPrompt: true)?.id == opportunity.id)
+        precondition(repeating.open(token: opportunity.id, at: 5701) != nil)
+        _ = repeating.finish() // Answer or explicit Skip.
+        precondition(repeating.repeatReminder(at: 10000, canPrompt: true) == nil)
+        precondition(repeating.open(token: opportunity.id, at: 10000) == nil)
 
         // An early break cancels the old schedule; return starts a fresh ten minutes.
         _ = policy.schedule(from: 0)
@@ -82,6 +106,6 @@ struct TimedCheckInTests {
         let surveys = try String(contentsOf: writer.folder.appendingPathComponent("surveys.csv"), encoding: .utf8)
         precondition(surveys.contains("during_work,answered") && surveys.contains(answered.id))
         precondition(surveys.contains("610.000000,615.000000,2,8"))
-        print("PASS: ten-minute boundary, one prompt per work period, deferral, stale/duplicate actions, stop/break cancellation, actual return timing and linked prompt/answer CSVs.")
+        print("PASS: ten-minute repeat boundaries, same prompt identity, dismissal/reopen, answer/skip cancellation, deferral, stale/duplicate actions, stop/break cancellation, actual return timing and linked prompt/answer CSVs.")
     }
 }
