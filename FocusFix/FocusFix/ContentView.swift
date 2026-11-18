@@ -35,7 +35,6 @@ struct ContentView: View {
                 .background(GeometryReader { geometry in
                     Color.clear.preference(key: CollectorHeightKey.self, value: geometry.size.height)
                 })
-                .frame(height: panels.expanded != nil ? expandedPanelHeight : nil, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
             if let panel = panels.expanded {
                 HStack(spacing: 0) {
@@ -43,7 +42,8 @@ struct ContentView: View {
                     sidePanel(panel, close: { panels.close() })
                         .frame(width: PeopleWindowLayout.panelWidth)
                 }
-                .frame(height: expandedPanelHeight)
+                // Panels scroll within the collector's height; opening one only adds width.
+                .frame(height: collectorHeight)
                 .transition(.opacity)
             }
         }
@@ -103,12 +103,6 @@ struct ContentView: View {
         // Prepare the overlay on automatic launches even if another app has focus.
         guard surveyCanAppear, collectorWindow?.isVisible == true else { return }
         dailySurvey.showIfDue()
-    }
-
-    private var expandedPanelHeight: CGFloat {
-        let chrome = collectorWindow.map { $0.frame.height - ($0.contentView?.frame.height ?? $0.frame.height) } ?? 28
-        let available = (collectorWindow?.screen?.visibleFrame.height ?? 900) - chrome
-        return max(collectorHeight, min(620, available))
     }
 
     private func showBadgeCollection() {
