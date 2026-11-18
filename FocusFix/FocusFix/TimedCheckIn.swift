@@ -12,11 +12,6 @@ struct TimedCheckIn {
     var lastReminderAt: Double?
 }
 
-enum CheckInPromptCopy {
-    static let title = "Time for a check-in"
-    static let question = "Would you like to check in on your fatigue and productivity?"
-}
-
 // Reminders retain the same opportunity, original request and recall window.
 struct TimedCheckInPolicy {
     private(set) var current: TimedCheckIn?
