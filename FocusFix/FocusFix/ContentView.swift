@@ -100,7 +100,8 @@ struct ContentView: View {
     }
 
     private func showDailySurveyIfReady() {
-        guard surveyCanAppear, NSApp.isActive, collectorWindow?.isKeyWindow == true else { return }
+        // Prepare the overlay on automatic launches even if another app has focus.
+        guard surveyCanAppear, collectorWindow?.isVisible == true else { return }
         dailySurvey.showIfDue()
     }
 
