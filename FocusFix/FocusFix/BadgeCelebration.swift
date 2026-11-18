@@ -10,6 +10,7 @@ struct BadgeCelebrationHost: ViewModifier {
     @ObservedObject var badges: BadgeController
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     var reduceMotionOverride: Bool? = nil
+    var showsCelebration = true
     private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
     @State private var flight: CGFloat = 0
     @State private var dismissing = false
@@ -25,7 +26,7 @@ struct BadgeCelebrationHost: ViewModifier {
             .accessibilityHidden(badge != nil && active)
             .overlayPreferenceValue(AnalyticsBadgeAnchor.self) { anchor in
                 GeometryReader { geometry in
-                    if let badge, active {
+                    if let badge, active, showsCelebration {
                         let destination = anchor.map { CGPoint(x: geometry[$0].midX, y: geometry[$0].midY) }
                             ?? CGPoint(x: geometry.size.width - 65, y: geometry.size.height - 45)
                         celebration(badge, size: geometry.size, destination: destination)
