@@ -14,7 +14,6 @@ struct BadgeCelebrationHost: ViewModifier {
     private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
     @State private var flight: CGFloat = 0
     @State private var dismissing = false
-    @State private var comingSoon = false
 
     func body(content: Content) -> some View {
         let badge = badges.celebration
@@ -35,7 +34,7 @@ struct BadgeCelebrationHost: ViewModifier {
             .background(BadgeEscapeHandler(enabled: badge != nil && showsCelebration) {
                 if let badge { dismiss(badge) }
             })
-            .onChange(of: badge?.id) { _, _ in flight = 0; dismissing = false; comingSoon = false }
+            .onChange(of: badge?.id) { _, _ in flight = 0; dismissing = false }
     }
 
     private func celebration(_ badge: FocusBadge, size: CGSize, destination: CGPoint) -> some View {
@@ -57,7 +56,7 @@ struct BadgeCelebrationHost: ViewModifier {
                 Text(badge.description).font(.callout).foregroundStyle(.secondary)
             }.frame(width: size.width).position(x: size.width / 2, y: start.y + 148)
                 .opacity(1 - flight).allowsHitTesting(false).accessibilityElement(children: .combine)
-            BadgeLinkedInButton(comingSoon: $comingSoon)
+            BadgeLinkedInButton(badge: badge)
                 .disabled(dismissing)
                 .position(x: size.width / 2, y: start.y + 210).opacity(1 - flight)
         }
@@ -72,7 +71,7 @@ struct BadgeCelebrationHost: ViewModifier {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 160 : 700))
             badges.dismissCelebration(badge)
-            flight = 0; dismissing = false; comingSoon = false
+            flight = 0; dismissing = false
         }
     }
 }
@@ -93,17 +92,37 @@ private struct BadgeFlight: GeometryEffect {
 }
 
 struct BadgeLinkedInButton: View {
-    @Binding var comingSoon: Bool
+    let badge: FocusBadge
+    @State private var share: BadgeShare?
+    @State private var preparationFailed = false
+    @State private var browserFailed = false
+
+    private func startSharing() {
+        do {
+            let prepared = try BadgeShare.prepare(badge)
+            share = prepared
+            browserFailed = !NSWorkspace.shared.open(BadgeShare.composerURL(caption: prepared.caption))
+        } catch {
+            preparationFailed = true
+        }
+    }
     var body: some View {
-        Button { comingSoon = true } label: {
+        Button(action: startSharing) {
             HStack(spacing: 9) {
                 LinkedInMark().frame(width: 20, height: 20)
-                Text(comingSoon ? "Coming soon" : "Share to LinkedIn").font(.callout.weight(.medium))
+                Text("Share to LinkedIn").font(.callout.weight(.medium))
             }.padding(.horizontal, 16).padding(.vertical, 10)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
                 .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.primary.opacity(0.12)))
         }.buttonStyle(.plain)
-            .accessibilityLabel(comingSoon ? "LinkedIn sharing coming soon" : "Share to LinkedIn")
+            .accessibilityLabel("Share to LinkedIn")
+            .sheet(item: $share) { BadgeSharePanel(share: $0, browserFailed: browserFailed) }
+            .alert("Couldn't prepare your badge", isPresented: $preparationFailed) {
+                Button("Try again", action: startSharing)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The badge image couldn't be saved. Please try again.")
+            }
     }
 }
 
