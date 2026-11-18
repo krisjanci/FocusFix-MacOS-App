@@ -150,7 +150,7 @@ struct WorkCheckInView: View {
     // Ask for fatigue and self-reported productivity during work without guessing unanswered values.
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Optional study check-in").font(.title2.weight(.semibold))
+            Text("Optional check-in").font(.title2.weight(.semibold))
             if let recall = tracker.studyRecallDescription { Text(recall).font(.callout).foregroundStyle(.secondary) }
             FatigueSlider(rating: $fatigue)
             RatingSlider(title: SurveyEntry.productivityQuestion,
