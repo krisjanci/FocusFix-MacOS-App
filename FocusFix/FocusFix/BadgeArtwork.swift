@@ -21,6 +21,14 @@ struct BadgeArtwork: View {
             let size = min(geometry.size.width, geometry.size.height)
             ZStack {
                 Circle().fill(colors[0].opacity(0.12)).blur(radius: size * 0.10).padding(size * 0.08)
+                if rank == 1 {
+                    ForEach(0..<5, id: \.self) { index in
+                        Diamond().fill(colors[0])
+                            .frame(width: size * 0.035, height: size * 0.09)
+                            .offset(y: -size * 0.39)
+                            .rotationEffect(.degrees(Double(index) * 30 - 60))
+                    }
+                }
                 if rank >= 4 {
                     ForEach(0..<(rank >= 6 ? 16 : 12), id: \.self) { index in
                         Diamond().fill(LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom))
