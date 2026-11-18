@@ -5,6 +5,18 @@ import AppKit
 @MainActor
 struct UserProfileTests {
     static func main() throws {
+        let suite = "focusfix.test.photo-visibility.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = UUID()
+        let visibility = GroupPhotoVisibilityPreference(defaults: defaults, accountID: owner, origin: "https://example.invalid")
+        precondition(visibility.isEnabled(for: nil))
+        visibility.save(false)
+        precondition(!visibility.isEnabled(for: nil))
+        let restoredVisibility = GroupPhotoVisibilityPreference(defaults: defaults, accountID: owner, origin: "https://example.invalid")
+        precondition(!restoredVisibility.isEnabled(for: UserProfile(name: "No photo")))
+        precondition(GroupPhotoVisibilityPreference(defaults: defaults, accountID: UUID(), origin: "https://example.invalid").isEnabled(for: nil))
+        precondition(GroupPhotoVisibilityPreference(defaults: defaults, accountID: owner, origin: "https://other.invalid").isEnabled(for: nil))
         let profile = try UserProfile(name: "  Kris  ", symbol: "leaf.fill", color: "blue").validated()
         precondition(profile.name == "Kris")
         for draft in [UserProfile(name: "  "), UserProfile(name: String(repeating: "x", count: 41)),
@@ -56,6 +68,10 @@ struct UserProfileTests {
         let groupImage = NSBitmapImageRep(data: thumbnail)!
         precondition(groupImage.pixelsWide == 64 && groupImage.pixelsHigh == 64 && thumbnail.count <= 32_768)
         let shared = try UserProfile(name: "Group photo", photo: avatar, groupPhoto: thumbnail).validated()
+        precondition(visibility.isEnabled(for: shared)) // Saved visibility wins over local defaults.
+        precondition(!visibility.isEnabled(for: UserProfile(name: "Private", photo: avatar)))
+        visibility.save(true)
+        precondition(visibility.isEnabled(for: UserProfile(name: "No photo")))
         try store.save(shared)
         precondition(tryLoad(store) == shared)
         for bad in [UserProfile(name: "No photo", groupPhoto: thumbnail),
