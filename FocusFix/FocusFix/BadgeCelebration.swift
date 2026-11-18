@@ -15,31 +15,27 @@ struct BadgeCelebrationHost: ViewModifier {
     @State private var flight: CGFloat = 0
     @State private var dismissing = false
     @State private var comingSoon = false
-    @State private var active = NSApp.isActive
 
     func body(content: Content) -> some View {
         let badge = badges.celebration
         content
-            .blur(radius: badge != nil && active ? 8 * (1 - flight) : 0)
-            .allowsHitTesting(badge == nil || !active)
-            .disabled(badge != nil && active)
-            .accessibilityHidden(badge != nil && active)
+            .blur(radius: badge != nil ? 8 * (1 - flight) : 0)
+            .allowsHitTesting(badge == nil)
+            .disabled(badge != nil)
+            .accessibilityHidden(badge != nil)
             .overlayPreferenceValue(AnalyticsBadgeAnchor.self) { anchor in
                 GeometryReader { geometry in
-                    if let badge, active, showsCelebration {
+                    if let badge, showsCelebration {
                         let destination = anchor.map { CGPoint(x: geometry[$0].midX, y: geometry[$0].midY) }
                             ?? CGPoint(x: geometry.size.width - 65, y: geometry.size.height - 45)
                         celebration(badge, size: geometry.size, destination: destination)
                     }
                 }
             }
-            .background(BadgeEscapeHandler(enabled: badge != nil && active && showsCelebration) {
+            .background(BadgeEscapeHandler(enabled: badge != nil && showsCelebration) {
                 if let badge { dismiss(badge) }
             })
-            .onAppear { active = NSApp.isActive }
             .onChange(of: badge?.id) { _, _ in flight = 0; dismissing = false; comingSoon = false }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in active = true }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in active = false }
     }
 
     private func celebration(_ badge: FocusBadge, size: CGSize, destination: CGPoint) -> some View {
