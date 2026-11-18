@@ -11,7 +11,38 @@ final class SurveyPreferences: ObservableObject {
     private let configuration: StudyCheckInConfiguration?
     @Published private(set) var studyCheckInsEnabled: Bool
     var onRevoke: (() -> Void)?
-    var activeConfiguration: StudyCheckInConfiguration? { studyCheckInsEnabled ? configuration : nil }
+    @Published private(set) var personalSurveysEnabled: Bool
+    @Published private(set) var promptsPerDay: Int
+    var onPersonalChange: (() -> Void)?
+    var activeConfiguration: StudyCheckInConfiguration? {
+        if personalSurveysEnabled { return .personal(promptsPerDay: promptsPerDay) }
+        return studyCheckInsEnabled ? configuration : nil
+    }
+    func setPersonalSurveysEnabled(_ enabled: Bool) {
+        guard enabled != personalSurveysEnabled else { return }
+        defaults.set(enabled, forKey: "focusfix.personalSurveys.enabled")
+        personalSurveysEnabled = enabled
+        onPersonalChange?()
+    }
+    func setPromptsPerDay(_ count: Int) {
+        let count = min(5, max(1, count))
+        guard count != promptsPerDay else { return }
+        defaults.set(count, forKey: "focusfix.personalSurveys.promptsPerDay")
+        promptsPerDay = count
+        onPersonalChange?()
+    }
+    func personalSchedule(at date: Date, budget: StudyPromptBudget, calendar: Calendar = .current) throws -> PersonalSurveySchedule {
+        if let data = defaults.data(forKey: "focusfix.personalSurveys.schedule") {
+            let saved = try JSONDecoder().decode(PersonalSurveySchedule.self, from: data)
+            if saved.matches(date: date, target: promptsPerDay, calendar: calendar) { return saved }
+        }
+        let schedule = PersonalSurveySchedule.make(at: date, target: promptsPerDay, requests: budget.requests, calendar: calendar)
+        try savePersonalSchedule(schedule)
+        return schedule
+    }
+    func savePersonalSchedule(_ schedule: PersonalSurveySchedule) throws {
+        defaults.set(try JSONEncoder().encode(schedule), forKey: "focusfix.personalSurveys.schedule")
+    }
     func setStudyCheckInsEnabled(_ enabled: Bool) {
         defaults.set(enabled, forKey: "focusfix.studyCheckIns.enabled")
         if enabled {
@@ -43,6 +74,8 @@ final class SurveyPreferences: ObservableObject {
     // Historic switches are retained, but never activate the new study scope.
     init(defaults: UserDefaults = .standard, configuration: StudyCheckInConfiguration? = StudyCheckInConfiguration.bundled, allowSynthetic: Bool = false) {
         self.defaults = defaults
+        personalSurveysEnabled = defaults.bool(forKey: "focusfix.personalSurveys.enabled")
+        promptsPerDay = min(5, max(1, defaults.object(forKey: "focusfix.personalSurveys.promptsPerDay") as? Int ?? 2))
         let acceptedConfiguration = configuration.flatMap { $0.valid && ($0.scope == .reviewedStudy || allowSynthetic) ? $0 : nil }
         self.configuration = acceptedConfiguration
         studyCheckInsEnabled = defaults.integer(forKey: "focusfix.studyCheckIns.scopeVersion") == 1
@@ -53,9 +86,10 @@ final class SurveyPreferences: ObservableObject {
         duringWork = defaults.object(forKey: "focusfix.surveys.duringWork") as? Bool ?? true
     }
 
-    // Return a value copy; later preference edits only affect future sessions.
+    // Legacy study choices remain session snapshots. Personal controls rotate live segments.
     var snapshot: SurveyOptions {
         guard activeConfiguration != nil else { return SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: false) }
+        if personalSurveysEnabled { return SurveyOptions(beforeSession: false, beforeBreak: false, duringWork: true) }
         return SurveyOptions(beforeSession: beforeSession, beforeBreak: beforeBreak, duringWork: duringWork)
     }
 }
