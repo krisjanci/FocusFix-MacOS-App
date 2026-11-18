@@ -92,6 +92,8 @@ final class SocialController: ObservableObject {
             let name = Data(key.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
             let url = root.appendingPathComponent("FocusFix/Social/\(name).json")
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            let journal = workJournal(for: url)
+            if FileManager.default.fileExists(atPath: journal.path) { try FileManager.default.removeItem(at: journal) }
             selectionDefaults?.removeObject(forKey: selectionKey(key))
             if identity == key { clearAccountState() }
         } catch { notice = "The account was deleted, but its cached group progress could not be removed from this Mac." }
@@ -111,9 +113,10 @@ final class SocialController: ObservableObject {
             file = root.appendingPathComponent("FocusFix/Social/\(name).json")
             if let file, FileManager.default.fileExists(atPath: file.path) {
                 ledger = try JSONDecoder().decode(SocialLedger.self, from: Data(contentsOf: file))
+                try replayWorkJournal(file: file)
                 pendingConfirmation = true
             }
-        } catch { notice = "Group progress could not be opened. Your existing file has been kept." }
+        } catch { ledger = nil; notice = "Group progress could not be opened. Your existing file has been kept." }
     }
 
     func enable() async {
@@ -132,7 +135,45 @@ final class SocialController: ObservableObject {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
             try JSONEncoder().encode(ledger).write(to: file, options: .atomic)
+            // The snapshot is durable before removing its now-redundant segment updates.
+            let journal = workJournal(for: file)
+            if FileManager.default.fileExists(atPath: journal.path) { try FileManager.default.removeItem(at: journal) }
         } catch { notice = "Progress could not be saved on this Mac. Keep FocusFix open and retry." }
+    }
+
+    // Main-actor ordering makes each atomic segment replacement durable before it
+    // can be sent. A crash between snapshot replacement and journal removal is safe:
+    // replay only accepts revisions newer than the durable full snapshot.
+    private func workJournal(for file: URL) -> URL { file.appendingPathExtension("work") }
+    private func persistWork(_ value: DeclaredWorkPending) {
+        guard let file else { return }
+        do {
+            let folder = workJournal(for: file)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+            try JSONEncoder().encode(value).write(to: folder.appendingPathComponent(value.segmentID.uuidString + ".json"), options: .atomic)
+        } catch { notice = "Progress could not be saved on this Mac. Keep FocusFix open and retry." }
+    }
+    private func replayWorkJournal(file: URL) throws {
+        let folder = workJournal(for: file)
+        guard FileManager.default.fileExists(atPath: folder.path), let owner = userID,
+              let origin = account.api?.configuration.origin.absoluteString else { return }
+        for url in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+            let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard info.isRegularFile == true, info.isSymbolicLink != true,
+                  (info.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw RecordingContract.Invalid.contract }
+            let value = try JSONDecoder().decode(DeclaredWorkPending.self, from: Data(contentsOf: url))
+            var validation = SocialLedger(timezone: ledger?.timezone ?? "UTC")
+            guard value.ready, validation.stageDeclaredWork(value, owner: owner, origin: origin),
+                  url.lastPathComponent == value.segmentID.uuidString + ".json" else { throw RecordingContract.Invalid.contract }
+            let key = value.segmentID.uuidString
+            let current = ledger?.declaredWorkSnapshots?[key] ?? ledger?.declaredWorkPending?[key]
+            guard (value.revision ?? 0) > (current?.revision ?? 0) else { continue }
+            if ledger?.declaredWorkSnapshots == nil { ledger?.declaredWorkSnapshots = [:] }
+            if ledger?.declaredWorkPending == nil { ledger?.declaredWorkPending = [:] }
+            ledger?.declaredWorkSnapshots?[key] = value
+            ledger?.declaredWorkPending?[key] = value
+        }
     }
 
     var declaredWorkScope: (owner: UUID, origin: String)? {
@@ -154,7 +195,7 @@ final class SocialController: ObservableObject {
         if previous == nil && days.values.allSatisfy({ $0 == 0 }) { return }
         if previous == value.declaredWorkPending?[segmentID.uuidString] { return }
         ledger = value
-        persist()
+        if let staged = value.declaredWorkPending?[segmentID.uuidString] { persistWork(staged) }
         pendingConfirmation = true
         notice = "Work progress is waiting to sync."
     }
