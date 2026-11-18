@@ -58,3 +58,22 @@ nonisolated struct ProfileStore {
         try JSONEncoder().encode(valid).write(to: url, options: .atomic)
     }
 }
+
+// Remember visibility chosen before adding a photo, separately for each account.
+// Existing photos use their saved thumbnail visibility as the source of truth.
+nonisolated struct GroupPhotoVisibilityPreference {
+    let defaults: UserDefaults
+    let key: String
+
+    init(defaults: UserDefaults = .standard, accountID: UUID, origin: String) {
+        self.defaults = defaults
+        key = "focusfix.groupPhotoVisibility.\(origin).\(accountID.uuidString)"
+    }
+
+    func isEnabled(for profile: UserProfile?) -> Bool {
+        if let profile, profile.photo != nil { return profile.groupPhoto != nil }
+        return defaults.object(forKey: key) as? Bool ?? true
+    }
+
+    func save(_ enabled: Bool) { defaults.set(enabled, forKey: key) }
+}
