@@ -60,7 +60,8 @@ final class ActivityTracker: ObservableObject {
         return "\(AccountController.shared.api?.configuration.origin.absoluteString ?? "")|\(session.user.id)"
     }
     private var progressReconciliation: Task<Void, Never>?
-    private var sessionRefresh: Task<Void, Never>?
+    private let sessionLoader = SessionLibraryLoader()
+    private var recoveryNotice: String?
     private var lastProgressSave: Double = 0
     private var progressDirty = false
     private var sessionCheckIn: CheckInPrompt?
@@ -139,7 +140,7 @@ final class ActivityTracker: ObservableObject {
     private init() {
         loadProgress()
         do { _ = try SessionFiles.recoverPending(in: SessionFiles.root()) }
-        catch { libraryError = "An interrupted recording could not be finalized; original files were kept." }
+        catch { recoveryNotice = "An interrupted recording could not be finalized; original files were kept." }
         refreshSessions()
         AutomaticRecordingPreferences.shared.onChange = { [weak self] in self?.automaticPreferencesChanged() }
         captureState = RecordingNotice().enabled ? .ready : .disabled
@@ -1273,22 +1274,24 @@ final class ActivityTracker: ObservableObject {
 
     // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
-        sessionRefresh?.cancel()
-        sessionRefresh = Task { [weak self] in
-            do {
-                // Large histories must never block input delivery or the sampling clock.
-                let listing = try await Task.detached(priority: .utility) {
-                    try SessionFiles.inspect(in: SessionFiles.root())
-                }.value
-                guard !Task.isCancelled, let self else { return }
-                self.sessions = listing.sessions
-                self.libraryNotice = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
-                self.libraryError = nil
-                self.reconcileSavedProgress()
-            } catch {
-                guard !Task.isCancelled else { return }
-                self?.libraryError = error.localizedDescription
+        do {
+            let root = try SessionFiles.root()
+            sessionLoader.load(root: root) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .success(let listing):
+                    self.sessions = listing.sessions
+                    let unreadable = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
+                    let notices = [self.recoveryNotice, unreadable].compactMap { $0 }
+                    self.libraryNotice = notices.isEmpty ? nil : notices.joined(separator: "\n")
+                    self.libraryError = nil
+                    self.reconcileSavedProgress()
+                case .failure(let error): self.libraryError = error.localizedDescription
+                }
             }
+        } catch {
+            sessionLoader.cancel()
+            libraryError = error.localizedDescription
         }
     }
     // Check whether a library entry is the session currently being recorded.
@@ -1329,6 +1332,14 @@ final class ActivityTracker: ObservableObject {
         try FileManager.default.trashItem(at: session.folder, resultingItemURL: nil)
         if SessionFiles.sameFolder(session.folder, sessionFolder) { sessionFolder = nil; sessionTags = []; sessionTagColors = [:] }
         refreshSessions()
+    }
+    func deleteSessions(_ sessions: [SavedSession]) throws -> SessionFiles.DeletionResult {
+        let result = try SessionFiles.deleteSelected(sessions, root: SessionFiles.root(), active: isRecording ? sessionFolder : nil)
+        if result.deleted.contains(where: { SessionFiles.sameFolder($0.folder, sessionFolder) }) {
+            sessionFolder = nil; sessionTags = []; sessionTagColors = [:]
+        }
+        refreshSessions()
+        return result
     }
     // Keep destination access alive while the background copy runs.
     func exportAllSavedSessions() async throws -> (folder: URL, count: Int)? {
