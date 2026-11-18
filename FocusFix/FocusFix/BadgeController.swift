@@ -72,10 +72,14 @@ final class BadgeController: ObservableObject {
         if previous != awards { save() }
         for badge in added { deliverNotification(badge) }
     }
-    private static func notify(_ badge: FocusBadge) {
+    static func notificationContent(for badge: FocusBadge) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = "You've gained a badge!"; content.body = badge.name
         content.userInfo = ["focusfix_badge": badge.id]
+        return content
+    }
+    private static func notify(_ badge: FocusBadge) {
+        let content = notificationContent(for: badge)
         Task {
             let center = UNUserNotificationCenter.current()
             let settings = await center.notificationSettings()
