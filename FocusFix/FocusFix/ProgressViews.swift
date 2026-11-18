@@ -131,11 +131,129 @@ struct ProgressMenuSummary: View {
 
 struct WorkStreakBadge: View {
     @ObservedObject var tracker: ActivityTracker
+    @State private var calendarPresented = false
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let status = tracker.dailyProgress.streakStatus(at: context.date, calendar: DailyProgress.calendar())
-            WorkStreakFlame(status: status)
+            Button { calendarPresented.toggle() } label: {
+                WorkStreakFlame(status: status)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Work streak, \(status.description)")
+            .accessibilityHint("Open work streak calendar")
+            .help("Open work streak calendar")
         }
+        .popover(isPresented: $calendarPresented, arrowEdge: .bottom) {
+            WorkStreakCalendar(tracker: tracker)
+        }
+    }
+}
+
+private struct WorkStreakCalendar: View {
+    @ObservedObject var tracker: ActivityTracker
+    @State private var month = Date()
+    @Environment(\.dismiss) private var dismiss
+    private let calendar = DailyProgress.calendar()
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let today = context.date
+            let progress = reconciledProgress(at: today)
+            let start = calendar.dateInterval(of: .month, for: month)!.start
+            let dayCount = calendar.range(of: .day, in: .month, for: start)!.count
+            let offset = (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Work streak").font(.headline)
+                    Spacer()
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.plain).accessibilityLabel("Close work streak calendar")
+                }
+                Text("60 minutes of declared work earns a streak day.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button { moveMonth(-1) } label: { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("Previous month")
+                    Spacer()
+                    Text(start.formatted(.dateTime.month(.wide).year())).font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Button { moveMonth(1) } label: { Image(systemName: "chevron.right") }
+                        .accessibilityLabel("Next month")
+                        .disabled(calendar.isDate(start, equalTo: today, toGranularity: .month))
+                }
+                LazyVGrid(columns: columns, spacing: 6) {
+                    ForEach(0..<7, id: \.self) { index in
+                        let weekday = (calendar.firstWeekday - 1 + index) % 7
+                        Text(calendar.shortWeekdaySymbols[weekday])
+                            .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                    ForEach(0..<(offset + dayCount), id: \.self) { index in
+                        if index < offset {
+                            Color.clear.frame(height: 34).accessibilityHidden(true)
+                        } else {
+                            let date = calendar.date(byAdding: .day, value: index - offset, to: start)!
+                            dayCell(date, progress: progress, today: today)
+                        }
+                    }
+                }
+                HStack(spacing: 18) {
+                    HStack(spacing: 5) {
+                        calendarFlame
+                        Text("Goal met")
+                    }
+                    Label("Freeze used", systemImage: "snowflake").foregroundStyle(.blue)
+                }.font(.caption)
+                Text("Missed weekends are optional and use no freezes.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if !calendar.isDate(start, equalTo: today, toGranularity: .month) {
+                    Button("Back to this month") { month = today }.font(.caption)
+                }
+            }
+            .padding(20).frame(width: 350)
+        }
+    }
+
+    private var calendarFlame: some View {
+        StreakFireContour(time: 0)
+            .fill(LinearGradient(colors: [.yellow, .orange, .red], startPoint: .bottom, endPoint: .top))
+            .frame(width: 11, height: 14)
+            .accessibilityHidden(true)
+    }
+
+    private func dayCell(_ date: Date, progress: DailyProgress, today: Date) -> some View {
+        let future = calendar.startOfDay(for: date) > calendar.startOfDay(for: today)
+        let complete = !future && progress.day(at: date, calendar: calendar).workSeconds >= DailyProgress.goalSeconds
+        let frozen = !future && !complete && progress.frozenDays.contains(DailyProgress.key(for: date, calendar: calendar))
+        let isToday = calendar.isDate(date, inSameDayAs: today)
+        let detail = complete ? "Work goal met" : frozen ? "Freeze used" : future ? "Future day" : "Work goal not met"
+        return HStack(spacing: 3) {
+            Text("\(calendar.component(.day, from: date))").monospacedDigit()
+            if complete { calendarFlame }
+            else if frozen { Image(systemName: "snowflake").font(.caption2).foregroundStyle(.blue) }
+        }
+        .font(.caption.weight(isToday ? .bold : .regular))
+        .frame(maxWidth: .infinity).frame(height: 34)
+        .foregroundStyle(future ? Color.secondary.opacity(0.5) : Color.primary)
+        .background(complete ? Color.orange.opacity(0.12) : frozen ? Color.blue.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 7))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(isToday ? Color.accentColor : Color.clear, lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted))\(isToday ? ", today" : ""), \(detail)")
+        .help("\(date.formatted(date: .complete, time: .omitted)): \(detail)")
+    }
+
+    private func reconciledProgress(at date: Date) -> DailyProgress {
+        var progress = tracker.dailyProgress
+        progress.reconcile(at: date, calendar: calendar)
+        return progress
+    }
+
+    private func moveMonth(_ amount: Int) {
+        let start = calendar.dateInterval(of: .month, for: month)!.start
+        if let next = calendar.date(byAdding: .month, value: amount, to: start) { month = next }
     }
 }
 
