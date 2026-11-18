@@ -28,3 +28,9 @@ every synthetic fixture. Checks include independent work/habit weekend credit,
 3599 versus 3600 seconds, Saturday and Sunday additions, timezone boundaries,
 weekend starts, freezes, missed-weekday resets, late work, ranking and permissions.
 See `weekend-streak-live-regressions.png` for the live result.
+
+The signed-in FocusFix app subsequently loaded the Allegheny College Team with
+Kristian at a 6-day work streak (previously 4 in the reported screenshot), Rei at
+5 (previously 3), and Justin at 3 (previously 1). See
+`weekend-streak-group-result.png`. This confirms existing weekend history is
+included in the actual group response and displayed by the app.
