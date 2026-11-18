@@ -191,25 +191,13 @@ struct SessionLibraryView: View {
     private func deleteSelected() {
         let sessions = pendingDeletion
         pendingDeletion = []
-        var deleted = 0
-        var failures: [String] = []
-        // Revalidate all targets before moving any. Each move remains recoverable in Trash.
         do {
-            for session in sessions {
-                try SessionFiles.validate(session.folder, in: SessionFiles.root(),
-                    active: tracker.isRecording ? tracker.sessionFolder : nil)
+            let result = try tracker.deleteSessions(sessions)
+            selection.subtract(result.deleted.map(\.id))
+            if !result.failures.isEmpty {
+                notice = "Moved \(result.deleted.count) of \(sessions.count) sessions to Trash. Could not delete:\n" + result.failures.joined(separator: "\n")
             }
-        } catch { notice = "Nothing was deleted: \(error.localizedDescription)"; return }
-        for session in sessions {
-            do {
-                try tracker.deleteSession(session)
-                selection.remove(session.id)
-                deleted += 1
-            } catch { failures.append("\(session.id): \(error.localizedDescription)") }
-        }
-        if !failures.isEmpty {
-            notice = "Moved \(deleted) of \(sessions.count) sessions to Trash. Could not delete:\n" + failures.joined(separator: "\n")
-        }
+        } catch { notice = "Nothing was deleted: \(error.localizedDescription)" }
     }
 
     private func exportSelected() {
