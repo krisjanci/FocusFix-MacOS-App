@@ -19,7 +19,7 @@ contents = pathlib.Path(sys.argv[1])
 PY
 source_dir=FocusFix/FocusFix
 sources=()
-for name in SessionTags RecordingContract ReminderEligibility StudyCheckIns ResearchArchiveContract RecordingCoverage SavedSession DailyProgress Badges BadgeController BadgeArtwork BadgeCelebration BadgeKeyboard AnalyticsPanel ButtonPressFeedback ButtonPressGeometry; do
+for name in SessionTags RecordingContract ReminderEligibility StudyCheckIns ResearchArchiveContract RecordingCoverage SavedSession DailyProgress Badges BadgeController BadgeArtwork BadgeSharing BadgeCelebration BadgeKeyboard AnalyticsPanel ButtonPressFeedback ButtonPressGeometry; do
     sources+=("$source_dir/$name.swift")
 done
 xcrun swiftc -module-cache-path "$preview_root/module-cache" "${sources[@]}" \
