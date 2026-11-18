@@ -59,7 +59,6 @@ begin
  if (member->>'workStreak')::int<>1 or (member->>'workStreakRank')::int<>1 then raise exception 'Current streak not ranked first'; end if;
  if has_function_privilege('authenticated','public.social_group_work_streak(uuid,uuid,timestamptz)','execute')
  or has_function_privilege('authenticated','public.social_state_daily_points(text,jsonb)','execute') then raise exception 'Private helper exposed'; end if;
- perform set_config('focusfix.current_streak_checks_passed','true',true);
 end $$;
 -- Weekend qualifications apply independently to work and healthy habits.
 do $$
@@ -69,6 +68,19 @@ begin
  insert into public.social_accounts(user_id,timezone,activated_at) values(a,'America/New_York','2026-10-22');
  insert into public.social_groups(id,owner,name) values(g,a,'Weekend streaks');
  insert into public.social_members(group_id,user_id,joined_at) values(g,a,'2026-10-22T12:00Z');
+ -- Weekend work still needs 60 minutes, independently of healthy-habit credit.
+ insert into public.social_member_days(group_id,user_id,day,seconds,healthy)
+ values(g,a,'2026-10-22',3600,true),(g,a,'2026-10-24',3599,true);
+ select * into result from public.social_group_work_streak(a,g,'2026-10-24T16:00Z');
+ if result.streak<>1 or not result.frozen then raise exception 'Partial weekend work earned a day'; end if;
+ select * into result from public.social_group_habit_streak(a,g,'2026-10-24T16:00Z');
+ if result.streak<>2 or result.frozen then raise exception 'Weekend habit depended on work goal'; end if;
+ update public.social_member_days set seconds=3600,healthy=false where group_id=g and day='2026-10-24';
+ select * into result from public.social_group_work_streak(a,g,'2026-10-24T16:00Z');
+ if result.streak<>2 or result.frozen then raise exception 'Exact weekend work goal did not count'; end if;
+ select * into result from public.social_group_habit_streak(a,g,'2026-10-24T16:00Z');
+ if result.streak<>1 or not result.frozen then raise exception 'Weekend work earned a habit day'; end if;
+ delete from public.social_member_days where group_id=g;
  insert into public.social_member_days(group_id,user_id,day,seconds,healthy) values(g,a,'2026-10-22',3600,true),(g,a,'2026-10-24',7200,true);
  -- Saturday thaws Friday; an idle Sunday stays optional, using the scoring timezone.
  for result in select * from public.social_group_work_streak(a,g,'2026-10-26T03:30Z')
@@ -100,6 +112,7 @@ begin
   raise exception 'Account-wide ledger ignored weekend start'; end if;
  if has_function_privilege('authenticated','public.social_group_habit_streak(uuid,uuid,timestamptz)','execute') then
   raise exception 'Habit helper exposed'; end if;
+ perform set_config('focusfix.current_streak_checks_passed','true',true);
 end $$;
 -- The marker is set only after all assertions. Running this SELECT alone cannot pass.
 select current_setting('focusfix.current_streak_checks_passed',true)='true' as current_streak_regressions_passed;
