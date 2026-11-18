@@ -72,6 +72,31 @@ import Foundation
         precondition(rotated.recordingContract!.segmentID != first.contract.segmentID)
         precondition(rotated.recordingContract!.intervals[0].logicalID == context.logicalID)
         precondition(rotated.recordingContract!.intervals[0].start == 2)
+        // A damaged pending entry must not stop independent checkpoint recovery.
+        for reverse in [false, true] {
+            let mixed = root.appendingPathComponent("mixed-\(reverse)")
+            let names = reverse ? ["z-valid", "a-missing", "b-malformed", "c-invalid"] : ["a-valid", "z-missing", "y-malformed", "x-invalid"]
+            let mixedPending = SessionFiles.pendingRoot(in: mixed)
+            var original: [URL: Data] = [:]
+            for (index, name) in names.enumerated() {
+                let fixture = try RecordingWriter(root: mixedPending, id: name, startedAt: midnight)
+                try fixture.checkpoint(at: 2)
+                let metadata = fixture.folder.appendingPathComponent("session.json")
+                if index == 1 { try FileManager.default.removeItem(at: metadata) }
+                if index == 2 { try Data("{broken".utf8).write(to: metadata) }
+                if index == 3 { try Data("invalid contract".utf8).write(to: fixture.folder.appendingPathComponent("context_intervals.json")) }
+                if index > 0 {
+                    for file in try FileManager.default.contentsOfDirectory(at: fixture.folder, includingPropertiesForKeys: nil) {
+                        original[file] = try Data(contentsOf: file)
+                    }
+                }
+            }
+            do { _ = try SessionFiles.recoverPending(in: mixed); preconditionFailure("Partial recovery must report damaged entries") }
+            catch { }
+            let recovered = try SessionFiles.list(in: mixed)
+            precondition(recovered.count == 1 && recovered[0].duration == 2, "Damaged entry blocked valid recovery")
+            for (file, bytes) in original { let actual = try Data(contentsOf: file); precondition(actual == bytes) }
+        }
         print("PASS: deterministic lifecycle, idle/resume, permission/pause/lock/quit/failure, midnight/timezone boundaries, durable-only recovery, short-auto retention and rotation IDs")
     }
 }
