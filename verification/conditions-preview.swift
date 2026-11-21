@@ -27,7 +27,7 @@ private struct ConditionsPreview: View {
                     Label("Work target", systemImage: "scope").font(.caption).padding(6)
                     Button { presented = true } label: { Label("Conditions", systemImage: "plus").font(.caption).padding(6) }
                         .buttonStyle(.plain).background(Color.primary.opacity(0.06), in: Capsule())
-                }
+                }.frame(maxWidth: .infinity, alignment: .leading)
                 if !conditions.isEmpty {
                     Button { presented = true } label: { SessionConditionSummary(conditions: conditions) }.buttonStyle(.plain)
                 }
