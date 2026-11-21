@@ -16,6 +16,7 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
     @State private var editingSessionTags = false
+    @State private var editingConditions = false
     @State private var editingActivity = false
     @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
@@ -54,7 +55,7 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
         .modifier(BadgeCelebrationHost(badges: badges, showsCelebration: dailySurvey.presented == nil && !dailySurvey.isDue() && panels.sheet == nil &&
-            !sharingPresented && !editingSessionTags && !editingActivity &&
+            !sharingPresented && !editingSessionTags && !editingConditions && !editingActivity &&
             !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
             !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented))
         .blur(radius: dailySurvey.presented == nil ? 0 : 8)
@@ -94,7 +95,7 @@ struct ContentView: View {
 
     private var surveyCanAppear: Bool {
         launchReady && !tour.isPresented && !RecordingNotice().needsFirstLaunchChoice &&
-        panels.sheet == nil && !sharingPresented && !editingSessionTags && !editingActivity &&
+        panels.sheet == nil && !sharingPresented && !editingSessionTags && !editingConditions && !editingActivity &&
         !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
         !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented
     }
@@ -200,7 +201,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                HStack(spacing: 8) {
+                ConditionChipLayout(spacing: 8) {
                     SessionTagButton(tags: tracker.timerTags,
                         colors: tagLibrary.resolvedColors(for: tracker.timerTags, saved: tracker.timerTagColors)) {
                             if tracker.canOpenWorkSetup() { editingSessionTags = true }
@@ -210,7 +211,15 @@ struct ContentView: View {
                             .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonPressFeedback().buttonStyle(.plain).help("Choose a work target")
-                    Spacer(minLength: 0)
+                    Button {
+                        if tracker.canOpenWorkSetup() { editingConditions = true }
+                    } label: {
+                        Label("condition", systemImage: "plus")
+                            .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                    }.buttonPressFeedback().buttonStyle(.plain)
+                        .help("Choose session conditions such as location, music, or work setting")
+                        .accessibilityLabel("Add condition")
                     if tracker.isRecording && !tracker.completedBreaks.isEmpty {
                         Button { editingActivity = true } label: {
                             Label("Edit activity", systemImage: "square.and.pencil")
@@ -219,6 +228,11 @@ struct ContentView: View {
                         }.buttonPressFeedback().buttonStyle(.plain)
                             .help("Edit activities for all completed breaks in this session")
                     }
+                }
+                if !tracker.timerConditions.isEmpty {
+                    Button { if tracker.canOpenWorkSetup() { editingConditions = true } } label: {
+                        SessionConditionSummary(conditions: tracker.timerConditions)
+                    }.buttonStyle(.plain).buttonPressFeedback().help("Edit session conditions")
                 }
             }
             .frame(maxWidth: .infinity).padding(26)
@@ -341,6 +355,12 @@ struct ContentView: View {
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
         .sheet(isPresented: $editingActivity) { BreakActivityEditor(tracker: tracker) }
+        .sheet(isPresented: $editingConditions) {
+            SessionConditionEditor(conditions: tracker.timerConditions,
+                confirmationTitle: tracker.isWorking ? "Done" : "Start work") { conditions in
+                try tracker.saveTimerConditions(conditions)
+            }
+        }
         .sheet(isPresented: $editingSessionTags) {
             SessionTagEditor(tags: tracker.timerTags, colors: tracker.timerTagColors, library: tagLibrary,
                              confirmationTitle: tracker.isWorking ? "Done" : "Start work") { tags, colors in
