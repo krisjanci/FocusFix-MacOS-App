@@ -98,7 +98,7 @@ struct SessionTagEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Tags").font(.title3.weight(.semibold))
+                Text("Tags").font(.system(size: 28, weight: .bold, design: .rounded))
                 Spacer()
                 if !managingOnly { Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction) }
             }
