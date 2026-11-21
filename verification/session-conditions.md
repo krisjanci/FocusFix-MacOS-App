@@ -19,3 +19,7 @@ No release, archive, signing, notarization, publishing, or push was performed. T
 Removed the Conditions search field and all condition filtering. The timer and history controls now read **+Conditions**. Conditions and Tags use the exact Work target title font (28-point bold rounded); category headings are 17-point semibold. Conditions use understated outlined chips with teal selected states, and intrinsic-width flow layout packs options together before wrapping. Selection and catalog behavior are unchanged.
 
 Verified the native synthetic preview in light and dark appearances: all four starter Location options fit one row, a new Jazz option fills the available Music row space, and a 39-character music option starts a new row. Confirmed exclusive Location selection, independent Music selection, saved summaries, and edit menus. The unsigned Debug build passed. No storage code changed; no new tests were added for this visual refinement. No release or push was performed.
+
+## Inline add-label control — November 21, 2026
+
+Replaced the visible Add label text with a teal `plus.circle` button appended inside each category’s chip flow. It retains its category-specific accessibility label and tooltip. Verified the native preview shows the circle after the Location, Music, and Work setting options, and clicking the Music plus opens New label. The unsigned Debug build and `git diff --check` passed. No release or push was performed.
