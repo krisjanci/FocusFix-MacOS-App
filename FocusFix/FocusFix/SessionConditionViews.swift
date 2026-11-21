@@ -150,7 +150,7 @@ struct SessionConditionEditor: View {
 
     private func conditionOption(_ label: ConditionLabel, category: ConditionCategory) -> some View {
         let selected = selection.contains { $0.categoryID == category.id && $0.labelID == label.id }
-        HStack(spacing: 2) {
+        return HStack(spacing: 2) {
             Button {
                 selection.removeAll { $0.categoryID == category.id }
                 if !selected {
