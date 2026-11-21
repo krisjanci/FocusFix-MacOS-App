@@ -72,7 +72,7 @@ private struct DevelopmentConsentView: View {
             Label("Share recordings to improve FocusFix", systemImage: "hand.raised")
                 .font(.title2.weight(.semibold))
             Text("Only accounts approved by the developer can use this option. You choose whether to share.")
-            Text("After you agree, new finished recordings may be sent to private Supabase storage for FocusFix product development. They include keyboard timing, clicks, scrolling, mouse-movement summaries, work labels, tags, and breaks. They do not include typed text, app names, URLs, screenshots, account passwords, or optional study ratings.")
+            Text("After you agree, new finished recordings may be sent to private Supabase storage for FocusFix product development. They include keyboard timing, clicks, scrolling, mouse-movement summaries, work labels, tags, session conditions (such as location, music, and work setting), and breaks. They do not include typed text, app names, URLs, screenshots, account passwords, or optional study ratings.")
             Text("The developer can access these detailed recordings. They are kept until you request deletion. Turning sharing off stops future uploads; use Request deletion to remove hosted copies and ask the developer to remove downloaded copies. Your local recordings are kept.")
             Text("An automatic recording already in progress is not shared until a new recording segment starts after consent.")
                 .foregroundStyle(.secondary)
