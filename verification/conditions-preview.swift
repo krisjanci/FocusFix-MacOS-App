@@ -35,12 +35,12 @@ private struct ConditionsPreview: View {
             }.padding(26).frame(maxWidth: .infinity).background(.teal.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
             Button("Reset preview") { conditions = []; working = false }
         }.padding(30).frame(width: 490)
-            .environment(\.colorScheme, dark ? .dark : .light)
+            .preferredColorScheme(dark ? .dark : .light)
             .sheet(isPresented: $presented) {
                 SessionConditionEditor(conditions: conditions, library: PreviewConditions.library,
                     confirmationTitle: working ? "Done" : "Start work") { values in
                     conditions = values; working = true
-                }.environment(\.colorScheme, dark ? .dark : .light)
+                }.preferredColorScheme(dark ? .dark : .light)
             }
     }
 }
