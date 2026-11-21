@@ -3,9 +3,15 @@ import SwiftUI
 struct SessionConditionSummary: View {
     let conditions: [SessionCondition]
     var body: some View {
-        Text(conditions.map { "\($0.category): \($0.label)" }.joined(separator: " · "))
-            .font(.caption).foregroundStyle(.secondary)
-            .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+        ConditionChipLayout(spacing: 5) {
+            ForEach(conditions) { value in
+                Text("\(value.category): \(value.label)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.06), in: Capsule())
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
@@ -203,5 +209,38 @@ private struct ConditionNameEditor: View {
                     .disabled((try? SessionTags.name(name)) == nil)
             }
         }.padding(20).frame(width: 320).tint(.teal)
+    }
+}
+
+// Wrap intrinsic chip sizes without widening the compact timer window.
+struct ConditionChipLayout: Layout {
+    var spacing: CGFloat = 8
+    private func arrangement(_ subviews: Subviews, width: CGFloat) -> (CGSize, [CGPoint]) {
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var usedWidth: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            if x > 0 && x + size.width > width {
+                y += rowHeight + spacing; x = 0; rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            usedWidth = max(usedWidth, x + size.width)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return (CGSize(width: usedWidth, height: y + rowHeight), positions)
+    }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrangement(subviews, width: proposal.width ?? 430).0
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let positions = arrangement(subviews, width: bounds.width).1
+        for (view, point) in zip(subviews, positions) {
+            view.place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+                       proposal: ProposedViewSize(width: bounds.width, height: nil))
+        }
     }
 }
