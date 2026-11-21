@@ -84,13 +84,9 @@ struct SessionConditionEditor: View {
             }
             if !library.loaded { Button("Reload condition list") { library.reload() }.buttonPressFeedback() }
             if editing {
-                Button { naming = ConditionNameRequest() } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 22, weight: .regular))
-                        .frame(width: 32, height: 32).contentShape(Circle())
-                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
-                    .disabled(!library.loaded)
-                    .accessibilityLabel("Add category").help("Add category")
+                Button("Add categories") { naming = ConditionNameRequest() }
+                    .buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+                    .font(.callout.weight(.medium)).disabled(!library.loaded)
             }
             Divider()
             HStack {
