@@ -214,12 +214,12 @@ struct ContentView: View {
                     Button {
                         if tracker.canOpenWorkSetup() { editingConditions = true }
                     } label: {
-                        Label("condition", systemImage: "plus")
+                        Label("Conditions", systemImage: "plus")
                             .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonPressFeedback().buttonStyle(.plain)
                         .help("Choose session conditions such as location, music, or work setting")
-                        .accessibilityLabel("Add condition")
+                        .accessibilityLabel("Add Conditions")
                     if tracker.isRecording && !tracker.completedBreaks.isEmpty {
                         Button { editingActivity = true } label: {
                             Label("Edit activity", systemImage: "square.and.pencil")
