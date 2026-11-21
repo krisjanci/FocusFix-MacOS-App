@@ -156,10 +156,10 @@ struct SessionLibraryView: View {
                 Button {
                     selection = [session.id]; conditioning = session
                 } label: {
-                    if session.conditions.isEmpty { Label("condition", systemImage: "plus").font(.caption) }
+                    if session.conditions.isEmpty { Label("Conditions", systemImage: "plus").font(.caption) }
                     else { SessionConditionSummary(conditions: session.conditions) }
                 }.buttonStyle(.plain).buttonPressFeedback().disabled(exportingAll)
-                    .accessibilityLabel(session.conditions.isEmpty ? "Add condition" : "Edit session conditions")
+                    .accessibilityLabel(session.conditions.isEmpty ? "Add Conditions" : "Edit session conditions")
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
