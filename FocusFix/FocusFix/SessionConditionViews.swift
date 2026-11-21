@@ -61,7 +61,7 @@ struct SessionConditionEditor: View {
                         categorySection(category)
                     }
                     if library.categories.isEmpty {
-                        Text("Add categories like place, music, or surroundings.").foregroundStyle(.secondary)
+                        Text("Choose Edit to add categories like place, music, or surroundings.").foregroundStyle(.secondary)
                     }
                     if !unavailable.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
@@ -83,8 +83,15 @@ struct SessionConditionEditor: View {
                 Text(message).font(.caption).foregroundStyle(.red)
             }
             if !library.loaded { Button("Reload condition list") { library.reload() }.buttonPressFeedback() }
-            Button { naming = ConditionNameRequest() } label: { Label("Category", systemImage: "plus") }
-                .buttonPressFeedback().disabled(!library.loaded)
+            if editing {
+                Button { naming = ConditionNameRequest() } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 22, weight: .regular))
+                        .frame(width: 32, height: 32).contentShape(Circle())
+                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+                    .disabled(!library.loaded)
+                    .accessibilityLabel("Add category").help("Add category")
+            }
             Divider()
             HStack {
                 Button("Cancel") { dismiss() }.buttonPressFeedback().keyboardShortcut(.cancelAction)
@@ -166,14 +173,16 @@ struct SessionConditionEditor: View {
                         }
                     }
                 }
-                Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 22, weight: .regular))
-                        .frame(width: 32, height: 32).contentShape(Circle())
-                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
-                    .disabled(!library.loaded)
-                    .accessibilityLabel("Add label to \(category.name)")
-                    .help("Add label to \(category.name)")
+                if editing {
+                    Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 22, weight: .regular))
+                            .frame(width: 32, height: 32).contentShape(Circle())
+                    }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+                        .disabled(!library.loaded)
+                        .accessibilityLabel("Add label to \(category.name)")
+                        .help("Add label to \(category.name)")
+                }
             }
         }
     }
