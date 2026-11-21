@@ -206,3 +206,9 @@ The idle reader uses Apple's any-input token, not a null-event query. Missing id
 status is not zero activity. Pending OS login approval can be turned off explicitly.
 Fresh signed-device/system/accessibility and service qualification remain separate
 from generated tests and component previews; see the readiness/manual checklists.
+
+## Session conditions
+
+`session.json` may include a `conditions` array. Each entry contains `categoryID`, `labelID` (UUID strings), and `category`, `label` (display-name snapshots). A category has at most one selected label; missing conditions mean an empty selection for older recordings. Names use the session label limits of 1–40 characters; up to 20 categories can be selected. Conditions apply to the entire segment and are not interval-level context declarations or inferred location/music observations.
+
+The separate local `session-conditions.json` catalog holds reusable categories and labels with stable IDs. Editing that catalog does not modify saved session snapshots. Segment rotation carries conditions forward; new work starts empty unless conditions are explicitly supplied. History edits preserve other metadata. Exports and eligible sharing archives include condition snapshots as part of `session.json`.
