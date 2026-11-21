@@ -11,6 +11,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     let endedAt: Date?
     let duration: Double?
     let status: String
+    let conditions: [SessionCondition]
     let tags: [String]
     let tagColors: [String: String]
     let schemaVersion: Int
@@ -79,6 +80,10 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         endedAt = (metadata["ended_at_utc"] as? String).flatMap { formatter.date(from: $0) }
             ?? start.flatMap { date in validDuration.map { date.addingTimeInterval($0) } }
         status = metadata["status"] as? String ?? "metadata_unavailable"
+        if let values = metadata["conditions"] {
+            conditions = try SessionConditions.validated(JSONDecoder().decode([SessionCondition].self,
+                from: JSONSerialization.data(withJSONObject: values)))
+        } else { conditions = [] }
         tags = metadata["tags"] as? [String] ?? []
         tagColors = (try? SessionTags.colors(metadata["tag_colors"] as? [String: String] ?? [:], for: tags)) ?? [:]
     }
@@ -188,6 +193,26 @@ nonisolated enum SessionFiles {
         return first.resolvingSymlinksInPath().standardizedFileURL.path
             == second.resolvingSymlinksInPath().standardizedFileURL.path
     }
+    static func updateConditions(_ values: [SessionCondition], for session: SavedSession, root: URL, active: URL?) throws {
+        try validate(session.folder, in: root, active: active)
+        let valid = try SessionConditions.validated(values)
+        let url = session.folder.appendingPathComponent("session.json")
+        var metadata: [String: Any]
+        if FileManager.default.fileExists(atPath: url.path) {
+            let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard properties.isRegularFile == true, properties.isSymbolicLink != true,
+                  let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
+                throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
+            }
+            metadata = existing
+        } else {
+            metadata = ["session_id": session.id, "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
+                        "status": session.status]
+        }
+        metadata["conditions"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
+        try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
+    }
+
     // Edit labels without recreating metadata or touching activity/survey files.
     static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
         try validate(session.folder, in: root, active: active)
