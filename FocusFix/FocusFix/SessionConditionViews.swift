@@ -79,7 +79,7 @@ struct SessionConditionEditor: View {
                         }
                     }
                 }.padding(.vertical, 4)
-            }.frame(height: 320)
+            }.frame(height: 350)
             if let message = notice ?? library.notice {
                 Text(message).font(.caption).foregroundStyle(.red)
             }
@@ -164,6 +164,7 @@ struct SessionConditionEditor: View {
             Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
                 Label("Label", systemImage: "plus").font(.caption)
             }.buttonPressFeedback().disabled(!library.loaded)
+                .accessibilityLabel("Add label to \(category.name)")
         }
     }
 
