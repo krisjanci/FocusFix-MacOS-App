@@ -228,11 +228,12 @@ struct ContentView: View {
                         }.buttonPressFeedback().buttonStyle(.plain)
                             .help("Edit activities for all completed breaks in this session")
                     }
-                }
+                }.frame(maxWidth: .infinity, alignment: .leading)
                 if !tracker.timerConditions.isEmpty {
                     Button { if tracker.canOpenWorkSetup() { editingConditions = true } } label: {
                         SessionConditionSummary(conditions: tracker.timerConditions)
                     }.buttonStyle(.plain).buttonPressFeedback().help("Edit session conditions")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity).padding(26)
