@@ -21,6 +21,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var eventCount = 0
     @Published private(set) var movementRows = 0
     @Published private(set) var sessionFolder: URL?
+    @Published private(set) var sessionConditions: [SessionCondition] = []
     @Published private(set) var sessionTags: [String] = []
     @Published private(set) var sessionTagColors: [String: String] = [:]
     @Published private(set) var message = "Ready when you are."
@@ -213,6 +214,7 @@ final class ActivityTracker: ObservableObject {
         message = "Input Monitoring is enabled. Press Start work when you are ready."
     }
     var isWorking: Bool { isRecording && userContext == .work }
+    var timerConditions: [SessionCondition] { isWorking ? sessionConditions : [] }
     var timerTags: [String] { isWorking ? sessionTags : [] }
     var timerTagColors: [String: String] { isWorking ? sessionTagColors : [:] }
     var timerTargetMinutes: Int? { isWorking ? sessionWorkPlan.targetMinutes : nil }
@@ -232,6 +234,10 @@ final class ActivityTracker: ObservableObject {
         guard !sessionCheckInPresented, !recordingNoticePresented else { return }
         if isRecording {
             let beginsWork = userContext != .work
+            if beginsWork {
+                do { try writer?.updateConditions([]); sessionConditions = [] }
+                catch { fail(error); return }
+            }
             setContext(.work)
             if isRecording, beginsWork { sessionWorkPlan = SessionWorkPlan() }
             return
@@ -266,7 +272,8 @@ final class ActivityTracker: ObservableObject {
         try beginConfiguredWork(SessionStartSelection(fatigue: nil, plan: SessionWorkPlan(), tags: tags, tagColors: colors))
     }
 
-    private func beginConfiguredWork(_ selection: SessionStartSelection, prompt: CheckInPrompt? = nil) throws {
+    private func beginConfiguredWork(_ selection: SessionStartSelection, prompt: CheckInPrompt? = nil, conditions: [SessionCondition] = []) throws {
+        let conditions = try SessionConditions.validated(conditions)
         let tags = try SessionTags.validated(selection.tags)
         let colors = try SessionTags.colors(selection.tagColors, for: tags)
         guard RecordingNotice().enabled else {
@@ -277,6 +284,9 @@ final class ActivityTracker: ObservableObject {
             throw SessionTags.TagError("Input Monitoring access is needed. Cancel, enable access on the main screen, then try again.")
         }
         if isRecording {
+            guard let writer else { throw CocoaError(.fileWriteUnknown) }
+            try writer.updateConditions(conditions)
+            sessionConditions = conditions
             try updateCurrentTags(tags, colors: colors)
             if let prompt {
                 try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
@@ -292,7 +302,7 @@ final class ActivityTracker: ObservableObject {
             AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
             lifecycle.failed = false
             start(fatigue: sessionSurveyOptions.beforeSession ? selection.fatigue : nil,
-                  prompt: prompt, plan: selection.plan, tags: tags, tagColors: colors,
+                  prompt: prompt, plan: selection.plan, tags: tags, tagColors: colors, conditions: conditions,
                   mode: automatic ? .automatic : .manual)
             if automatic, isRecording { setContext(.work) }
             guard isWorking else { throw SessionTags.TagError(message) }
@@ -414,7 +424,7 @@ final class ActivityTracker: ObservableObject {
         sessionCheckInPresented = false
     }
     // Create the local session files, snapshot the sharing choice, and start activity monitors and timers.
-    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String], mode: RecordingMode = .manual) {
+    private func start(fatigue: Int?, prompt: CheckInPrompt?, plan: SessionWorkPlan, tags: [String], tagColors: [String: String], conditions: [SessionCondition] = [], mode: RecordingMode = .manual) {
         guard !isRecording, RecordingNotice().enabled else { return }
         guard InputMonitor.hasPermission else {
             needsPermission = true
@@ -447,9 +457,10 @@ final class ActivityTracker: ObservableObject {
             developmentConsent = DevelopmentSharingController.shared.capturedConsent
             capturedResearchIdentity = researchCaptureIdentity
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
-                mode: mode, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors)
+                mode: mode, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors, conditions: conditions)
             writer = newWriter
             sessionFolder = newWriter.folder
+            sessionConditions = conditions
             sessionTags = tags
             sessionTagColors = tagColors
             startInstant = clock.now
@@ -696,7 +707,7 @@ final class ActivityTracker: ObservableObject {
         developmentConsent = DevelopmentSharingController.shared.capturedConsent
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
             startedAt: nextStart, mode: recordingMode, continuingContract: next, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
-            tags: sessionTags, tagColors: sessionTagColors)
+            tags: sessionTags, tagColors: sessionTagColors, conditions: sessionConditions)
         writer = replacement; sessionFolder = replacement.folder
         segmentWorkDays = [:]; pendingWorkSlices = []; segmentWorkIntervals = []
         captureAccountKey = activeAccountKey
@@ -1311,6 +1322,32 @@ final class ActivityTracker: ObservableObject {
     func isActive(_ session: SavedSession) -> Bool {
         isRecording && SessionFiles.sameFolder(session.folder, sessionFolder)
     }
+    func saveTimerConditions(_ values: [SessionCondition]) throws {
+        let valid = try SessionConditions.validated(values)
+        if isWorking {
+            guard let writer else { throw CocoaError(.fileWriteUnknown) }
+            try writer.updateConditions(valid)
+            sessionConditions = valid
+            refreshSessions()
+        } else {
+            if !isRecording { sessionSurveyOptions = SurveyPreferences.shared.snapshot }
+            try beginConfiguredWork(SessionStartSelection(fatigue: nil, plan: SessionWorkPlan()), conditions: valid)
+        }
+    }
+
+    func updateConditions(_ values: [SessionCondition], for session: SavedSession) throws {
+        let valid = try SessionConditions.validated(values)
+        if isActive(session) {
+            guard let writer else { throw CocoaError(.fileWriteUnknown) }
+            try writer.updateConditions(valid)
+            sessionConditions = valid
+        } else {
+            try SessionFiles.updateConditions(valid, for: session, root: SessionFiles.root(),
+                                              active: isRecording ? sessionFolder : nil)
+        }
+        refreshSessions()
+    }
+
     func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession) throws {
         let valid = try SessionTags.validated(tags)
         let validColors = try SessionTags.colors(colors, for: valid)
