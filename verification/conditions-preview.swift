@@ -25,7 +25,7 @@ private struct ConditionsPreview: View {
                 ConditionChipLayout {
                     Label("Add tags", systemImage: "plus").font(.caption).padding(6)
                     Label("Work target", systemImage: "scope").font(.caption).padding(6)
-                    Button { presented = true } label: { Label("condition", systemImage: "plus").font(.caption).padding(6) }
+                    Button { presented = true } label: { Label("Conditions", systemImage: "plus").font(.caption).padding(6) }
                         .buttonStyle(.plain).background(Color.primary.opacity(0.06), in: Capsule())
                 }
                 if !conditions.isEmpty {
