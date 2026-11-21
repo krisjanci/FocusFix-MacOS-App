@@ -134,57 +134,70 @@ struct SessionConditionEditor: View {
             }
             ConditionChipLayout(spacing: 8) {
                 ForEach(category.labels) { label in
-                    let selected = selection.contains { $0.categoryID == category.id && $0.labelID == label.id }
-                    HStack(spacing: 2) {
-                        Button {
-                            selection.removeAll { $0.categoryID == category.id }
-                            if !selected {
-                                guard selection.count < 20 else { notice = "Choose up to 20 categories."; return }
-                                selection.append(SessionCondition(categoryID: category.id, labelID: label.id,
-                                                                  category: category.name, label: label.name))
-                            }
-                            notice = nil
-                        } label: {
-                            HStack(spacing: 4) {
-                                if selected { Image(systemName: "checkmark").font(.caption2.bold()) }
-                                Text(label.name).fixedSize(horizontal: false, vertical: true)
-                            }.font(.callout.weight(selected ? .medium : .regular))
-                                .padding(.horizontal, 12).padding(.vertical, 8)
-                                .foregroundStyle(selected ? Color.teal : Color.primary)
-                                .background(selected ? Color.teal.opacity(0.10) : Color.primary.opacity(0.025), in: Capsule())
-                                .overlay {
-                                    Capsule().strokeBorder(selected ? Color.teal.opacity(0.65) : Color.primary.opacity(0.14),
-                                                           lineWidth: selected ? 1.5 : 1)
-                                }
-                        }.buttonStyle(.plain).buttonPressFeedback()
-                            .accessibilityLabel("\(category.name): \(label.name)")
-                            .accessibilityValue(selected ? "Selected" : "Not selected")
-                        if editing {
-                            Menu {
-                                Button("Rename label…") {
-                                    naming = ConditionNameRequest(categoryID: category.id, labelID: label.id, name: label.name)
-                                }
-                                Button("Remove label from list", role: .destructive) {
-                                    perform { try library.removeLabel(label.id, categoryID: category.id) }
-                                }
-                            } label: { Image(systemName: "ellipsis") }
-                                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
-                                .accessibilityLabel("Edit \(label.name)").disabled(!library.loaded)
+                    if editing, label.id == category.labels.last?.id {
+                        HStack(spacing: 8) {
+                            conditionOption(label, category: category)
+                            addLabelButton(category)
                         }
+                    } else {
+                        conditionOption(label, category: category)
                     }
                 }
-                if editing {
-                    Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 22, weight: .regular))
-                            .frame(width: 32, height: 32).contentShape(Circle())
-                    }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
-                        .disabled(!library.loaded)
-                        .accessibilityLabel("Add label to \(category.name)")
-                        .help("Add label to \(category.name)")
-                }
+                if editing, category.labels.isEmpty { addLabelButton(category) }
             }
         }
+    }
+
+    private func conditionOption(_ label: ConditionLabel, category: ConditionCategory) -> some View {
+        let selected = selection.contains { $0.categoryID == category.id && $0.labelID == label.id }
+        HStack(spacing: 2) {
+            Button {
+                selection.removeAll { $0.categoryID == category.id }
+                if !selected {
+                    guard selection.count < 20 else { notice = "Choose up to 20 categories."; return }
+                    selection.append(SessionCondition(categoryID: category.id, labelID: label.id,
+                                                      category: category.name, label: label.name))
+                }
+                notice = nil
+            } label: {
+                HStack(spacing: 4) {
+                    if selected { Image(systemName: "checkmark").font(.caption2.bold()) }
+                    Text(label.name).fixedSize(horizontal: false, vertical: true)
+                }.font(.callout.weight(selected ? .medium : .regular))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .foregroundStyle(selected ? Color.teal : Color.primary)
+                    .background(selected ? Color.teal.opacity(0.10) : Color.primary.opacity(0.025), in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(selected ? Color.teal.opacity(0.65) : Color.primary.opacity(0.14),
+                                               lineWidth: selected ? 1.5 : 1)
+                    }
+            }.buttonStyle(.plain).buttonPressFeedback()
+                .accessibilityLabel("\(category.name): \(label.name)")
+                .accessibilityValue(selected ? "Selected" : "Not selected")
+            if editing {
+                Menu {
+                    Button("Rename label…") {
+                        naming = ConditionNameRequest(categoryID: category.id, labelID: label.id, name: label.name)
+                    }
+                    Button("Remove label from list", role: .destructive) {
+                        perform { try library.removeLabel(label.id, categoryID: category.id) }
+                    }
+                } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
+                    .accessibilityLabel("Edit \(label.name)").disabled(!library.loaded)
+            }
+        }
+    }
+
+    private func addLabelButton(_ category: ConditionCategory) -> some View {
+        Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
+            Image(systemName: "plus.circle")
+                .font(.system(size: 22, weight: .regular))
+                .frame(width: 32, height: 32).contentShape(Circle())
+        }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+            .disabled(!library.loaded)
+            .accessibilityLabel("Add label to \(category.name)")
+            .help("Add label to \(category.name)")
     }
 
     private func perform(_ action: () throws -> Void) {
