@@ -111,13 +111,15 @@ final class RecordingWriter {
     private let surveyOptions: SurveyOptions
     private var tags: [String]
     private var tagColors: [String: String]
+    private var conditions: [SessionCondition]
     private let startedAt: Date
     // Create a new session folder and CSV files, then write the initial session metadata.
     init(root: URL, id: String, startedAt: Date,
-         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, researchIdentity: ResearchCaptureIdentity? = nil, studyConfiguration: StudyCheckInConfiguration? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:]) throws {
+         mode: RecordingMode = .manual, continuingContract: RecordingContract? = nil, researchIdentity: ResearchCaptureIdentity? = nil, studyConfiguration: StudyCheckInConfiguration? = nil, surveyOptions: SurveyOptions = SurveyOptions(), tags: [String] = [], tagColors: [String: String] = [:], conditions: [SessionCondition] = []) throws {
         contract = continuingContract ?? RecordingContract(mode: mode, startedAt: startedAt)
         self.studyConfiguration = studyConfiguration
         self.surveyOptions = surveyOptions
+        self.conditions = try SessionConditions.validated(conditions)
         self.tags = try SessionTags.validated(tags)
         self.tagColors = try SessionTags.colors(tagColors, for: self.tags)
         self.startedAt = startedAt
@@ -254,6 +256,14 @@ final class RecordingWriter {
         catch { self.tags = previous.0; self.tagColors = previous.1; throw error }
     }
 
+    func updateConditions(_ values: [SessionCondition]) throws {
+        let valid = try SessionConditions.validated(values)
+        let previous = conditions
+        conditions = valid
+        do { try metadata(startedAt: startedAt, duration: nil, reason: "recording") }
+        catch { conditions = previous; throw error }
+    }
+
     // Write session timing, schema, participant identity and consent information into session.json.
     private func metadata(startedAt: Date, duration: Double?, reason: String) throws {
         var fields: [String: Any] = [
@@ -267,6 +277,7 @@ final class RecordingWriter {
             "elapsed_basis": "logical recording monotonic elapsed; segment duration subtracts elapsed_origin_seconds",
             "legacy_phase_semantics": "activity_phase=work means normal intervention phase, not a user-declared work label",
             "tags": tags, "tag_colors": tagColors,
+            "conditions": try JSONSerialization.jsonObject(with: JSONEncoder().encode(conditions)),
             "survey_options": surveyOptions.metadata,
             "survey_options_policy": "Choices copied before the starting check-in and kept for the entire session. Disabled surveys produce no answer or prompt rows; they are not skipped responses. Preference changes apply to the next session.",
             "timed_check_in_policy": "When enabled: one notification request 600 seconds after session start or actual break return; no idle or fatigue threshold. Unanswered requests repeat every 600 seconds without creating another check-in. Opening pauses repeats; dismissal leaves the check-in pending. Breaks defer pending reminders; session stop cancels them. Break start cancels only an unrequested opportunity. Skip/Snooze of a break reminder does not reset it.",
