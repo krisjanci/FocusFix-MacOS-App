@@ -119,6 +119,9 @@ struct SessionConditionEditor: View {
                             perform { try library.removeCategory(category.id) }
                         }
                     } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                        .frame(width: 28, height: 28)
+                        .background(Color.primary.opacity(0.04), in: Circle())
                         .accessibilityLabel("Edit \(category.name)").disabled(!library.loaded)
                 }
             }
@@ -158,7 +161,7 @@ struct SessionConditionEditor: View {
                                     perform { try library.removeLabel(label.id, categoryID: category.id) }
                                 }
                             } label: { Image(systemName: "ellipsis") }
-                                .menuStyle(.borderlessButton).frame(width: 18)
+                                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
                                 .accessibilityLabel("Edit \(label.name)").disabled(!library.loaded)
                         }
                     }
