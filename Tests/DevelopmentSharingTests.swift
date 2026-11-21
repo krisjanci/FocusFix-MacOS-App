@@ -5,7 +5,8 @@ import Foundation
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let start = Date(timeIntervalSince1970: 100)
-        let writer = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: start, mode: .automatic)
+        let condition = SessionCondition(categoryID: UUID(), labelID: UUID(), category: "Location", label: "Synthetic library")
+        let writer = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: start, mode: .automatic, conditions: [condition])
         try writer.event(time: 1, type: "left_click_down")
         try writer.finish(startedAt: start, duration: 30, reason: "fixture")
         let consent = DevelopmentConsent(id: UUID(), owner: UUID(), origin: "https://example.invalid",
@@ -34,6 +35,18 @@ import Foundation
         precondition(listing.contains("events.csv") && listing.contains("sharing_manifest.json"))
         precondition(!listing.contains("credentials") && !listing.contains("surveys.csv") &&
                      !listing.contains("research_eligibility"))
+        let metadataProcess = Process(), metadataPipe = Pipe()
+        metadataProcess.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        metadataProcess.arguments = ["-p", destination.path, "\(writer.folder.lastPathComponent)/session.json"]
+        metadataProcess.standardOutput = metadataPipe
+        try metadataProcess.run()
+        let metadataData = metadataPipe.fileHandleForReading.readDataToEndOfFile()
+        metadataProcess.waitUntilExit()
+        precondition(metadataProcess.terminationStatus == 0)
+        let metadata = try JSONSerialization.jsonObject(with: metadataData) as! [String: Any]
+        let conditions = try JSONDecoder().decode([SessionCondition].self,
+            from: JSONSerialization.data(withJSONObject: metadata["conditions"]!))
+        precondition(conditions == [condition])
         state.disable()
         precondition(state.consent == nil && state.pending.isEmpty && state.pendingWithdrawals == [consent])
         do {
