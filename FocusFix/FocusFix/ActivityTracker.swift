@@ -289,7 +289,7 @@ final class ActivityTracker: ObservableObject {
             sessionConditions = conditions
             try updateCurrentTags(tags, colors: colors)
             if let prompt {
-                try writer?.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
+                try writer.logSurvey(SurveyEntry(id: prompt.id, context: .sessionStart,
                     status: selection.fatigue == nil ? .skipped : .answered, breakID: "",
                     shownAt: prompt.shownAt, answeredAt: Date(), shownElapsed: prompt.elapsed,
                     answeredElapsed: now, fatigue: selection.fatigue, productivity: nil))
