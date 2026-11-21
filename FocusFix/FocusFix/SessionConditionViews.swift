@@ -166,12 +166,15 @@ struct SessionConditionEditor: View {
                         }
                     }
                 }
+                Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 22, weight: .regular))
+                        .frame(width: 32, height: 32).contentShape(Circle())
+                }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+                    .disabled(!library.loaded)
+                    .accessibilityLabel("Add label to \(category.name)")
+                    .help("Add label to \(category.name)")
             }
-            Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
-                Label("Add label", systemImage: "plus").font(.caption.weight(.medium))
-            }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
-                .disabled(!library.loaded)
-                .accessibilityLabel("Add label to \(category.name)")
         }
     }
 
