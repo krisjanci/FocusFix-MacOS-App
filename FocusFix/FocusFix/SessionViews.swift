@@ -13,6 +13,7 @@ struct SessionLibraryView: View {
     @State private var notice: String?
     @State private var exportingAll = false
     @State private var tagging: SavedSession?
+    @State private var conditioning: SavedSession?
     @State private var coverage: RecordingCoverage?
     @State private var coverageError: String?
     @ObservedObject var tagLibrary = SessionTagLibrary.shared
@@ -116,6 +117,11 @@ struct SessionLibraryView: View {
                 coverage = result
             } catch { coverageError = "Coverage unavailable; missing observations are not zero activity." }
         }
+        .sheet(item: $conditioning) { session in
+            SessionConditionEditor(conditions: session.conditions) { conditions in
+                try tracker.updateConditions(conditions, for: session)
+            }
+        }
         .sheet(item: $tagging) { session in
             SessionTagEditor(tags: session.tags, colors: session.tagColors, library: tagLibrary) { tags, colors in
                 try tracker.updateTags(tags, colors: colors, for: session)
@@ -147,6 +153,13 @@ struct SessionLibraryView: View {
                     colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors)) {
                         selection = [session.id]; tagging = session
                     }.disabled(exportingAll)
+                Button {
+                    selection = [session.id]; conditioning = session
+                } label: {
+                    if session.conditions.isEmpty { Label("condition", systemImage: "plus").font(.caption) }
+                    else { SessionConditionSummary(conditions: session.conditions) }
+                }.buttonStyle(.plain).buttonPressFeedback().disabled(exportingAll)
+                    .accessibilityLabel(session.conditions.isEmpty ? "Add condition" : "Edit session conditions")
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
