@@ -21,7 +21,6 @@ struct SessionConditionEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selection: [SessionCondition]
     @State private var editing = false
-    @State private var search = ""
     @State private var notice: String?
     @State private var naming: ConditionNameRequest?
     let confirmationTitle: String
@@ -46,19 +45,19 @@ struct SessionConditionEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Conditions").font(.title2.weight(.semibold))
+                Text("Conditions").font(.system(size: 28, weight: .bold, design: .rounded))
                 Spacer()
-                Button(editing ? "Finish editing" : "Edit") { editing.toggle() }.buttonPressFeedback()
+                Button(editing ? "Done editing" : "Edit") { editing.toggle() }
+                    .buttonPressFeedback().buttonStyle(.plain)
+                    .font(.callout.weight(.semibold)).foregroundStyle(.teal)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(.teal.opacity(0.08), in: Capsule())
             }
             Text("Choose one label in each category. All are optional.")
                 .font(.callout).foregroundStyle(.secondary)
-            TextField("Find a category or label", text: $search).textFieldStyle(.roundedBorder)
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    ForEach(library.categories.filter { category in
-                        search.isEmpty || category.name.localizedCaseInsensitiveContains(search) ||
-                        category.labels.contains { $0.name.localizedCaseInsensitiveContains(search) }
-                    }) { category in
+                VStack(alignment: .leading, spacing: 24) {
+                    ForEach(library.categories) { category in
                         categorySection(category)
                     }
                     if library.categories.isEmpty {
@@ -96,7 +95,7 @@ struct SessionConditionEditor: View {
                     catch { notice = error.localizedDescription }
                 }.buttonPressFeedback().buttonStyle(.borderedProminent)
             }
-        }.padding(20).frame(width: 430).tint(.teal)
+        }.padding(24).frame(width: 430).tint(.teal)
         .sheet(item: $naming) { request in
             ConditionNameEditor(request: request) { name in
                 if let categoryID = request.categoryID {
@@ -107,9 +106,9 @@ struct SessionConditionEditor: View {
     }
 
     private func categorySection(_ category: ConditionCategory) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(category.name).font(.headline)
+                Text(category.name).font(.system(size: 17, weight: .semibold))
                 Spacer()
                 if editing {
                     Menu {
@@ -123,10 +122,8 @@ struct SessionConditionEditor: View {
                         .accessibilityLabel("Edit \(category.name)").disabled(!library.loaded)
                 }
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 115), alignment: .leading)], alignment: .leading, spacing: 8) {
-                ForEach(category.labels.filter { label in
-                    search.isEmpty || category.name.localizedCaseInsensitiveContains(search) || label.name.localizedCaseInsensitiveContains(search)
-                }) { label in
+            ConditionChipLayout(spacing: 8) {
+                ForEach(category.labels) { label in
                     let selected = selection.contains { $0.categoryID == category.id && $0.labelID == label.id }
                     HStack(spacing: 2) {
                         Button {
@@ -141,8 +138,14 @@ struct SessionConditionEditor: View {
                             HStack(spacing: 4) {
                                 if selected { Image(systemName: "checkmark").font(.caption2.bold()) }
                                 Text(label.name).fixedSize(horizontal: false, vertical: true)
-                            }.font(.caption).padding(.horizontal, 9).padding(.vertical, 7)
-                                .background(selected ? Color.teal.opacity(0.16) : Color.primary.opacity(0.06), in: Capsule())
+                            }.font(.callout.weight(selected ? .medium : .regular))
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .foregroundStyle(selected ? Color.teal : Color.primary)
+                                .background(selected ? Color.teal.opacity(0.10) : Color.primary.opacity(0.025), in: Capsule())
+                                .overlay {
+                                    Capsule().strokeBorder(selected ? Color.teal.opacity(0.65) : Color.primary.opacity(0.14),
+                                                           lineWidth: selected ? 1.5 : 1)
+                                }
                         }.buttonStyle(.plain).buttonPressFeedback()
                             .accessibilityLabel("\(category.name): \(label.name)")
                             .accessibilityValue(selected ? "Selected" : "Not selected")
@@ -162,8 +165,9 @@ struct SessionConditionEditor: View {
                 }
             }
             Button { naming = ConditionNameRequest(categoryID: category.id) } label: {
-                Label("Label", systemImage: "plus").font(.caption)
-            }.buttonPressFeedback().disabled(!library.loaded)
+                Label("Add label", systemImage: "plus").font(.caption.weight(.medium))
+            }.buttonPressFeedback().buttonStyle(.plain).foregroundStyle(.teal)
+                .disabled(!library.loaded)
                 .accessibilityLabel("Add label to \(category.name)")
         }
     }
@@ -213,35 +217,42 @@ private struct ConditionNameEditor: View {
     }
 }
 
-// Wrap intrinsic chip sizes without widening the compact timer window.
+// Measure each chip at its intrinsic width, constraining only oversized labels.
+// Placement uses the same sizes so compact chips sit together instead of filling columns.
 struct ConditionChipLayout: Layout {
     var spacing: CGFloat = 8
-    private func arrangement(_ subviews: Subviews, width: CGFloat) -> (CGSize, [CGPoint]) {
-        var positions: [CGPoint] = []
+    private struct Placement {
+        let point: CGPoint
+        let size: CGSize
+    }
+    private func arrangement(_ subviews: Subviews, width: CGFloat) -> (CGSize, [Placement]) {
+        let width = max(0, width)
+        var placements: [Placement] = []
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var usedWidth: CGFloat = 0
         for view in subviews {
-            let size = view.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            let ideal = view.sizeThatFits(.unspecified)
+            let size = ideal.width <= width ? ideal : view.sizeThatFits(ProposedViewSize(width: width, height: nil))
             if x > 0 && x + size.width > width {
                 y += rowHeight + spacing; x = 0; rowHeight = 0
             }
-            positions.append(CGPoint(x: x, y: y))
+            placements.append(Placement(point: CGPoint(x: x, y: y), size: size))
             usedWidth = max(usedWidth, x + size.width)
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
-        return (CGSize(width: usedWidth, height: y + rowHeight), positions)
+        return (CGSize(width: usedWidth, height: y + rowHeight), placements)
     }
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         arrangement(subviews, width: proposal.width ?? 430).0
     }
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let positions = arrangement(subviews, width: bounds.width).1
-        for (view, point) in zip(subviews, positions) {
-            view.place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
-                       proposal: ProposedViewSize(width: bounds.width, height: nil))
+        let placements = arrangement(subviews, width: bounds.width).1
+        for (view, placement) in zip(subviews, placements) {
+            view.place(at: CGPoint(x: bounds.minX + placement.point.x, y: bounds.minY + placement.point.y),
+                       proposal: ProposedViewSize(placement.size))
         }
     }
 }
