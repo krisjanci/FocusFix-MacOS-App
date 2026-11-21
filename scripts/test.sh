@@ -11,7 +11,7 @@ run_test() {
     shift
     echo "Testing $name"
     local sources=("$source_dir/SessionTags.swift") candidate existing duplicate
-    for candidate in "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/ResearchArchiveContract.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
+    for candidate in "$source_dir/SessionConditions.swift" "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/ResearchArchiveContract.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
         duplicate=false
         for existing in "${sources[@]}"; do if [ "$candidate" = "$existing" ]; then duplicate=true; break; fi; done
         if [ "$duplicate" = false ]; then sources+=("$candidate"); fi
@@ -48,6 +48,7 @@ run_test QuickTourTests "$source_dir/QuickTour.swift" "$source_dir/GroupPresenta
 run_test SessionWorkPlanTests "$source_dir/SessionWorkPlan.swift" "$source_dir/SessionStartDraft.swift" "$source_dir/DailyProgress.swift"
 run_test SessionRetentionTests "$source_dir/SavedSession.swift" "$source_dir/DailyProgress.swift" \
     "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
+run_test SessionConditionsTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test SessionTagsTests "$source_dir/SavedSession.swift"
 run_test LaunchCoordinatorTests "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" \
     "$source_dir/AccountController.swift" "$source_dir/LaunchCoordinator.swift"
