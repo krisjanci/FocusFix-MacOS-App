@@ -23,3 +23,9 @@ Verified the native synthetic preview in light and dark appearances: all four st
 ## Inline add-label control — November 21, 2026
 
 Replaced the visible Add label text with a teal `plus.circle` button appended inside each category’s chip flow. It retains its category-specific accessibility label and tooltip. Verified the native preview shows the circle after the Location, Music, and Work setting options, and clicking the Music plus opens New label. The unsigned Debug build and `git diff --check` passed. No release or push was performed.
+
+## Edit-only creation controls and timer alignment — November 21, 2026
+
+Label creation uses the teal circled plus only in Edit mode; the last label and its plus wrap together. Category creation is the **Add categories** text button, also only in Edit mode. Empty catalogs point users to Edit. The Tags / Work target / Conditions timer controls and selected-condition summary are explicitly aligned to the leading edge.
+
+Verified the final synthetic native preview: normal mode has no creation controls; Edit shows category-specific label plus buttons alongside the final options and Add categories below; Add categories opens New category. Inspected the timer row’s left alignment. The final unsigned Debug build and `git diff --check` passed. Each changed file/iteration was committed separately. No release or push was performed.
