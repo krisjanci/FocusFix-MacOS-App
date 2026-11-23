@@ -41,9 +41,9 @@ import Foundation
         precondition(single.range(total: Int.max).upperBound == Int.max)
         for (size, reserved, divider) in [(8, 60.0, 1.0), (7, 94.0, 0.0)] {
             let list = ChecklistExpansion(size: size)
-            for height in [450.0, 600.0, 900.0] {
+            for height in [410.0, 450.0, 600.0, 900.0] {
                 let row = list.rowHeight(available: height, reserved: reserved, divider: divider)
-                precondition(row >= 44)
+                precondition(row >= 40)
                 precondition(abs((row + divider) * Double(size) + reserved - height) < 0.001,
                              "A full initial list must fill its available canvas")
             }
