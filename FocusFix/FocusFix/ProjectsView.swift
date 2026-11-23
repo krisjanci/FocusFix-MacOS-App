@@ -19,6 +19,11 @@ struct ProjectsView: View {
     @State private var settled: Set<UUID> = []
     @State private var swiping: Set<UUID> = []
     @State private var deletion: WorkProject?
+    @State private var editingList = false
+    @State private var dragSource: ChecklistDragItem?
+    @State private var insertion: ChecklistInsertion?
+    @FocusState private var renameFocus: UUID?
+    private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     private var project: WorkProject? { store.projects.first { $0.id == selectedProject } }
     private var usesReducedMotion: Bool { reduceMotionOverride ?? reduceMotion }
@@ -31,12 +36,17 @@ struct ProjectsView: View {
                     Image(systemName: "arrow.left").frame(width: 28, height: 22)
                 }.buttonStyle(.bordered)
                     .accessibilityLabel(projectEditor ? "Cancel project editing" : project == nil ? "Back to timer" : "Back to projects")
-                Text(projectEditor ? (editingProject == nil ? "New project" : "Edit project") : project?.name ?? "Projects")
-                    .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary).lineLimit(1)
-                Spacer()
+                pageHeading
+                    .font(.system(size: 23, weight: .semibold, design: .rounded)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 if !projectEditor {
+                    Button(editingList ? "Done" : "Edit", action: toggleEditing)
+                        .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(teal)
+                        .accessibilityLabel(editingList ? "Finish editing" : "Edit projects and tasks")
                     Button {
-                        editingProject = nil; projectName = ""; projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
+                        guard finishRename() else { return }
+                        editingList = false; editingProject = nil; projectName = ""
+                        projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
                     } label: { Image(systemName: "plus") }.accessibilityLabel("New project")
                 }
             }
@@ -63,7 +73,7 @@ struct ProjectsView: View {
             else { projectList }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onExitCommand(perform: goBack)
+        .onExitCommand(perform: cancelEditingOrGoBack)
         .confirmationDialog("Delete project and its tasks? Recorded work will be kept.", isPresented: Binding(
             get: { deletion != nil }, set: { if !$0 { deletion = nil } }), titleVisibility: .visible) {
                 Button("Delete project", role: .destructive) {
@@ -72,7 +82,11 @@ struct ProjectsView: View {
                 }
                 Button("Cancel", role: .cancel) { deletion = nil }
             }
-        .onChange(of: store.projects) { _, values in tracker.reconcileWorkAssignment(projects: values) }
+        .onChange(of: store.projects) { _, values in
+            tracker.reconcileWorkAssignment(projects: values)
+            if let editingProject, !values.contains(where: { $0.id == editingProject }) { self.editingProject = nil }
+            if let editingTask, project?.tasks.contains(where: { $0.id == editingTask }) != true { self.editingTask = nil }
+        }
         .task(id: project?.tasks) {
             // Dates survive navigation and relaunch; cancelled tasks cannot perform stale moves.
             swiping = []
@@ -111,7 +125,6 @@ struct ProjectsView: View {
     private var projectForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder).onSubmit(saveProject)
-                .disabled(store.projects.first { $0.id == editingProject }?.isRandomTasks == true)
             ColorPicker("Project color", selection: $projectColor, supportsOpacity: false)
             HStack {
                 Button("Cancel") { projectEditor = false; error = nil }
@@ -123,57 +136,81 @@ struct ProjectsView: View {
         }
     }
 
+    @ViewBuilder private var pageHeading: some View {
+        if projectEditor { Text("New project") }
+        else if let project, editingProject == project.id {
+            projectNameField(project)
+        } else if let project, editingList && !project.isRandomTasks {
+            Button(project.name) { beginProjectRename(project) }.buttonStyle(.plain)
+                .accessibilityLabel("Rename project \(project.name)")
+        } else { Text(project?.name ?? "Projects") }
+    }
+
     private var projectList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if store.projects.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Image(systemName: "doc.text").font(.largeTitle).foregroundStyle(.teal)
-                        Text("Give your work a home").font(.headline)
-                        Text("Create a project, add a few tasks, and choose what to focus on.").font(.callout).foregroundStyle(.secondary)
-                    }.padding(.vertical, 16)
-                }
                 ForEach(store.projects) { value in
                     HStack(spacing: 10) {
-                        Button {
-                            selectedProject = value.id; error = nil; editingTask = nil
-                        } label: {
-                            HStack {
-                                Circle().fill(Color(tagHex: value.color)).frame(width: 10, height: 10)
-                                Text(value.name).lineLimit(1)
-                                Spacer()
-                                Text("\(value.tasks.filter { $0.completedAt == nil }.count)").foregroundStyle(.secondary)
-                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                        Menu { projectActions(value) } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize()
-                            .accessibilityLabel("Options for \(value.name)")
+                        projectColorControl(value)
+                        if editingProject == value.id {
+                            projectNameField(value)
+                            Button { saveProjectName(value) } label: { Image(systemName: "checkmark") }
+                                .buttonStyle(.plain).accessibilityLabel("Save project name")
+                        } else {
+                            Button {
+                                if editingList { beginProjectRename(value) } else { openProject(value) }
+                            } label: {
+                                Text(value.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                            }.buttonStyle(.plain).disabled(editingList && value.isRandomTasks)
+                                .accessibilityLabel(editingList ? "Rename project \(value.name)" : "Open project \(value.name)")
+                        }
+                        Text("\(value.tasks.filter { $0.completedAt == nil }.count)").foregroundStyle(.secondary)
+                        if editingList {
+                            if value.isRandomTasks {
+                                Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary)
+                                    .frame(width: 34, height: 26).help("Random Tasks cannot be renamed or deleted")
+                            } else {
+                                deleteButton("Delete project \(value.name)") { deletion = value }
+                            }
+                        } else {
+                            Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+                                .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
+                        }
                     }.padding(.vertical, 11)
-                    .draggable("project:\(value.id.uuidString)")
-                    .dropDestination(for: String.self) { values, location in
-                        guard let text = values.first, text.hasPrefix("project:"),
-                              let id = UUID(uuidString: String(text.dropFirst(8))) else { return false }
-                        perform { try store.moveProject(id, relativeTo: value.id, after: location.y > 20) }
-                        return true
-                    }
+                    .modifier(ChecklistReorderRow(item: .project(value.id), source: $dragSource, insertion: $insertion) { dragging, after in
+                        guard case .project(let id) = dragging else { return }
+                        perform { try store.moveProject(id, relativeTo: value.id, after: after) }
+                    })
                     .accessibilityAction(named: "Move up") { moveProject(value, direction: -1) }
                     .accessibilityAction(named: "Move down") { moveProject(value, direction: 1) }
                     Divider()
                 }
-
             }
         }
+    }
+
+    private func projectNameField(_ project: WorkProject) -> some View {
+        TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder)
+            .focused($renameFocus, equals: project.id).onAppear { renameFocus = project.id }
+            .onSubmit { saveProjectName(project) }.onExitCommand { editingProject = nil }
+    }
+
+    @ViewBuilder private func projectColorControl(_ project: WorkProject) -> some View {
+        if editingList {
+            ColorPicker("Project color", selection: Binding(get: { Color(tagHex: project.color) }, set: { color in
+                perform { try store.editProject(project.id, name: project.name, color: color.tagHex) }
+            }), supportsOpacity: false).labelsHidden().frame(width: 22)
+                .accessibilityLabel("Color for \(project.name)")
+        } else { Circle().fill(Color(tagHex: project.color)).frame(width: 10, height: 10) }
     }
 
     private func checklist(_ project: WorkProject) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Circle().fill(Color(tagHex: project.color)).frame(width: 8, height: 8)
+                projectColorControl(project)
                 Text("Untasked Work").font(.callout)
                 Spacer()
-                workButton(project, task: nil)
-                Menu { projectActions(project) } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize()
-                    .accessibilityLabel("Project options")
+                if !editingList { workButton(project, task: nil) }
             }
             HStack {
                 TextField("Add a task…", text: $newTask).textFieldStyle(.roundedBorder).onSubmit { addTask(project) }
@@ -208,40 +245,41 @@ struct ProjectsView: View {
             } label: {
                 Image(systemName: task.completedAt == nil ? "circle" : "checkmark.circle.fill")
                     .font(.system(size: 19)).foregroundStyle(task.completedAt == nil ? Color.secondary : .green)
-            }.buttonStyle(.plain).accessibilityLabel("\(task.completedAt == nil ? "Complete" : "Reopen") \(task.title)")
+            }.buttonStyle(.plain).disabled(editingList)
+                .accessibilityLabel("\(task.completedAt == nil ? "Complete" : "Reopen") \(task.title)")
                 .accessibilityValue(task.completedAt == nil ? "Incomplete" : "Complete")
             if editingTask == task.id {
-                TextField("Task title", text: $taskTitle).textFieldStyle(.roundedBorder).onSubmit { saveTask(task, project: project) }
-                    .onExitCommand { editingTask = nil }
-                Button("Save") { saveTask(task, project: project) }
+                TextField("Task title", text: $taskTitle).textFieldStyle(.roundedBorder)
+                    .focused($renameFocus, equals: task.id).onAppear { renameFocus = task.id }
+                    .onSubmit { saveTask(task, project: project) }.onExitCommand { editingTask = nil }
+                Button { saveTask(task, project: project) } label: { Image(systemName: "checkmark") }
+                    .buttonStyle(.plain).accessibilityLabel("Save task name")
+            } else if editingList {
+                Button { beginTaskRename(task) } label: {
+                    Text(task.title).font(.callout).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("Rename task \(task.title)")
             } else {
                 Text(task.title).font(.callout).lineLimit(2).foregroundStyle(finished ? .secondary : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if task.completedAt == nil { workButton(project, task: task) }
-                Menu {
-                    Button("Rename") { editingTask = task.id; taskTitle = task.title }
-                    Button("Move up") { move(task, project: project, direction: -1) }
-                    Button("Move down") { move(task, project: project, direction: 1) }
-                    Button("Delete task", role: .destructive) { perform { try store.deleteTask(task.id, project: project.id) } }
-                } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize()
-                    .accessibilityLabel("Options for \(task.title)")
             }
+            if editingList {
+                deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
+            } else if task.completedAt == nil { workButton(project, task: task) }
         }
         .padding(.vertical, 10).padding(.horizontal, 4)
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
-        .scaleEffect(finished && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished ? 0.6 : 1)
+        .scaleEffect(finished && !editingList && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished && !editingList ? 0.6 : 1)
         .offset(x: swiping.contains(task.id) && !usesReducedMotion ? 430 : 0)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
-        .draggable(task.id.uuidString)
-        .dropDestination(for: String.self) { values, location in
-            guard let id = values.first.flatMap(UUID.init(uuidString:)), project.tasks.contains(where: { $0.id == id }) else { return false }
-            perform {
-                if location.y > 20 { try store.moveTask(id, after: task.id, project: project.id) }
-                else { try store.moveTask(id, before: task.id, project: project.id) }
-            }
-            return true
-        }
+        .modifier(ChecklistReorderRow(item: .task(project: project.id, id: task.id), enabled: task.completedAt == nil,
+            source: $dragSource, insertion: $insertion) { dragging, after in
+                guard case .task(let parent, let id) = dragging, parent == project.id else { return }
+                perform {
+                    if after { try store.moveTask(id, after: task.id, project: project.id) }
+                    else { try store.moveTask(id, before: task.id, project: project.id) }
+                }
+            })
         .accessibilityAction(named: "Move up") { move(task, project: project, direction: -1) }
         .accessibilityAction(named: "Move down") { move(task, project: project, direction: 1) }
     }
@@ -251,29 +289,55 @@ struct ProjectsView: View {
         return Button {
             perform { try tracker.workOn(project: project, task: task) }
         } label: {
-            Image(systemName: active ? "waveform" : "play.fill").font(.caption)
-                .foregroundStyle(active ? Color(tagHex: project.color) : .secondary)
+            Image(systemName: active ? "waveform" : "play.fill").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white).frame(width: 34, height: 26)
+                .background(teal.opacity(active ? 0.65 : 1), in: RoundedRectangle(cornerRadius: 7))
         }.buttonStyle(.plain).disabled(active)
             .help(active ? "Currently working on this" : "Work on this")
             .accessibilityLabel(active ? "Currently working on \(task?.title ?? "Untasked Work")" : "Work on \(task?.title ?? "Untasked Work")")
     }
 
-    @ViewBuilder private func projectActions(_ project: WorkProject) -> some View {
-        Button("Edit project") {
-            editingProject = project.id; projectName = project.name; projectColor = Color(tagHex: project.color); projectEditor = true
-        }
-        Button("Move up") { moveProject(project, direction: -1) }
-            .disabled(store.projects.first?.id == project.id)
-        Button("Move down") { moveProject(project, direction: 1) }
-            .disabled(store.projects.last?.id == project.id)
-        if !project.isRandomTasks {
-            Button("Delete project", role: .destructive) { deletion = project }
-        }
+    private func deleteButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(role: .destructive, action: action) {
+            Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.red).frame(width: 34, height: 26)
+                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
+        }.buttonStyle(.plain).accessibilityLabel(label).help(label)
+    }
+
+    private func openProject(_ project: WorkProject) {
+        selectedProject = project.id; editingList = false; editingProject = nil; editingTask = nil
+        error = nil; dragSource = nil; insertion = nil
+    }
+    private func toggleEditing() {
+        guard finishRename() else { return }
+        editingList.toggle(); dragSource = nil; insertion = nil
+    }
+    private func beginProjectRename(_ project: WorkProject) {
+        guard !project.isRandomTasks, finishRename() else { return }
+        editingProject = project.id; projectName = project.name; renameFocus = project.id
+    }
+    private func beginTaskRename(_ task: ProjectTask) {
+        guard finishRename() else { return }
+        editingTask = task.id; taskTitle = task.title; renameFocus = task.id
+    }
+    private func finishRename() -> Bool {
+        if let id = editingProject, let project = store.projects.first(where: { $0.id == id }), !saveProjectName(project) { return false }
+        if let id = editingTask, let project, let task = project.tasks.first(where: { $0.id == id }), !saveTask(task, project: project) { return false }
+        return true
+    }
+    @discardableResult private func saveProjectName(_ project: WorkProject) -> Bool {
+        perform { try store.editProject(project.id, name: projectName, color: project.color); editingProject = nil }
+    }
+    private func cancelEditingOrGoBack() {
+        if editingProject != nil || editingTask != nil { editingProject = nil; editingTask = nil }
+        else if editingList { editingList = false }
+        else { goBack() }
     }
     private func goBack() {
-        error = nil
+        error = nil; editingList = false; editingProject = nil; editingTask = nil; dragSource = nil; insertion = nil
         if projectEditor { projectEditor = false }
-        else if project != nil { selectedProject = nil; editingTask = nil; newTask = "" }
+        else if project != nil { selectedProject = nil; newTask = "" }
         else { close() }
     }
     private func moveProject(_ project: WorkProject, direction: Int) {
@@ -282,23 +346,24 @@ struct ProjectsView: View {
     }
     private func saveProject() {
         perform {
-            if let editingProject { try store.editProject(editingProject, name: projectName, color: projectColor.tagHex) }
-            else { selectedProject = try store.addProject(projectName, color: projectColor.tagHex) }
+            selectedProject = try store.addProject(projectName, color: projectColor.tagHex)
             projectEditor = false
         }
     }
     private func addTask(_ project: WorkProject) { perform { try store.addTask(newTask, project: project.id); newTask = "" } }
-    private func saveTask(_ task: ProjectTask, project: WorkProject) {
+    @discardableResult private func saveTask(_ task: ProjectTask, project: WorkProject) -> Bool {
         perform { try store.renameTask(task.id, project: project.id, title: taskTitle); editingTask = nil }
     }
     private func move(_ task: ProjectTask, project: WorkProject, direction: Int) {
-        guard let index = project.tasks.firstIndex(where: { $0.id == task.id }), project.tasks.indices.contains(index + direction) else { return }
+        let tasks = project.tasks.filter { $0.completedAt == nil }
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }), tasks.indices.contains(index + direction) else { return }
         perform {
-            if direction < 0 { try store.moveTask(task.id, before: project.tasks[index - 1].id, project: project.id) }
-            else { try store.moveTask(project.tasks[index + 1].id, before: task.id, project: project.id) }
+            if direction < 0 { try store.moveTask(task.id, before: tasks[index - 1].id, project: project.id) }
+            else { try store.moveTask(task.id, after: tasks[index + 1].id, project: project.id) }
         }
     }
-    private func perform(_ action: () throws -> Void) {
-        do { try action(); error = nil } catch { self.error = error.localizedDescription }
+    @discardableResult private func perform(_ action: () throws -> Void) -> Bool {
+        do { try action(); error = nil; return true }
+        catch { self.error = error.localizedDescription; return false }
     }
 }
