@@ -46,6 +46,16 @@ import Foundation
         precondition(!DevelopmentArchive.files.contains(WorkAssignmentJournal.filename))
         let upload = try DevelopmentArchive.sources(id: saved.id, root: root)
         precondition(!upload.contains { $0.lastPathComponent == WorkAssignmentJournal.filename })
+        let zip = export.appendingPathComponent("shared.zip")
+        let consent = DevelopmentConsent(id: UUID(), owner: UUID(), origin: "https://example.invalid", policyVersion: "test", startedAt: started)
+        _ = try DevelopmentArchive.prepare(id: saved.id, root: root, consent: consent, destination: zip)
+        let unzip = Process(), output = Pipe()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        unzip.arguments = ["-p", zip.path]; unzip.standardOutput = output; unzip.standardError = FileHandle.nullDevice
+        try unzip.run()
+        let payload = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        unzip.waitUntilExit()
+        precondition(unzip.terminationStatus == 0 && !payload.contains("Private project") && !payload.contains("Private task"))
         // An uncheckpointed choice cannot manufacture time during crash recovery.
         var crash = journal
         try crash.select(a, at: 100)
@@ -69,6 +79,19 @@ import Foundation
         try fm.removeItem(at: writer.folder.appendingPathComponent(WorkAssignmentJournal.filename))
         let legacy = try SavedSession(folder: writer.folder)
         precondition(legacy.assignedWork.isEmpty)
+        let corrupt = writer.folder.appendingPathComponent(WorkAssignmentJournal.filename)
+        try Data("broken".utf8).write(to: corrupt)
+        let unreadable = try SavedSession(folder: writer.folder)
+        precondition(unreadable.assignmentNotice != nil)
+        let kept = try String(contentsOf: corrupt, encoding: .utf8)
+        precondition(kept == "broken")
+        let failingWriter = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: started)
+        let blockedSidecar = failingWriter.folder.appendingPathComponent(WorkAssignmentJournal.filename)
+        try fm.removeItem(at: blockedSidecar)
+        try fm.createDirectory(at: blockedSidecar, withIntermediateDirectories: false)
+        let previous = failingWriter.assignments
+        do { try failingWriter.selectAssignment(a, at: 1); preconditionFailure("Expected sidecar write failure") } catch { }
+        precondition(failingWriter.assignments == previous)
         print("WorkAssignmentsTests passed")
     }
 }
