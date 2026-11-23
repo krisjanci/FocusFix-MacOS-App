@@ -287,7 +287,9 @@ struct ProjectsView: View {
     private func workButton(_ project: WorkProject, task: ProjectTask?) -> some View {
         let active = tracker.isWorking && tracker.workAssignment.projectID == project.id && tracker.workAssignment.taskID == task?.id
         return Button {
-            perform { try tracker.workOn(project: project, task: task) }
+            let saved = perform { try tracker.workOn(project: project, task: task) }
+            if saved, tracker.isWorking, tracker.workAssignment.projectID == project.id,
+               tracker.workAssignment.taskID == task?.id { close() }
         } label: {
             Image(systemName: active ? "waveform" : "play.fill").font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white).frame(width: 34, height: 26)
