@@ -14,11 +14,14 @@ nonisolated struct ChecklistExpansion: Equatable {
     }
     func hasMore(total: Int) -> Bool { range(total: total).upperBound < max(0, total) }
     var isExpanded: Bool { batches > 1 }
-    mutating func expand(total: Int) { batches = min(batches + 1, maximumBatches(total: total)) }
+    mutating func expand(total: Int) {
+        clamp(total: total)
+        if hasMore(total: total) { batches += 1 }
+    }
     mutating func collapse() { batches = 1 }
     mutating func clamp(total: Int) { batches = min(batches, maximumBatches(total: total)) }
     mutating func reveal(itemAt position: Int, total: Int) {
-        let position = max(0, min(position, max(0, total - 1)))
+        let position = max(0, min(position, max(0, max(0, total) - 1)))
         batches = max(batches, position / size + 1)
     }
 
