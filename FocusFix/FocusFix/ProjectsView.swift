@@ -29,7 +29,7 @@ struct ProjectsView: View {
             HStack {
                 Button(action: goBack) {
                     Image(systemName: "arrow.left").frame(width: 28, height: 22)
-                }.buttonStyle(.bordered).keyboardShortcut(.cancelAction)
+                }.buttonStyle(.bordered)
                     .accessibilityLabel(projectEditor ? "Cancel project editing" : project == nil ? "Back to timer" : "Back to projects")
                 Text(projectEditor ? (editingProject == nil ? "New project" : "Edit project") : project?.name ?? "Projects")
                     .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary).lineLimit(1)
@@ -63,6 +63,7 @@ struct ProjectsView: View {
             else { projectList }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onExitCommand(perform: goBack)
         .confirmationDialog("Delete project and its tasks? Recorded work will be kept.", isPresented: Binding(
             get: { deletion != nil }, set: { if !$0 { deletion = nil } }), titleVisibility: .visible) {
                 Button("Delete project", role: .destructive) {
