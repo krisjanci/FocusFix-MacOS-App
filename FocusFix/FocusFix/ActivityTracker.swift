@@ -310,6 +310,12 @@ final class ActivityTracker: ObservableObject {
     }
     // The same explicit start path serves task rows and the main Start work button.
     func workOn(project: WorkProject?, task: ProjectTask? = nil) throws {
+        let requestedProject = project
+        let project = requestedProject.flatMap { requested in ProjectStore.shared.projects.first { $0.id == requested.id } }
+        guard requestedProject == nil || project != nil else { throw SessionTags.TagError("This project no longer exists.") }
+        let requestedTask = task
+        let task = requestedTask.flatMap { requested in project?.tasks.first { $0.id == requested.id } }
+        guard requestedTask == nil || task != nil else { throw SessionTags.TagError("This task no longer exists in this project.") }
         guard task?.completedAt == nil else { throw SessionTags.TagError("Uncheck this task before working on it.") }
         if !isWorking { requestStart() }
         guard isWorking, let writer else { return }
