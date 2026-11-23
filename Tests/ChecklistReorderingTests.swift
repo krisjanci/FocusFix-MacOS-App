@@ -1,7 +1,7 @@
 import Foundation
 
 @main struct ChecklistReorderingTests {
-    static func main() {
+    static func main() async throws {
         let first = ChecklistDragItem.project(UUID()), second = ChecklistDragItem.project(UUID())
         precondition(first.canMove(to: second) && !first.canMove(to: first))
         for height in [26.0, 44, 68, 120] {
@@ -31,6 +31,20 @@ import Foundation
         precondition(ChecklistInsertion(source: first, target: second, y: .infinity, rowHeight: 44) == nil)
         precondition(first.token != second.token && a.token != b.token && a.token != foreign.token)
         precondition(first.token.hasPrefix("project:") && a.token.hasPrefix("task:"))
+        for source in [first, a, finishedA] {
+            let provider = ChecklistDragPayload.provider(for: source)
+            precondition(provider.hasItemConformingToTypeIdentifier(ChecklistDragPayload.type.identifier))
+            let data: Data = try await withCheckedThrowingContinuation { continuation in
+                provider.loadDataRepresentation(forTypeIdentifier: ChecklistDragPayload.type.identifier) { data, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else if let data { continuation.resume(returning: data) }
+                    else { continuation.resume(throwing: CocoaError(.fileReadUnknown)) }
+                }
+            }
+            precondition(ChecklistDragPayload.matches(data, source: source))
+            precondition(!ChecklistDragPayload.matches(Data("external text".utf8), source: source))
+            precondition(!ChecklistDragPayload.matches(nil, source: source))
+        }
         print("ChecklistReorderingTests passed: measured midpoints, before/after, self/cross-scope rejection and valid payload identity")
     }
 }
