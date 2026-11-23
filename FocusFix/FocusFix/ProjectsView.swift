@@ -126,7 +126,10 @@ struct ProjectsView: View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder).onSubmit(saveProject)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Project color").font(.callout)
+                HStack(spacing: 8) {
+                    Text("Project color").font(.callout)
+                    Circle().fill(projectColor).frame(width: 12, height: 12).accessibilityLabel("Selected project color")
+                }
                 ProjectColorChooser(selection: Binding(get: { projectColor.tagHex }, set: { projectColor = Color(tagHex: $0) }), inline: true)
             }
             HStack {
