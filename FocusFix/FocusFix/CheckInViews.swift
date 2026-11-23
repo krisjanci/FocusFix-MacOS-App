@@ -56,7 +56,7 @@ struct SessionCheckInView: View {
         self.tracker = tracker
         _draft = State(initialValue: SessionStartDraft.workTarget(
             asksForFatigue: !tracker.isWorking && tracker.sessionSurveyOptions.beforeSession,
-            targetMinutes: tracker.timerTargetMinutes, tags: tracker.timerTags, tagColors: tracker.timerTagColors))
+            targetMinutes: tracker.timerTargetMinutes))
     }
 
     var body: some View {
