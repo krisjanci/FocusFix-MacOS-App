@@ -186,7 +186,7 @@ struct ProjectsView: View {
                             Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                                 .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
                         }
-                    }.frame(minHeight: 23).padding(.vertical, 7)
+                    }.frame(minHeight: 23).padding(.vertical, 5)
                     .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
                         guard case .project(let id) = dragging else { return }
                         perform { try store.moveProject(id, relativeTo: value.id, after: after) }
@@ -302,7 +302,7 @@ struct ProjectsView: View {
         else { tasksPage.previous(total: project?.tasks.count ?? 0) }
         dragSource = nil; insertion = nil
     }
-    private func cancelTaskEntry() { showingTaskEntry = false; newTask = ""; newTaskFocused = false }
+    private func cancelTaskEntry() { showingTaskEntry = false; newTask = ""; newTaskFocused = false; error = nil }
 
     private func taskRow(_ task: ProjectTask, project: WorkProject) -> some View {
         let finished = settled.contains(task.id) || swiping.contains(task.id)
