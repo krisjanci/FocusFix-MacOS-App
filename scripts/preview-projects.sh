@@ -9,7 +9,7 @@ python3 - "$preview_bundle/Contents" <<'PY'
 import pathlib, plistlib, sys
 contents = pathlib.Path(sys.argv[1])
 (contents / 'Info.plist').write_bytes(plistlib.dumps({
-    'CFBundleIdentifier': 'local.focusfix.projects-preview',
+    'CFBundleIdentifier': 'local.focusfix.projects-preview.' + contents.parents[1].name.rsplit('.', 1)[-1].lower(),
     'CFBundleExecutable': 'ProjectsPreview',
     'CFBundleName': 'FocusFix Projects Preview',
     'CFBundlePackageType': 'APPL',
