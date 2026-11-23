@@ -71,16 +71,19 @@ struct ProjectsView: View {
             let completedNow = matureTasks()
             withAnimation(animation) { settled = completedNow }
             while !Task.isCancelled {
+                let completed = matureTasks()
+                if completed != settled {
+                    if !reduceMotion {
+                        withAnimation(.easeIn(duration: 0.18)) { swiping = completed.subtracting(settled) }
+                        do { try await Task.sleep(for: .seconds(0.18)) } catch { return }
+                    }
+                    withAnimation(animation) { settled = completed; swiping = [] }
+                    continue
+                }
                 let pending = (project?.tasks ?? []).compactMap(\.completedAt)
                     .map { 3 - Date().timeIntervalSince($0) }.filter { $0 > 0 }
                 guard let wait = pending.min() else { return }
                 do { try await Task.sleep(for: .seconds(wait)) } catch { return }
-                let completed = matureTasks()
-                if !reduceMotion {
-                    withAnimation(.easeIn(duration: 0.18)) { swiping = completed.subtracting(settled) }
-                    do { try await Task.sleep(for: .seconds(0.18)) } catch { return }
-                }
-                withAnimation(animation) { settled = completed; swiping = [] }
             }
         }
     }
