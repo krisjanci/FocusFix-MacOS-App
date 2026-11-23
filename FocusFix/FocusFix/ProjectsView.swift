@@ -22,6 +22,10 @@ struct ProjectsView: View {
     @State private var editingList = false
     @State private var dragSource: ChecklistDragItem?
     @State private var insertion: ChecklistInsertion?
+    @State private var projectsPage = ChecklistPage(size: 8)
+    @State private var tasksPage = ChecklistPage(size: 7)
+    @State private var showingTaskEntry = false
+    @FocusState private var newTaskFocused: Bool
     @FocusState private var renameFocus: UUID?
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
@@ -43,11 +47,6 @@ struct ProjectsView: View {
                     Button(editingList ? "Done" : "Edit", action: toggleEditing)
                         .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(teal)
                         .accessibilityLabel(editingList ? "Finish editing" : "Edit projects and tasks")
-                    Button {
-                        guard finishRename() else { return }
-                        editingList = false; editingProject = nil; projectName = ""
-                        projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
-                    } label: { Image(systemName: "plus") }.accessibilityLabel("New project")
                 }
             }
             if tracker.isWorking {
@@ -84,6 +83,8 @@ struct ProjectsView: View {
             }
         .onChange(of: store.projects) { _, values in
             tracker.reconcileWorkAssignment(projects: values)
+            projectsPage.clamp(total: values.count)
+            tasksPage.clamp(total: project?.tasks.count ?? 0)
             if let editingProject, !values.contains(where: { $0.id == editingProject }) { self.editingProject = nil }
             if let editingTask, project?.tasks.contains(where: { $0.id == editingTask }) != true { self.editingTask = nil }
         }
@@ -153,9 +154,12 @@ struct ProjectsView: View {
     }
 
     private var projectList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(store.projects) { value in
+        VStack(alignment: .leading, spacing: 8) {
+            if projectsPage.hasPrevious(total: store.projects.count) {
+                centeredListButton("chevron.up", width: 36, lighter: true, label: "Previous projects") { turnProjectsPage(forward: false) }
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(store.projects[projectsPage.range(total: store.projects.count)])) { value in
                     HStack(spacing: 10) {
                         projectColorControl(value)
                         if editingProject == value.id {
@@ -182,7 +186,7 @@ struct ProjectsView: View {
                             Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                                 .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
                         }
-                    }.padding(.vertical, 11)
+                    }.frame(minHeight: 23).padding(.vertical, 7)
                     .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
                         guard case .project(let id) = dragging else { return }
                         perform { try store.moveProject(id, relativeTo: value.id, after: after) }
@@ -192,6 +196,11 @@ struct ProjectsView: View {
                     Divider()
                 }
             }
+            if projectsPage.hasNext(total: store.projects.count) {
+                centeredListButton("chevron.down", width: 36, lighter: true, label: "Next projects") { turnProjectsPage(forward: true) }
+            }
+            centeredListButton("plus", label: "New project", action: beginNewProject)
+            Spacer(minLength: 0)
         }
     }
 
@@ -213,36 +222,87 @@ struct ProjectsView: View {
         } else { Circle().fill(Color(tagHex: project.color)).frame(width: 10, height: 10) }
     }
 
+    private func orderedTasks(_ project: WorkProject) -> [ProjectTask] {
+        project.tasks.filter { !settled.contains($0.id) } + project.completedTasks.filter { settled.contains($0.id) }
+    }
+
     private func checklist(_ project: WorkProject) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let ordered = orderedTasks(project)
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 projectColorControl(project)
                 Text("Untasked Work").font(.callout)
                 Spacer()
                 if !editingList { workButton(project, task: nil) }
             }
-            HStack {
-                TextField("Add a task…", text: $newTask).textFieldStyle(.roundedBorder).onSubmit { addTask(project) }
-                Button { addTask(project) } label: { Image(systemName: "plus") }.accessibilityLabel("Add task")
-                    .disabled(newTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if tasksPage.hasPrevious(total: ordered.count) {
+                centeredListButton("chevron.up", width: 36, lighter: true, label: "Previous tasks") { turnTasksPage(forward: false) }
             }
-            ScrollViewReader { reader in
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        if project.tasks.isEmpty {
-                            Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
-                        }
-                        let ordered = project.tasks.filter { !settled.contains($0.id) } + project.completedTasks.filter { settled.contains($0.id) }
-                        ForEach(ordered) { task in
-                            taskRow(task, project: project).id(task.id)
-                                .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
-                        }
-                    }.animation(animation, value: project.tasks).animation(animation, value: settled)
+            VStack(spacing: 0) {
+                if project.tasks.isEmpty {
+                    Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
                 }
-                .onChange(of: selectedProject) { _, _ in if let first = project.tasks.first { reader.scrollTo(first.id, anchor: .top) } }
+                ForEach(Array(ordered[tasksPage.range(total: ordered.count)])) { task in
+                    taskRow(task, project: project).id(task.id)
+                        .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                }
+            }.animation(animation, value: project.tasks).animation(animation, value: settled)
+            if tasksPage.hasNext(total: ordered.count) {
+                centeredListButton("chevron.down", width: 36, lighter: true, label: "Next tasks") { turnTasksPage(forward: true) }
             }
+            if showingTaskEntry {
+                HStack {
+                    TextField("Add a task…", text: $newTask).textFieldStyle(.roundedBorder)
+                        .focused($newTaskFocused).onSubmit { addTask(project) }
+                        .onExitCommand { cancelTaskEntry() }
+                        .task { await Task.yield(); guard !Task.isCancelled else { return }; newTaskFocused = true }
+                    Button { addTask(project) } label: { Image(systemName: "plus") }.accessibilityLabel("Save new task")
+                        .disabled(newTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } else {
+                centeredListButton("plus", label: "Add task") { showingTaskEntry = true }
+            }
+            Spacer(minLength: 0)
         }
     }
+
+    private func centeredListButton(_ symbol: String, width: CGFloat = 108, lighter: Bool = false,
+                                    label: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button(action: action) {
+                Image(systemName: symbol).font(.system(size: 13, weight: .medium))
+                    .frame(width: width, height: 22)
+                    .background {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.06))
+                            if lighter { RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.1)) }
+                        }
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 5))
+            }.buttonStyle(.plain).buttonPressFeedback().accessibilityLabel(label).help(label)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func beginNewProject() {
+        guard finishRename() else { return }
+        editingList = false; editingProject = nil; projectName = ""
+        projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
+    }
+    private func turnProjectsPage(forward: Bool) {
+        guard finishRename() else { return }
+        if forward { projectsPage.next(total: store.projects.count) }
+        else { projectsPage.previous(total: store.projects.count) }
+        dragSource = nil; insertion = nil
+    }
+    private func turnTasksPage(forward: Bool) {
+        guard finishRename() else { return }
+        if forward { tasksPage.next(total: project?.tasks.count ?? 0) }
+        else { tasksPage.previous(total: project?.tasks.count ?? 0) }
+        dragSource = nil; insertion = nil
+    }
+    private func cancelTaskEntry() { showingTaskEntry = false; newTask = ""; newTaskFocused = false }
 
     private func taskRow(_ task: ProjectTask, project: WorkProject) -> some View {
         let finished = settled.contains(task.id) || swiping.contains(task.id)
@@ -264,17 +324,19 @@ struct ProjectsView: View {
                     .buttonStyle(.plain).accessibilityLabel("Save task name")
             } else if editingList {
                 Button { beginTaskRename(task) } label: {
-                    Text(task.title).font(.callout).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    Text(task.title).font(.callout).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Rename task \(task.title)")
             } else {
-                Text(task.title).font(.callout).lineLimit(2).foregroundStyle(finished ? .secondary : .primary)
+                Text(task.title).font(.callout).lineLimit(1).foregroundStyle(finished ? .secondary : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if editingList {
                 deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
             } else if task.completedAt == nil { workButton(project, task: task) }
         }
-        .padding(.vertical, 10).padding(.horizontal, 4)
+        .frame(minHeight: 26)
+        .padding(.vertical, 6).padding(.horizontal, 4)
+        .help(task.title)
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
         .scaleEffect(finished && !editingList && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished && !editingList ? 0.6 : 1)
@@ -317,6 +379,7 @@ struct ProjectsView: View {
 
     private func openProject(_ project: WorkProject) {
         selectedProject = project.id; editingList = false; editingProject = nil; editingTask = nil
+        tasksPage = ChecklistPage(size: 7); cancelTaskEntry()
         error = nil; dragSource = nil; insertion = nil
     }
     private func toggleEditing() {
@@ -340,12 +403,14 @@ struct ProjectsView: View {
         perform { try store.editProject(project.id, name: projectName, color: project.color); editingProject = nil }
     }
     private func cancelEditingOrGoBack() {
-        if editingProject != nil || editingTask != nil { editingProject = nil; editingTask = nil }
+        if showingTaskEntry { cancelTaskEntry() }
+        else if editingProject != nil || editingTask != nil { editingProject = nil; editingTask = nil }
         else if editingList { editingList = false }
         else { goBack() }
     }
     private func goBack() {
         error = nil; editingList = false; editingProject = nil; editingTask = nil; dragSource = nil; insertion = nil
+        cancelTaskEntry()
         if projectEditor { projectEditor = false }
         else if project != nil { selectedProject = nil; newTask = "" }
         else { close() }
@@ -356,11 +421,23 @@ struct ProjectsView: View {
     }
     private func saveProject() {
         perform {
-            selectedProject = try store.addProject(projectName, color: projectColor.tagHex)
+            let id = try store.addProject(projectName, color: projectColor.tagHex)
+            selectedProject = id
+            if let position = store.projects.firstIndex(where: { $0.id == id }) { projectsPage.reveal(itemAt: position, total: store.projects.count) }
+            tasksPage = ChecklistPage(size: 7); cancelTaskEntry()
             projectEditor = false
         }
     }
-    private func addTask(_ project: WorkProject) { perform { try store.addTask(newTask, project: project.id); newTask = "" } }
+    private func addTask(_ project: WorkProject) {
+        perform {
+            let id = try store.addTask(newTask, project: project.id)
+            if let updated = store.projects.first(where: { $0.id == project.id }),
+               let position = orderedTasks(updated).firstIndex(where: { $0.id == id }) {
+                tasksPage.reveal(itemAt: position, total: updated.tasks.count)
+            }
+            cancelTaskEntry()
+        }
+    }
     @discardableResult private func saveTask(_ task: ProjectTask, project: WorkProject) -> Bool {
         perform { try store.renameTask(task.id, project: project.id, title: taskTitle); editingTask = nil }
     }
