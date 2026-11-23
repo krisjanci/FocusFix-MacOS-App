@@ -89,6 +89,16 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
             value.tasks.insert(task, at: index)
         }
     }
+    func moveTask(_ id: UUID, after target: UUID, project: UUID) throws {
+        guard id != target else { return }
+        try edit(project) { value in
+            guard let old = value.tasks.firstIndex(where: { $0.id == id }),
+                  value.tasks.contains(where: { $0.id == target }) else { return }
+            let task = value.tasks.remove(at: old)
+            let index = value.tasks.firstIndex { $0.id == target }!
+            value.tasks.insert(task, at: index + 1)
+        }
+    }
     private func edit(_ id: UUID, change: (inout WorkProject) throws -> Void) throws {
         var values = projects
         guard let index = values.firstIndex(where: { $0.id == id }) else { throw SessionTags.TagError("This project no longer exists.") }
