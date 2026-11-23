@@ -5,6 +5,7 @@ struct ProjectsView: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject var tracker: ActivityTracker
     let close: () -> Void
+    var reduceMotionOverride: Bool? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedProject: UUID?
     @State private var projectEditor = false
@@ -20,7 +21,8 @@ struct ProjectsView: View {
     @State private var deletion: WorkProject?
 
     private var project: WorkProject? { store.projects.first { $0.id == selectedProject } }
-    private var animation: Animation? { reduceMotion ? .easeOut(duration: 0.15) : .spring(duration: 0.45, bounce: 0.12) }
+    private var usesReducedMotion: Bool { reduceMotionOverride ?? reduceMotion }
+    private var animation: Animation? { usesReducedMotion ? nil : .spring(duration: 0.45, bounce: 0.12) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -73,10 +75,11 @@ struct ProjectsView: View {
             while !Task.isCancelled {
                 let completed = matureTasks()
                 if completed != settled {
-                    if !reduceMotion {
-                        withAnimation(.easeIn(duration: 0.18)) { swiping = completed.subtracting(settled) }
-                        do { try await Task.sleep(for: .seconds(0.18)) } catch { return }
+                    let duration = usesReducedMotion ? 0.15 : 0.18
+                    withAnimation(usesReducedMotion ? .easeOut(duration: duration) : .easeIn(duration: duration)) {
+                        swiping = completed.subtracting(settled)
                     }
+                    do { try await Task.sleep(for: .seconds(duration)) } catch { return }
                     withAnimation(animation) { settled = completed; swiping = [] }
                     continue
                 }
@@ -174,7 +177,7 @@ struct ProjectsView: View {
                         }
                         ForEach(ordered) { task in
                             taskRow(task, project: project).id(task.id)
-                                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                                .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
                         }
                     }.animation(animation, value: project.tasks).animation(animation, value: settled)
                 }
@@ -213,8 +216,8 @@ struct ProjectsView: View {
         .padding(.vertical, 10).padding(.horizontal, 4)
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
-        .scaleEffect(finished ? 0.85 : 1, anchor: .leading).opacity(finished ? 0.6 : 1)
-        .offset(x: swiping.contains(task.id) ? 430 : 0)
+        .scaleEffect(finished && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished ? 0.6 : 1)
+        .offset(x: swiping.contains(task.id) && !usesReducedMotion ? 430 : 0)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
         .draggable(task.id.uuidString)
         .dropDestination(for: String.self) { values, location in
