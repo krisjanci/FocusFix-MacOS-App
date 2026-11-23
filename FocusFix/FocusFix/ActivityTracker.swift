@@ -309,7 +309,7 @@ final class ActivityTracker: ObservableObject {
         }
     }
     // The same explicit start path serves task rows and the main Start work button.
-    func workOn(project: WorkProject?, task: ProjectTask? = nil) throws {
+    func workOn(project: WorkProject?, task: ProjectTask? = nil, promoteProject: Bool = true) throws {
         let requestedProject = project
         let project = requestedProject.flatMap { requested in ProjectStore.shared.projects.first { $0.id == requested.id } }
         guard requestedProject == nil || project != nil else { throw SessionTags.TagError("This project no longer exists.") }
@@ -332,6 +332,7 @@ final class ActivityTracker: ObservableObject {
         defer { lastObservedTime = max(lastObservedTime, writer.contract.observedThrough) }
         try writer.selectAssignment(assignment, at: effectiveTime)
         workAssignment = assignment
+        if promoteProject, let project { try ProjectStore.shared.recordWork(on: project.id) }
     }
 
     func reconcileWorkAssignment(projects: [WorkProject]) {
@@ -341,7 +342,7 @@ final class ActivityTracker: ObservableObject {
         let updated = WorkAssignment(projectID: project?.id, projectName: project?.name,
             projectColor: project?.color, taskID: task?.id, taskTitle: task?.title)
         guard updated != workAssignment else { return }
-        do { try workOn(project: project, task: task) }
+        do { try workOn(project: project, task: task, promoteProject: false) }
         catch { fail(error) }
     }
 
