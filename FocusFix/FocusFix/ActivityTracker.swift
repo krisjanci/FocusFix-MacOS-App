@@ -317,7 +317,8 @@ final class ActivityTracker: ObservableObject {
         let task = requestedTask.flatMap { requested in project?.tasks.first { $0.id == requested.id } }
         guard requestedTask == nil || task != nil else { throw SessionTags.TagError("This task no longer exists in this project.") }
         guard task?.completedAt == nil else { throw SessionTags.TagError("Uncheck this task before working on it.") }
-        if !isWorking { requestStart() }
+        let beginsWork = !isWorking
+        if beginsWork { requestStart() }
         guard isWorking, let writer else { return }
         let assignment = WorkAssignment(projectID: project?.id, projectName: project?.name,
             projectColor: project?.color, taskID: task?.id, taskTitle: task?.title)
@@ -326,7 +327,10 @@ final class ActivityTracker: ObservableObject {
             stop(reason: "capture_gap", observedEnd: lastObservedTime)
             throw SessionTags.TagError("Recording stopped after an activity gap. Start work again.")
         }
-        try writer.selectAssignment(assignment, at: time)
+        // A task-row start owns the entire new work period, including its first fraction of a second.
+        let effectiveTime = beginsWork ? (writer.contract.intervals.last?.start ?? time) : time
+        defer { lastObservedTime = max(lastObservedTime, writer.contract.observedThrough) }
+        try writer.selectAssignment(assignment, at: effectiveTime)
         workAssignment = assignment
     }
 
