@@ -36,7 +36,6 @@ import AppKit
 struct ProjectsPreview: View {
     @StateObject private var tracker = ActivityTracker()
     @State private var dark = false
-    @State private var reducedMotion = false
     @State private var panel = false
     @State private var tasks = true
     var body: some View {
@@ -59,13 +58,12 @@ struct ProjectsPreview: View {
                 HStack {
                     Button(tracker.isWorking ? "End work" : "Start work") { tracker.isWorking.toggle(); tracker.workAssignment = .none }
                         .buttonStyle(.borderedProminent).tint(.teal).frame(maxWidth: .infinity)
-                    Toggle("Reduce Motion", isOn: $reducedMotion).toggleStyle(.checkbox)
+                    Text("Uses system Reduce Motion").font(.caption).foregroundStyle(.secondary)
                 }
                 HStack { Button("Groups") { panel.toggle() }; Spacer(); Button("Analytics") { panel.toggle() } }
             }.padding(30).frame(width: 490)
             if panel { Divider(); Text("Independent side panel").frame(width: 280) }
         }.preferredColorScheme(dark ? .dark : .light)
-            .environment(\.accessibilityReduceMotion, reducedMotion)
     }
 }
 
