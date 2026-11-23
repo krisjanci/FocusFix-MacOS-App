@@ -96,6 +96,7 @@ struct KeyTiming {
 // and on Stop; never keep the entire session in memory.
 final class RecordingWriter {
     let folder: URL
+    private(set) var assignments = WorkAssignmentJournal()
     private(set) var contract: RecordingContract
     private let events: FileHandle
     private let mouse: FileHandle
@@ -158,6 +159,8 @@ final class RecordingWriter {
         try ResearchCaptureManifest(recordingID: contract.recordingID, segmentID: contract.segmentID, capturedAtUTC: startedAt, identity: researchIdentity).save(to: folder)
         try contract.save(to: folder)
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
+        try assignments.select(.none, at: contract.elapsedOrigin)
+        try assignments.save(to: folder)
     }
     // Buffer a generic keyboard, click, scroll or app-switch event with timing and phase information.
     func event(time: Double, type: String, repeated: Bool? = nil, hold: Double? = nil,
@@ -173,6 +176,12 @@ final class RecordingWriter {
     func append(_ summaries: [MouseSummary]) { mouseBuffer += summaries.map(\.csv).joined() }
     // Write and synchronize a break transition so it survives a later interruption.
     func logBreak(_ entry: BreakLogEntry) throws {
+        if let record = entry.record {
+            var updated = assignments
+            updated.recordBreak(id: record.id, start: record.start, end: record.end)
+            try updated.save(to: folder)
+            assignments = updated
+        }
         breakBuffer += entry.csv
         // Lifecycle decisions are persisted immediately, not just on session Stop.
         try flush()
@@ -216,6 +225,14 @@ final class RecordingWriter {
         var data = try encoder.encode(entry); data.append(10)
         try reminderLog.write(contentsOf: data); try reminderLog.synchronize()
     }
+    func selectAssignment(_ assignment: WorkAssignment, at time: Double) throws {
+        try checkpoint(at: time)
+        var updated = assignments
+        try updated.select(assignment, at: time)
+        try updated.save(to: folder)
+        assignments = updated
+    }
+
     func changeContext(_ context: ActivityContext, at time: Double, effectiveAt: Date, source: ContextSource) throws {
         try checkpoint(at: time)
         var snapshot = contract
