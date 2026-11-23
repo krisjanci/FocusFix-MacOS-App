@@ -20,6 +20,7 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test ChecklistPageTests "$source_dir/ChecklistPage.swift"
 run_test ChecklistReorderingTests "$source_dir/ChecklistReordering.swift"
 run_test ProjectsTests "$source_dir/Projects.swift"
 run_test WorkAssignmentsTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift" "$source_dir/DevelopmentSharing.swift"
