@@ -86,14 +86,16 @@ private struct ReorderingGuidePreview: View {
     private static let b = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
     @State private var source: ChecklistDragItem? = .project(a)
     @State private var insertion = ChecklistInsertion(source: .project(a), target: .project(b), y: 0, rowHeight: 44)
+    @State private var lastDrop = "No drop yet"
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack { Text("Insertion guide preview").font(.title2); Spacer(); Button("Close", action: close) }
             Text("The actual drag-row modifier renders the placement line before release.").font(.caption).foregroundStyle(.secondary)
             VStack(spacing: 0) {
                 Text("Dragged row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .modifier(ChecklistReorderRow(item: .project(Self.a), source: $source, insertion: $insertion) { _, after in lastDrop = "Dropped \(after ? "after" : "before") dragged row" })
                 Text("Target row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .modifier(ChecklistReorderRow(item: .project(Self.b), source: $source, insertion: $insertion) { _, _ in })
+                    .modifier(ChecklistReorderRow(item: .project(Self.b), source: $source, insertion: $insertion) { _, after in lastDrop = "Dropped \(after ? "after" : "before") target row" })
                 Text("Next row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
             HStack {
@@ -101,6 +103,8 @@ private struct ReorderingGuidePreview: View {
                 Button("After target") { source = .project(Self.a); insertion = ChecklistInsertion(source: source, target: .project(Self.b), y: 44, rowHeight: 44) }
                 Button("Cancel drag") { source = nil; insertion = nil }
             }
+            Text(lastDrop).font(.caption)
+            Text(source == nil ? "No active drag" : "Active drag: \(source!.token)").font(.caption)
             Spacer()
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
