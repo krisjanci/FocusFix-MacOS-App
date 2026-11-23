@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct ProjectColorChooser: View {
     @Binding var selection: String
@@ -56,6 +57,7 @@ struct ProjectColorChooser: View {
 }
 
 @MainActor private final class ProjectCustomColorPicker: NSObject, ObservableObject {
+    let objectWillChange = ObservableObjectPublisher()
     private static weak var active: ProjectCustomColorPicker?
     private var change: ((String) -> Void)?
     private var configuring = false
