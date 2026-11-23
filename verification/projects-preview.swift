@@ -16,6 +16,11 @@ import AppKit
             projectColor: project?.color, taskID: task?.id, taskTitle: task?.title)
         if promoteProject, let project { try PreviewProjects.store.recordWork(on: project.id) }
     }
+    func finishCurrentTask() {
+        guard isWorking, let project = workAssignment.projectID, let task = workAssignment.taskID else { return }
+        try? PreviewProjects.store.completeTask(task, project: project)
+        reconcileWorkAssignment(projects: PreviewProjects.store.projects)
+    }
     func reconcileWorkAssignment(projects: [WorkProject]) {
         guard isWorking, let id = workAssignment.projectID else { return }
         let project = projects.first { $0.id == id }
@@ -55,6 +60,19 @@ struct ProjectsPreview: View {
                         Text("17:04").font(.system(size: 46, weight: .light, design: .rounded))
                         Button { tasks = true } label: { Label("Task", systemImage: "doc.text") }
                         Text(tracker.workAssignment.summary).font(.caption)
+                        HStack(spacing: 8) {
+                            Label("Work target", systemImage: "scope").font(.caption)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(Color.primary.opacity(0.06), in: Capsule())
+                            if tracker.isWorking, tracker.workAssignment.taskID != nil {
+                                Button { tracker.finishCurrentTask() } label: {
+                                    Label("Finished task", systemImage: "checkmark").font(.caption)
+                                        .padding(.horizontal, 8).padding(.vertical, 4).foregroundStyle(.green)
+                                        .background(Color.green.opacity(0.06), in: Capsule())
+                                        .overlay { Capsule().stroke(Color.green.opacity(0.75), lineWidth: 1) }
+                                }.buttonStyle(.plain)
+                            }
+                        }
                     }.frame(maxWidth: .infinity).frame(height: 350)
                         .background(TagTintBackground(colors: [tracker.workAssignment.projectColor].compactMap { $0 }))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
