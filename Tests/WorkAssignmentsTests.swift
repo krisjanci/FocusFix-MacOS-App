@@ -29,7 +29,8 @@ import Foundation
         precondition(intervals.map(\.assignment) == [a, b, b, .none])
         let saved = try SavedSession(folder: writer.folder)
         precondition(saved.assignedWork == intervals && saved.assignmentNotice == nil)
-        let export = root.appendingPathComponent("export", isDirectory: true)
+        let export = fm.temporaryDirectory.appendingPathComponent("assignment-export-\(UUID())", isDirectory: true)
+        defer { try? fm.removeItem(at: export) }
         try fm.createDirectory(at: export, withIntermediateDirectories: true)
         let copy = try SessionFiles.export(saved, to: export, root: root, active: nil)
         precondition(fm.fileExists(atPath: copy.appendingPathComponent(WorkAssignmentJournal.filename).path))
@@ -53,7 +54,8 @@ import Foundation
         // Renaming/deleting the catalog cannot change frozen assignment snapshots.
         precondition(journal.changes.first?.assignment.projectName == "Private project")
         try fm.removeItem(at: writer.folder.appendingPathComponent(WorkAssignmentJournal.filename))
-        precondition(try SavedSession(folder: writer.folder).assignedWork.isEmpty)
+        let legacy = try SavedSession(folder: writer.folder)
+        precondition(legacy.assignedWork.isEmpty)
         print("WorkAssignmentsTests passed")
     }
 }
