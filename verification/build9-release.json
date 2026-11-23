@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-23",
+  "version": "1.0",
+  "build": 9,
+  "source_revision": "2f8e324e70634714ef009d424fa21c397f8c19ca",
+  "tag": "notarized-2026-11-23-build9",
+  "release_url": "https://github.com/krisjanci/FocusFix-MacOS-App/releases/tag/notarized-2026-11-23-build9",
+  "release_workflow": {
+    "id": 45278341713,
+    "conclusion": "success"
+  },
+  "checks": {
+    "app_test_groups": 47,
+    "app_tests": "passed",
+    "service_tests": "passed (10 tests)",
+    "database_tests": "passed",
+    "universal_release_archive": "passed (arm64 and x86_64)",
+    "content": "passed",
+    "signature": "valid Developer ID Application",
+    "notarization": "accepted; stapled ticket validated",
+    "gatekeeper": "accepted: Notarized Developer ID",
+    "public_latest_download": "SHA-256 matches the verified package"
+  },
+  "assets_sha256": {
+    "FocusFix-macOS.zip": "2ba619b5b6008030b150f0a5dad80b0201add25fc84aceb4f715dd70ec14ca25",
+    "FocusFix-source.zip": "2271ebc6987fface655dd51f1b519520dde614e2f732234695f442bc7381a4af",
+    "LICENSE.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "SOURCE-REVISION.txt": "3f1e25bbe6b6f6d3961c397f0bd144e9f0d26cd7ff8441a3098b5c12512d5a8f",
+    "SHA256SUMS.txt": "d824d45978c6044400fc4bcb07571424acbe93c8281c71180f5c0cf85414e3a5"
+  },
+  "limitations": [
+    "No fresh-Mac run for this build.",
+    "Projects/tasks UI checked with an isolated synthetic recorder. A final pointer-driven drag/drop was not established; reordering behavior and payloads have automated coverage.",
+    "Detailed recording sharing remains disabled."
+  ],
+  "distribution": "GitHub latest release; existing website latest-download links resolve to Build 9."
+}
