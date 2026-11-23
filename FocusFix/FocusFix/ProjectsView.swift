@@ -16,6 +16,7 @@ struct ProjectsView: View {
     @State private var taskTitle = ""
     @State private var error: String?
     @State private var settled: Set<UUID> = []
+    @State private var swiping: Set<UUID> = []
     @State private var deletion: WorkProject?
 
     private var project: WorkProject? { store.projects.first { $0.id == selectedProject } }
@@ -66,15 +67,28 @@ struct ProjectsView: View {
         .onChange(of: store.projects) { _, values in tracker.reconcileWorkAssignment(projects: values) }
         .task(id: project?.tasks) {
             // Dates survive navigation and relaunch; cancelled tasks cannot perform stale moves.
+            swiping = []
+            let completedNow = matureTasks()
+            withAnimation(animation) { settled = completedNow }
             while !Task.isCancelled {
-                let tasks = project?.tasks ?? []
-                let completed = Set(tasks.filter { $0.completedAt.map { Date().timeIntervalSince($0) >= 3 } ?? false }.map(\.id))
-                withAnimation(animation) { settled = completed }
-                let pending = tasks.compactMap(\.completedAt).map { 3 - Date().timeIntervalSince($0) }.filter { $0 > 0 }
+                let pending = (project?.tasks ?? []).compactMap(\.completedAt)
+                    .map { 3 - Date().timeIntervalSince($0) }.filter { $0 > 0 }
                 guard let wait = pending.min() else { return }
                 do { try await Task.sleep(for: .seconds(wait)) } catch { return }
+                let completed = matureTasks()
+                if !reduceMotion {
+                    withAnimation(.easeIn(duration: 0.18)) { swiping = completed.subtracting(settled) }
+                    do { try await Task.sleep(for: .seconds(0.18)) } catch { return }
+                }
+                withAnimation(animation) { settled = completed; swiping = [] }
             }
         }
+    }
+
+    private func matureTasks() -> Set<UUID> {
+        Set((project?.tasks ?? []).filter {
+            $0.completedAt.map { Date().timeIntervalSince($0) >= 3 } ?? false
+        }.map(\.id))
     }
 
     private var clock: String {
@@ -167,7 +181,7 @@ struct ProjectsView: View {
     }
 
     private func taskRow(_ task: ProjectTask, project: WorkProject) -> some View {
-        let finished = settled.contains(task.id)
+        let finished = settled.contains(task.id) || swiping.contains(task.id)
         return HStack(spacing: 9) {
             Button {
                 perform { try store.completeTask(task.id, project: project.id, at: task.completedAt == nil ? Date() : nil) }
@@ -197,11 +211,16 @@ struct ProjectsView: View {
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
         .scaleEffect(finished ? 0.85 : 1, anchor: .leading).opacity(finished ? 0.6 : 1)
+        .offset(x: swiping.contains(task.id) ? 430 : 0)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
         .draggable(task.id.uuidString)
-        .dropDestination(for: String.self) { values, _ in
+        .dropDestination(for: String.self) { values, location in
             guard let id = values.first.flatMap(UUID.init(uuidString:)), project.tasks.contains(where: { $0.id == id }) else { return false }
-            perform { try store.moveTask(id, before: task.id, project: project.id) }; return true
+            perform {
+                if location.y > 20 { try store.moveTask(id, after: task.id, project: project.id) }
+                else { try store.moveTask(id, before: task.id, project: project.id) }
+            }
+            return true
         }
         .accessibilityAction(named: "Move up") { move(task, project: project, direction: -1) }
         .accessibilityAction(named: "Move down") { move(task, project: project, direction: 1) }
