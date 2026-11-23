@@ -11,9 +11,13 @@ import Foundation
             precondition(ChecklistInsertion(source: first, target: second, y: height, rowHeight: height)?.after == true)
         }
         let project = UUID(), otherProject = UUID()
-        let a = ChecklistDragItem.task(project: project, id: UUID())
-        let b = ChecklistDragItem.task(project: project, id: UUID())
-        let foreign = ChecklistDragItem.task(project: otherProject, id: UUID())
+        let a = ChecklistDragItem.task(project: project, id: UUID(), completed: false)
+        let b = ChecklistDragItem.task(project: project, id: UUID(), completed: false)
+        let foreign = ChecklistDragItem.task(project: otherProject, id: UUID(), completed: false)
+        let finishedA = ChecklistDragItem.task(project: project, id: UUID(), completed: true)
+        let finishedB = ChecklistDragItem.task(project: project, id: UUID(), completed: true)
+        precondition(finishedA.canMove(to: finishedB) && !a.canMove(to: finishedB) && !finishedA.canMove(to: a))
+        precondition(ChecklistInsertion(source: a, target: finishedB, y: 20, rowHeight: 44) == nil)
         precondition(a.canMove(to: b) && !a.canMove(to: foreign))
         precondition(!a.canMove(to: first) && !first.canMove(to: a))
         for (source, target) in [(a, a), (a, foreign), (a, first), (first, a)] {
