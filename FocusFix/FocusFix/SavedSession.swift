@@ -88,6 +88,17 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         tagColors = (try? SessionTags.colors(metadata["tag_colors"] as? [String: String] ?? [:], for: tags)) ?? [:]
     }
 
+    var assignedWork: [AssignedWorkInterval] {
+        guard let recordingContract, let journal = try? WorkAssignmentJournal.load(from: folder) else { return [] }
+        return journal.intervals(in: recordingContract)
+    }
+
+    var assignmentNotice: String? {
+        guard FileManager.default.fileExists(atPath: folder.appendingPathComponent(WorkAssignmentJournal.filename).path) else { return nil }
+        do { _ = try WorkAssignmentJournal.load(from: folder); return nil }
+        catch { return "Project/task history could not be read. The original file was kept." }
+    }
+
     // Build the readable FocusFix Session name from local start and end dates.
     func exportName(timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
