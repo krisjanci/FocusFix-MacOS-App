@@ -89,8 +89,14 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     }
 
     var assignedWork: [AssignedWorkInterval] {
-        guard let recordingContract, let journal = try? WorkAssignmentJournal.load(from: folder) else { return [] }
-        return journal.intervals(in: recordingContract)
+        (try? assignmentHistory()) ?? []
+    }
+
+    func assignmentHistory() throws -> [AssignedWorkInterval] {
+        guard let recordingContract else { return [] }
+        let journal = try WorkAssignmentJournal.load(from: folder)
+        let coverage = try RecordingCoverage.load(session: self)
+        return journal.intervals(in: recordingContract, observedWork: coverage.workSlices.map { ($0.start, $0.end) })
     }
 
     var assignmentNotice: String? {
