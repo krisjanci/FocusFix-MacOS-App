@@ -15,6 +15,7 @@ struct ChecklistReorderRow: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if enabled {
             content
+                .contentShape(Rectangle())
                 .background(GeometryReader { geometry in
                     Color.clear.onAppear { height = geometry.size.height }
                         .onChange(of: geometry.size.height) { _, value in height = value }
