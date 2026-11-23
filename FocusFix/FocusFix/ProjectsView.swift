@@ -192,7 +192,7 @@ struct ProjectsView: View {
     private func projectNameField(_ project: WorkProject) -> some View {
         TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder)
             .focused($renameFocus, equals: project.id)
-            .task { renameFocus = nil; await Task.yield(); renameFocus = project.id }
+            .task { renameFocus = nil; await Task.yield(); guard !Task.isCancelled else { return }; renameFocus = project.id }
             .onSubmit { saveProjectName(project) }.onExitCommand { editingProject = nil }
     }
 
@@ -250,7 +250,7 @@ struct ProjectsView: View {
             if editingTask == task.id {
                 TextField("Task title", text: $taskTitle).textFieldStyle(.roundedBorder)
                     .focused($renameFocus, equals: task.id)
-                    .task { renameFocus = nil; await Task.yield(); renameFocus = task.id }
+                    .task { renameFocus = nil; await Task.yield(); guard !Task.isCancelled else { return }; renameFocus = task.id }
                     .onSubmit { saveTask(task, project: project) }.onExitCommand { editingTask = nil }
                 Button { saveTask(task, project: project) } label: { Image(systemName: "checkmark") }
                     .buttonStyle(.plain).accessibilityLabel("Save task name")
