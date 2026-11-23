@@ -130,8 +130,10 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
         values.insert(project, at: index + (after ? 1 : 0))
         try save(values)
     }
-    func addTask(_ title: String, project: UUID) throws {
-        try edit(project) { $0.tasks.append(ProjectTask(title: try Self.title(title, limit: 200))) }
+    @discardableResult func addTask(_ title: String, project: UUID) throws -> UUID {
+        let id = UUID()
+        try edit(project) { $0.tasks.append(ProjectTask(id: id, title: try Self.title(title, limit: 200))) }
+        return id
     }
     func renameTask(_ id: UUID, project: UUID, title: String) throws {
         try editTask(id, project: project) { $0.title = try Self.title(title, limit: 200) }
