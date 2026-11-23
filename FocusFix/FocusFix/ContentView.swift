@@ -214,6 +214,16 @@ struct ContentView: View {
                             .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonPressFeedback().buttonStyle(.plain).help("Choose a work target")
+                    if tracker.isWorking, !onBreak, tracker.workAssignment.taskID != nil {
+                        Button { tracker.finishCurrentTask() } label: {
+                            Label("Finished task", systemImage: "checkmark")
+                                .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
+                                .foregroundStyle(.green)
+                                .background(Color.green.opacity(0.06), in: Capsule())
+                                .overlay { Capsule().stroke(Color.green.opacity(0.75), lineWidth: 1) }
+                        }.buttonPressFeedback().buttonStyle(.plain)
+                            .help("Check off this task and continue as Untasked Work")
+                    }
                     Button {
                         if tracker.canOpenWorkSetup() { editingConditions = true }
                     } label: {
