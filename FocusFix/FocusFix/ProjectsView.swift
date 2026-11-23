@@ -47,6 +47,12 @@ struct ProjectsView: View {
                     Text(clock).monospacedDigit()
                 }.font(.caption).foregroundStyle(.secondary)
             }
+            if tracker.needsPermission {
+                Text(tracker.message).font(.caption).foregroundStyle(.secondary)
+                Button("Enable Input Monitoring") { tracker.requestPermission() }
+            } else if tracker.hasError {
+                Text(tracker.message).font(.caption).foregroundStyle(.red)
+            }
             if let notice = store.notice {
                 Text(notice).font(.caption).foregroundStyle(.red)
                 Button("Reload projects") { store.reload() }
