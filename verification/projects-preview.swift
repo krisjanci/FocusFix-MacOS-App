@@ -44,11 +44,12 @@ struct ProjectsPreview: View {
     @State private var reducedMotion = false
     @State private var panel = false
     @State private var tasks = true
+    @State private var showingGuide = false
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 20) {
-                    HStack { Text("FocusFix").font(.title2.weight(.semibold)); Spacer(); Button("Appearance") { dark.toggle() } }
+                    HStack { Text("FocusFix").font(.title2.weight(.semibold)); Spacer(); Button("Placement guide") { showingGuide = true }; Button("Appearance") { dark.toggle() } }
                     Text("Synthetic preview · no recording").font(.caption).foregroundStyle(.secondary)
                     VStack {
                         Text("17:04").font(.system(size: 46, weight: .light, design: .rounded))
@@ -72,6 +73,36 @@ struct ProjectsPreview: View {
             }.padding(30).frame(width: 490)
             if panel { Divider(); Text("Independent side panel").frame(width: 280) }
         }.preferredColorScheme(dark ? .dark : .light)
+            .overlay {
+                if showingGuide { ReorderingGuidePreview(close: { showingGuide = false }).padding(30).background(Color(nsColor: .windowBackgroundColor)) }
+            }
+    }
+}
+
+// Deterministic hover fixture renders the production row modifier before any drop.
+private struct ReorderingGuidePreview: View {
+    let close: () -> Void
+    private static let a = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+    private static let b = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
+    @State private var source: ChecklistDragItem? = .project(a)
+    @State private var insertion = ChecklistInsertion(source: .project(a), target: .project(b), y: 0, rowHeight: 44)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack { Text("Insertion guide preview").font(.title2); Spacer(); Button("Close", action: close) }
+            Text("The actual drag-row modifier renders the placement line before release.").font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                Text("Dragged row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                Text("Target row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .modifier(ChecklistReorderRow(item: .project(Self.b), source: $source, insertion: $insertion) { _, _ in })
+                Text("Next row").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            HStack {
+                Button("Before target") { source = .project(Self.a); insertion = ChecklistInsertion(source: source, target: .project(Self.b), y: 0, rowHeight: 44) }
+                Button("After target") { source = .project(Self.a); insertion = ChecklistInsertion(source: source, target: .project(Self.b), y: 44, rowHeight: 44) }
+                Button("Cancel drag") { source = nil; insertion = nil }
+            }
+            Spacer()
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
