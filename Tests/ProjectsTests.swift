@@ -24,6 +24,8 @@ import Foundation
         precondition(store.projects[0].tasks.map(\.id) == original)
         try store.moveTask(original[2], before: original[0], project: id)
         precondition(store.projects[0].tasks.map(\.id) == [original[2], original[0], original[1]])
+        try store.moveTask(original[2], after: original[1], project: id)
+        precondition(store.projects[0].tasks.map(\.id) == original)
         try store.renameTask(original[0], project: id, title: "Updated")
         try store.editProject(id, name: "Project", color: "#7963CF")
         precondition(ProjectStore(file: file).projects == store.projects)
