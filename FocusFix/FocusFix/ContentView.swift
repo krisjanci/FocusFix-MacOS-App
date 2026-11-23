@@ -15,6 +15,8 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
+    @State private var showingProjects = false
+    @ObservedObject private var projects = ProjectStore.shared
     @State private var editingSessionTags = false
     @State private var editingConditions = false
     @State private var editingActivity = false
@@ -84,7 +86,7 @@ struct ContentView: View {
                 .modifier(BadgeCelebrationHost(badges: badges))
         }
         .onChange(of: tour.isPresented) { _, shown in
-            if shown { panels.close() }
+            if shown { panels.close(); showingProjects = false }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { note in
             guard let window = note.object as? NSWindow, window === collectorWindow,
@@ -170,6 +172,7 @@ struct ContentView: View {
                 RecordingStatusPanel(state: tracker.captureState, mode: tracker.recordingMode, context: tracker.userContext, phase: tracker.interventionPhase)
                 appearanceButton
             }
+            VStack(spacing: 20) {
             VStack(spacing: 16) {
                 if onBreak, let record = tracker.currentBreak {
                     Image(systemName: "leaf").font(.system(size: 28, weight: .light)).foregroundStyle(teal)
@@ -202,10 +205,11 @@ struct ContentView: View {
                     }
                 }
                 ConditionChipLayout(spacing: 8) {
-                    SessionTagButton(tags: tracker.timerTags,
-                        colors: tagLibrary.resolvedColors(for: tracker.timerTags, saved: tracker.timerTagColors)) {
-                            if tracker.canOpenWorkSetup() { editingSessionTags = true }
-                        }
+                    Button { showingProjects = true } label: {
+                        Label("Task", systemImage: "doc.text")
+                            .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                    }.buttonPressFeedback().buttonStyle(.plain).help("Projects and tasks")
                     Button { tracker.requestWorkTarget() } label: {
                         Label(tracker.timerTargetMinutes.map { "Work target · \($0) min" } ?? "Work target", systemImage: "scope")
                             .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
@@ -229,6 +233,12 @@ struct ContentView: View {
                             .help("Edit activities for all completed breaks in this session")
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
+                if tracker.isWorking, tracker.workAssignment.projectID != nil {
+                    Button { showingProjects = true } label: {
+                        Text(tracker.workAssignment.summary).font(.caption).lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(.plain).help("Change project or task")
+                }
                 if !tracker.timerConditions.isEmpty {
                     Button { if tracker.canOpenWorkSetup() { editingConditions = true } } label: {
                         SessionConditionSummary(conditions: tracker.timerConditions)
@@ -238,12 +248,23 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity).padding(26)
             .background {
-                TagTintBackground(colors: tracker.timerTags.map { tagLibrary.color(for: $0, saved: tracker.timerTagColors) },
+                TagTintBackground(colors: tracker.isWorking ? [tracker.workAssignment.projectColor].compactMap { $0 } : [],
                                   opacity: onBreak ? 0.2 : 0.15)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
 
             DailyProgressCard(tracker: tracker)
+            }
+            // The timer content remains the layout reference, preserving both window dimensions.
+            .opacity(showingProjects ? 0 : 1)
+            .allowsHitTesting(!showingProjects)
+            .accessibilityHidden(showingProjects)
+            .overlay {
+                ProjectsView(store: projects, tracker: tracker, close: { showingProjects = false })
+                    .opacity(showingProjects ? 1 : 0)
+                    .allowsHitTesting(showingProjects)
+                    .accessibilityHidden(!showingProjects)
+            }
 
             HStack(spacing: 12) {
                 Button {
