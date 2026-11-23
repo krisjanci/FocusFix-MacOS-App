@@ -156,57 +156,57 @@ struct ProjectsView: View {
 
     private var projectList: some View {
         GeometryReader { geometry in
-        let rowHeight = projectsExpansion.rowHeight(available: geometry.size.height,
-            reserved: store.projects.count > 8 ? 60 : 30, divider: 1)
-        ScrollView {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(store.projects[projectsExpansion.range(total: store.projects.count)])) { value in
-                    HStack(spacing: 10) {
-                        projectColorControl(value)
-                        if editingProject == value.id {
-                            projectNameField(value)
-                            Button { saveProjectName(value) } label: { Image(systemName: "checkmark") }
-                                .buttonStyle(.plain).accessibilityLabel("Save project name")
-                        } else {
-                            Button {
-                                if editingList { beginProjectRename(value) } else { openProject(value) }
-                            } label: {
-                                Text(value.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                            }.buttonStyle(.plain).disabled(editingList && value.isRandomTasks)
-                                .accessibilityLabel(editingList ? "Rename project \(value.name)" : "Open project \(value.name)")
+            let rowHeight = projectsExpansion.rowHeight(available: geometry.size.height,
+                reserved: store.projects.count > 8 ? 60 : 30, divider: 1)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(store.projects[projectsExpansion.range(total: store.projects.count)])) { value in
+                            HStack(spacing: 10) {
+                                projectColorControl(value)
+                                if editingProject == value.id {
+                                    projectNameField(value)
+                                    Button { saveProjectName(value) } label: { Image(systemName: "checkmark") }
+                                        .buttonStyle(.plain).accessibilityLabel("Save project name")
+                                } else {
+                                    Button {
+                                        if editingList { beginProjectRename(value) } else { openProject(value) }
+                                    } label: {
+                                        Text(value.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                                    }.buttonStyle(.plain).disabled(editingList && value.isRandomTasks)
+                                        .accessibilityLabel(editingList ? "Rename project \(value.name)" : "Open project \(value.name)")
+                                }
+                                Text("\(value.tasks.filter { $0.completedAt == nil }.count)").foregroundStyle(.secondary)
+                                if editingList {
+                                    if value.isRandomTasks {
+                                        Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary)
+                                            .frame(width: 34, height: 26).help("Random Tasks cannot be renamed or deleted")
+                                    } else {
+                                        deleteButton("Delete project \(value.name)") { deletion = value }
+                                    }
+                                } else {
+                                    Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+                                        .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
+                                }
+                            }.frame(height: rowHeight)
+                            .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
+                                guard case .project(let id) = dragging else { return }
+                                perform { try store.moveProject(id, relativeTo: value.id, after: after) }
+                            })
+                            .accessibilityAction(named: "Move up") { moveProject(value, direction: -1) }
+                            .accessibilityAction(named: "Move down") { moveProject(value, direction: 1) }
+                            Divider()
                         }
-                        Text("\(value.tasks.filter { $0.completedAt == nil }.count)").foregroundStyle(.secondary)
-                        if editingList {
-                            if value.isRandomTasks {
-                                Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary)
-                                    .frame(width: 34, height: 26).help("Random Tasks cannot be renamed or deleted")
-                            } else {
-                                deleteButton("Delete project \(value.name)") { deletion = value }
-                            }
-                        } else {
-                            Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
-                                .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
-                        }
-                    }.frame(height: rowHeight)
-                    .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
-                        guard case .project(let id) = dragging else { return }
-                        perform { try store.moveProject(id, relativeTo: value.id, after: after) }
-                    })
-                    .accessibilityAction(named: "Move up") { moveProject(value, direction: -1) }
-                    .accessibilityAction(named: "Move down") { moveProject(value, direction: 1) }
-                    Divider()
+                    }
+                    if projectsExpansion.hasMore(total: store.projects.count) {
+                        centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more projects") { expandProjects() }
+                    }
+                    if projectsExpansion.isExpanded {
+                        centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer projects") { collapseProjects() }
+                    }
+                    centeredListButton("plus", label: "New project", action: beginNewProject)
                 }
-            }
-            if projectsExpansion.hasMore(total: store.projects.count) {
-                centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more projects") { expandProjects() }
-            }
-            if projectsExpansion.isExpanded {
-                centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer projects") { collapseProjects() }
-            }
-            centeredListButton("plus", label: "New project", action: beginNewProject)
-        }
-        }.scrollIndicators(.automatic)
+            }.scrollIndicators(.automatic)
         }
     }
 
@@ -235,50 +235,50 @@ struct ProjectsView: View {
     private func checklist(_ project: WorkProject) -> some View {
         let ordered = orderedTasks(project)
         return GeometryReader { geometry in
-        let rowHeight = tasksExpansion.rowHeight(available: geometry.size.height,
-            reserved: ordered.count > 7 ? 94 : 64)
-        ScrollViewReader { scroll in
-        ScrollView {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                projectColorControl(project)
-                Text("Untasked Work").font(.callout)
-                Spacer()
-                if !editingList { workButton(project, task: nil) }
-            }
-            VStack(spacing: 0) {
-                if project.tasks.isEmpty {
-                    Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
+            let rowHeight = tasksExpansion.rowHeight(available: geometry.size.height,
+                reserved: ordered.count > 7 ? 94 : 64)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            projectColorControl(project)
+                            Text("Untasked Work").font(.callout)
+                            Spacer()
+                            if !editingList { workButton(project, task: nil) }
+                        }
+                        VStack(spacing: 0) {
+                            if project.tasks.isEmpty {
+                                Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
+                            }
+                            ForEach(Array(ordered[tasksExpansion.range(total: ordered.count)])) { task in
+                                taskRow(task, project: project, height: rowHeight).id(task.id)
+                                    .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                            }
+                        }.animation(animation, value: project.tasks).animation(animation, value: settled)
+                        if tasksExpansion.hasMore(total: ordered.count) {
+                            centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more tasks") { expandTasks() }
+                        }
+                        if tasksExpansion.isExpanded {
+                            centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer tasks") { collapseTasks() }
+                        }
+                        if showingTaskEntry {
+                            HStack {
+                                TextField("Add a task…", text: $newTask).textFieldStyle(.roundedBorder)
+                                    .focused($newTaskFocused).onSubmit { addTask(project) }
+                                    .onExitCommand { cancelTaskEntry() }
+                                    .task { await Task.yield(); guard !Task.isCancelled else { return }; newTaskFocused = true }
+                                Button { addTask(project) } label: { Image(systemName: "plus") }.accessibilityLabel("Save new task")
+                                    .disabled(newTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                        } else {
+                            centeredListButton("plus", label: "Add task") { showingTaskEntry = true }
+                        }
+                    }
+                }.scrollIndicators(.automatic)
+                .onChange(of: newTaskScrollTarget) { _, id in
+                    if let id { withAnimation(animation) { scroll.scrollTo(id, anchor: .bottom) } }
                 }
-                ForEach(Array(ordered[tasksExpansion.range(total: ordered.count)])) { task in
-                    taskRow(task, project: project, height: rowHeight).id(task.id)
-                        .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
-                }
-            }.animation(animation, value: project.tasks).animation(animation, value: settled)
-            if tasksExpansion.hasMore(total: ordered.count) {
-                centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more tasks") { expandTasks() }
             }
-            if tasksExpansion.isExpanded {
-                centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer tasks") { collapseTasks() }
-            }
-            if showingTaskEntry {
-                HStack {
-                    TextField("Add a task…", text: $newTask).textFieldStyle(.roundedBorder)
-                        .focused($newTaskFocused).onSubmit { addTask(project) }
-                        .onExitCommand { cancelTaskEntry() }
-                        .task { await Task.yield(); guard !Task.isCancelled else { return }; newTaskFocused = true }
-                    Button { addTask(project) } label: { Image(systemName: "plus") }.accessibilityLabel("Save new task")
-                        .disabled(newTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            } else {
-                centeredListButton("plus", label: "Add task") { showingTaskEntry = true }
-            }
-        }
-        }.scrollIndicators(.automatic)
-        .onChange(of: newTaskScrollTarget) { _, id in
-            if let id { withAnimation(animation) { scroll.scrollTo(id, anchor: .bottom) } }
-        }
-        }
         }
     }
 
