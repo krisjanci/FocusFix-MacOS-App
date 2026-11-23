@@ -125,7 +125,10 @@ struct ProjectsView: View {
     private var projectForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder).onSubmit(saveProject)
-            ColorPicker("Project color", selection: $projectColor, supportsOpacity: false)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Project color").font(.callout)
+                ProjectColorChooser(selection: Binding(get: { projectColor.tagHex }, set: { projectColor = Color(tagHex: $0) }), inline: true)
+            }
             HStack {
                 Button("Cancel") { projectEditor = false; error = nil }
                 Spacer()
@@ -198,10 +201,12 @@ struct ProjectsView: View {
 
     @ViewBuilder private func projectColorControl(_ project: WorkProject) -> some View {
         if editingList {
-            ColorPicker("Project color", selection: Binding(get: { Color(tagHex: project.color) }, set: { color in
-                perform { try store.editProject(project.id, name: project.name, color: color.tagHex) }
-            }), supportsOpacity: false).labelsHidden().controlSize(.small).frame(width: 44, height: 26).clipped()
-                .accessibilityLabel("Color for \(project.name)")
+            ProjectColorChooser(selection: Binding(get: {
+                store.projects.first { $0.id == project.id }?.color ?? project.color
+            }, set: { color in
+                guard let current = store.projects.first(where: { $0.id == project.id }) else { return }
+                perform { try store.editProject(current.id, name: current.name, color: color) }
+            })).accessibilityLabel("Color for \(project.name)")
         } else { Circle().fill(Color(tagHex: project.color)).frame(width: 10, height: 10) }
     }
 
