@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let checklistDragType = UTType(exportedAs: "io.github.krisjanci.focusfix.checklist-item")
+private let checklistDragType = UTType(exportedAs: "io.github.krisjanci.focusfix.checklist-item", conformingTo: .data)
 
 struct ChecklistReorderRow: ViewModifier {
     let item: ChecklistDragItem
@@ -32,7 +32,7 @@ struct ChecklistReorderRow: ViewModifier {
                 .onDrag {
                     source = item; insertion = nil
                     let provider = NSItemProvider()
-                    provider.registerDataRepresentation(forTypeIdentifier: checklistDragType.identifier, visibility: .ownProcess) { completion in
+                    provider.registerDataRepresentation(forTypeIdentifier: checklistDragType.identifier, visibility: .all) { completion in
                         completion(Data(item.token.utf8), nil); return nil
                     }
                     return provider
