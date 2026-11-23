@@ -36,6 +36,7 @@ import AppKit
 struct ProjectsPreview: View {
     @StateObject private var tracker = ActivityTracker()
     @State private var dark = false
+    @State private var reducedMotion = false
     @State private var panel = false
     @State private var tasks = true
     var body: some View {
@@ -52,13 +53,13 @@ struct ProjectsPreview: View {
                         .background(TagTintBackground(colors: [tracker.workAssignment.projectColor].compactMap { $0 }))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .opacity(tasks ? 0 : 1).allowsHitTesting(!tasks)
-                    ProjectsView(store: PreviewProjects.store, tracker: tracker, close: { tasks = false })
+                    ProjectsView(store: PreviewProjects.store, tracker: tracker, close: { tasks = false }, reduceMotionOverride: reducedMotion)
                         .opacity(tasks ? 1 : 0).allowsHitTesting(tasks)
                 }.frame(height: 350)
                 HStack {
                     Button(tracker.isWorking ? "End work" : "Start work") { tracker.isWorking.toggle(); tracker.workAssignment = .none }
                         .buttonStyle(.borderedProminent).tint(.teal).frame(maxWidth: .infinity)
-                    Text("Uses system Reduce Motion").font(.caption).foregroundStyle(.secondary)
+                    Toggle("Reduce Motion", isOn: $reducedMotion).toggleStyle(.checkbox)
                 }
                 HStack { Button("Groups") { panel.toggle() }; Spacer(); Button("Analytics") { panel.toggle() } }
             }.padding(30).frame(width: 490)
