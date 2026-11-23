@@ -435,6 +435,9 @@ nonisolated enum SessionFiles {
         Activity context labels are work and unknown. Historical non_work labels in context intervals,
         revision history, reminder requests and study check-in prompts are exported as unknown.
         Saved originals are unchanged. Times, identifiers, unrelated text and activity CSVs are preserved.
+        If present, work_assignments.json contains private project/task name snapshots on the logical recording clock.
+        Assignment time counts only observed declared work, excluding breaks, check-ins and Unknown activity.
+        This private sidecar is included in local exports and excluded from shared recording uploads.
         Work is a declaration of intent; breaks and missing observations remain separate.
         """
         let noteFile = folder.appendingPathComponent("export-notes.txt")
