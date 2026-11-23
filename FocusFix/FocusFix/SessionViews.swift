@@ -149,10 +149,23 @@ struct SessionLibraryView: View {
                 Text(session.endedAt.map { "Ended \($0.formatted(date: .abbreviated, time: .standard))" }
                     ?? (tracker.isActive(session) ? (tracker.breakPhase == .work ? "Recording now" : "On break") : "Unfinished session"))
                     .font(.caption).foregroundStyle(.secondary)
+                let assigned = session.assignedWork
+                if assigned.contains(where: { $0.assignment.projectID != nil }) {
+                    ForEach(Array(assigned.enumerated()), id: \.offset) { _, interval in
+                        HStack(spacing: 5) {
+                            Circle().fill(Color(tagHex: interval.assignment.projectColor ?? "#64748B")).frame(width: 6, height: 6)
+                            Text(interval.assignment.summary).lineLimit(2)
+                            Text("· \(Int(interval.end - interval.start))s").monospacedDigit()
+                        }.font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if let notice = session.assignmentNotice { Text(notice).font(.caption).foregroundStyle(.red) }
+                if !session.tags.isEmpty {
                 SessionTagButton(tags: session.tags,
                     colors: tagLibrary.resolvedColors(for: session.tags, saved: session.tagColors)) {
                         selection = [session.id]; tagging = session
                     }.disabled(exportingAll)
+                }
                 Button {
                     selection = [session.id]; conditioning = session
                 } label: {
