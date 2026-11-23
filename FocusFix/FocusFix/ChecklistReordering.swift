@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 nonisolated enum ChecklistDragItem: Equatable {
     case project(UUID)
@@ -30,4 +31,17 @@ nonisolated struct ChecklistInsertion: Equatable {
         self.target = target
         after = y >= rowHeight / 2
     }
+}
+
+// Share the exact native payload path between drag sources, drop validation, and tests.
+nonisolated enum ChecklistDragPayload {
+    static let type = UTType.utf8PlainText
+    static func provider(for item: ChecklistDragItem) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: type.identifier, visibility: .all) { completion in
+            completion(Data(item.token.utf8), nil); return nil
+        }
+        return provider
+    }
+    static func matches(_ data: Data?, source: ChecklistDragItem) -> Bool { data == Data(source.token.utf8) }
 }
