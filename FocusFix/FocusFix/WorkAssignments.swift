@@ -67,7 +67,7 @@ nonisolated struct WorkAssignmentJournal: Codable, Hashable {
     }
 
     // Intersect with durable observed work; never attribute downtime, Unknown, or breaks.
-    func intervals(in contract: RecordingContract) -> [AssignedWorkInterval] {
+    func intervals(in contract: RecordingContract, observedWork: [(start: Double, end: Double)]? = nil) -> [AssignedWorkInterval] {
         var result: [AssignedWorkInterval] = []
         for (index, change) in changes.enumerated() {
             let limit = index + 1 < changes.count ? changes[index + 1].elapsed : contract.observedThrough
@@ -86,6 +86,20 @@ nonisolated struct WorkAssignmentJournal: Codable, Hashable {
                 result += slices.map { AssignedWorkInterval(start: $0.0, end: $0.1, assignment: change.assignment) }
             }
         }
-        return result
+        if let observedWork {
+            result = result.flatMap { interval in
+                observedWork.compactMap { observed in
+                    let start = max(interval.start, observed.start), end = min(interval.end, observed.end)
+                    return end > start ? AssignedWorkInterval(start: start, end: end, assignment: interval.assignment) : nil
+                }
+            }
+        }
+        var merged: [AssignedWorkInterval] = []
+        for interval in result {
+            if let last = merged.last, last.assignment == interval.assignment, last.end == interval.start {
+                merged[merged.count - 1] = AssignedWorkInterval(start: last.start, end: interval.end, assignment: last.assignment)
+            } else { merged.append(interval) }
+        }
+        return merged
     }
 }
