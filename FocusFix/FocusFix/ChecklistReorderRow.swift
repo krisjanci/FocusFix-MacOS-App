@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 // Standard UTF-8 transport works across AppKit drag sessions; only matching local UUID tokens can move rows.
-private let checklistDragType = UTType.utf8PlainText
+private let checklistDragType = ChecklistDragPayload.type
 
 struct ChecklistReorderRow: ViewModifier {
     let item: ChecklistDragItem
@@ -32,11 +32,7 @@ struct ChecklistReorderRow: ViewModifier {
                 }
                 .onDrag {
                     source = item; insertion = nil
-                    let provider = NSItemProvider()
-                    provider.registerDataRepresentation(forTypeIdentifier: checklistDragType.identifier, visibility: .all) { completion in
-                        completion(Data(item.token.utf8), nil); return nil
-                    }
-                    return provider
+                    return ChecklistDragPayload.provider(for: item)
                 }
                 .onDrop(of: [checklistDragType], delegate: ChecklistRowDropDelegate(item: item, height: height,
                     source: $source, insertion: $insertion, move: move))
@@ -68,7 +64,7 @@ private struct ChecklistRowDropDelegate: DropDelegate {
               let placement = ChecklistInsertion(source: dragging, target: item, y: info.location.y, rowHeight: height),
               let provider = info.itemProviders(for: [checklistDragType]).first else { return false }
         provider.loadDataRepresentation(forTypeIdentifier: checklistDragType.identifier) { data, _ in
-            guard data == Data(dragging.token.utf8) else { return }
+            guard ChecklistDragPayload.matches(data, source: dragging) else { return }
             Task { @MainActor in move(dragging, placement.after) }
         }
         return true
