@@ -17,10 +17,8 @@ struct ContentView: View {
     @State private var sharingPresented = false
     @State private var showingProjects = false
     @ObservedObject private var projects = ProjectStore.shared
-    @State private var editingSessionTags = false
     @State private var editingConditions = false
     @State private var editingActivity = false
-    @ObservedObject private var tagLibrary = SessionTagLibrary.shared
     @ObservedObject var social = SocialController.shared
     @State private var panels = CollectorPanelSelection()
     @ObservedObject private var badges = BadgeController.shared
@@ -57,7 +55,7 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .clipped()
         .modifier(BadgeCelebrationHost(badges: badges, showsCelebration: dailySurvey.presented == nil && !dailySurvey.isDue() && panels.sheet == nil &&
-            !sharingPresented && !editingSessionTags && !editingConditions && !editingActivity &&
+            !sharingPresented && !editingConditions && !editingActivity &&
             !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
             !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented))
         .blur(radius: dailySurvey.presented == nil ? 0 : 8)
@@ -97,7 +95,7 @@ struct ContentView: View {
 
     private var surveyCanAppear: Bool {
         launchReady && !tour.isPresented && !RecordingNotice().needsFirstLaunchChoice &&
-        panels.sheet == nil && !sharingPresented && !editingSessionTags && !editingConditions && !editingActivity &&
+        panels.sheet == nil && !sharingPresented && !editingConditions && !editingActivity &&
         !tracker.recordingNoticePresented && !tracker.breakSetupPresented &&
         !tracker.sessionCheckInPresented && !tracker.timedCheckInPresented
     }
@@ -381,12 +379,6 @@ struct ContentView: View {
             SessionConditionEditor(conditions: tracker.timerConditions,
                 confirmationTitle: tracker.isWorking ? "Done" : "Start work") { conditions in
                 try tracker.saveTimerConditions(conditions)
-            }
-        }
-        .sheet(isPresented: $editingSessionTags) {
-            SessionTagEditor(tags: tracker.timerTags, colors: tracker.timerTagColors, library: tagLibrary,
-                             confirmationTitle: tracker.isWorking ? "Done" : "Start work") { tags, colors in
-                try tracker.saveTimerTags(tags, colors: colors)
             }
         }
         .sheet(isPresented: $tracker.recordingNoticePresented) { RecordingNoticeView(tracker: tracker).tint(teal).interactiveDismissDisabled() }
