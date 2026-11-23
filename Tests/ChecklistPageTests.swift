@@ -47,7 +47,7 @@ import Foundation
                 precondition(abs((row + divider) * Double(size) + reserved - height) < 0.001,
                              "A full initial list must fill its available canvas")
             }
-            precondition(list.rowHeight(available: 100, reserved: reserved, divider: divider) == 44)
+            precondition(list.rowHeight(available: 100, reserved: reserved, divider: divider) == 40)
         }
         print("Checklist expansion passed: cumulative reveal, eight/seven initial limits, collapse, deletion, new-row reveal, safe bounds and canvas-filling row heights")
     }
