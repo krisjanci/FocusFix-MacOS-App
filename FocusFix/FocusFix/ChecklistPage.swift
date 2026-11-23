@@ -1,25 +1,29 @@
 import Foundation
 
-// Paging keeps the checklist compact without losing access to any saved rows.
-nonisolated struct ChecklistPage: Equatable {
+// Expansion always retains the beginning of the checklist.
+nonisolated struct ChecklistExpansion: Equatable {
     let size: Int
-    private(set) var index = 0
+    private(set) var batches = 1
 
-    init(size: Int) {
-        precondition(size > 0)
-        self.size = size
-    }
-    private func validIndex(total: Int) -> Int { min(index, max(0, (max(0, total) - 1) / size)) }
+    init(size: Int) { precondition(size > 0); self.size = size }
+    private func maximumBatches(total: Int) -> Int { max(1, (max(0, total) - 1) / size + 1) }
     func range(total: Int) -> Range<Int> {
-        let count = max(0, total), start = validIndex(total: total) * size
-        return start..<(start + min(size, count - start))
+        let count = max(0, total)
+        let visible = batches >= maximumBatches(total: count) ? count : batches * size
+        return 0..<visible
     }
-    func hasNext(total: Int) -> Bool { range(total: total).upperBound < max(0, total) }
-    func hasPrevious(total: Int) -> Bool { validIndex(total: total) > 0 }
-    mutating func next(total: Int) { index = min(validIndex(total: total) + 1, max(0, (max(0, total) - 1) / size)) }
-    mutating func previous(total: Int) { index = max(0, validIndex(total: total) - 1) }
-    mutating func clamp(total: Int) { index = validIndex(total: total) }
+    func hasMore(total: Int) -> Bool { range(total: total).upperBound < max(0, total) }
+    var isExpanded: Bool { batches > 1 }
+    mutating func expand(total: Int) { batches = min(batches + 1, maximumBatches(total: total)) }
+    mutating func collapse() { batches = 1 }
+    mutating func clamp(total: Int) { batches = min(batches, maximumBatches(total: total)) }
     mutating func reveal(itemAt position: Int, total: Int) {
-        index = max(0, min(position, max(0, total - 1))) / size
+        let position = max(0, min(position, max(0, total - 1)))
+        batches = max(batches, position / size + 1)
+    }
+
+    // Base rows fill the viewport; expansion keeps their height and adds content below.
+    func rowHeight(available: Double, reserved: Double, divider: Double = 0) -> Double {
+        max(44, (available - reserved) / Double(size) - divider)
     }
 }
