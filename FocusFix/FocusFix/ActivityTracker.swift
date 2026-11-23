@@ -335,6 +335,17 @@ final class ActivityTracker: ObservableObject {
         if promoteProject, let project { try ProjectStore.shared.recordWork(on: project.id) }
     }
 
+    func finishCurrentTask() {
+        guard isWorking, let projectID = workAssignment.projectID, let taskID = workAssignment.taskID else { return }
+        do {
+            try ProjectStore.shared.completeTask(taskID, project: projectID)
+            reconcileWorkAssignment(projects: ProjectStore.shared.projects)
+        } catch {
+            hasError = true
+            message = "The task could not be finished. \(error.localizedDescription)"
+        }
+    }
+
     func reconcileWorkAssignment(projects: [WorkProject]) {
         guard isWorking, let id = workAssignment.projectID else { return }
         let project = projects.first { $0.id == id }
