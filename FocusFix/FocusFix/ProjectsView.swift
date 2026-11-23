@@ -22,9 +22,10 @@ struct ProjectsView: View {
     @State private var editingList = false
     @State private var dragSource: ChecklistDragItem?
     @State private var insertion: ChecklistInsertion?
-    @State private var projectsPage = ChecklistPage(size: 8)
-    @State private var tasksPage = ChecklistPage(size: 7)
+    @State private var projectsExpansion = ChecklistExpansion(size: 8)
+    @State private var tasksExpansion = ChecklistExpansion(size: 7)
     @State private var showingTaskEntry = false
+    @State private var newTaskScrollTarget: UUID?
     @FocusState private var newTaskFocused: Bool
     @FocusState private var renameFocus: UUID?
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
@@ -83,8 +84,8 @@ struct ProjectsView: View {
             }
         .onChange(of: store.projects) { _, values in
             tracker.reconcileWorkAssignment(projects: values)
-            projectsPage.clamp(total: values.count)
-            tasksPage.clamp(total: project?.tasks.count ?? 0)
+            projectsExpansion.clamp(total: values.count)
+            tasksExpansion.clamp(total: project?.tasks.count ?? 0)
             if let editingProject, !values.contains(where: { $0.id == editingProject }) { self.editingProject = nil }
             if let editingTask, project?.tasks.contains(where: { $0.id == editingTask }) != true { self.editingTask = nil }
         }
@@ -154,12 +155,13 @@ struct ProjectsView: View {
     }
 
     private var projectList: some View {
+        GeometryReader { geometry in
+        let rowHeight = projectsExpansion.rowHeight(available: geometry.size.height,
+            reserved: store.projects.count > 8 ? 60 : 30, divider: 1)
+        ScrollView {
         VStack(alignment: .leading, spacing: 8) {
-            if projectsPage.hasPrevious(total: store.projects.count) {
-                centeredListButton("chevron.up", width: 36, lighter: true, label: "Previous projects") { turnProjectsPage(forward: false) }
-            }
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(store.projects[projectsPage.range(total: store.projects.count)])) { value in
+                ForEach(Array(store.projects[projectsExpansion.range(total: store.projects.count)])) { value in
                     HStack(spacing: 10) {
                         projectColorControl(value)
                         if editingProject == value.id {
@@ -186,7 +188,7 @@ struct ProjectsView: View {
                             Button { openProject(value) } label: { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                                 .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
                         }
-                    }.frame(minHeight: 23).padding(.vertical, 5)
+                    }.frame(height: rowHeight)
                     .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
                         guard case .project(let id) = dragging else { return }
                         perform { try store.moveProject(id, relativeTo: value.id, after: after) }
@@ -196,11 +198,15 @@ struct ProjectsView: View {
                     Divider()
                 }
             }
-            if projectsPage.hasNext(total: store.projects.count) {
-                centeredListButton("chevron.down", width: 36, lighter: true, label: "Next projects") { turnProjectsPage(forward: true) }
+            if projectsExpansion.hasMore(total: store.projects.count) {
+                centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more projects") { expandProjects() }
+            }
+            if projectsExpansion.isExpanded {
+                centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer projects") { collapseProjects() }
             }
             centeredListButton("plus", label: "New project", action: beginNewProject)
-            Spacer(minLength: 0)
+        }
+        }.scrollIndicators(.automatic)
         }
     }
 
@@ -228,27 +234,32 @@ struct ProjectsView: View {
 
     private func checklist(_ project: WorkProject) -> some View {
         let ordered = orderedTasks(project)
-        return VStack(alignment: .leading, spacing: 8) {
+        return GeometryReader { geometry in
+        let rowHeight = tasksExpansion.rowHeight(available: geometry.size.height,
+            reserved: ordered.count > 7 ? 94 : 64)
+        ScrollViewReader { scroll in
+        ScrollView {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 projectColorControl(project)
                 Text("Untasked Work").font(.callout)
                 Spacer()
                 if !editingList { workButton(project, task: nil) }
             }
-            if tasksPage.hasPrevious(total: ordered.count) {
-                centeredListButton("chevron.up", width: 36, lighter: true, label: "Previous tasks") { turnTasksPage(forward: false) }
-            }
             VStack(spacing: 0) {
                 if project.tasks.isEmpty {
                     Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
                 }
-                ForEach(Array(ordered[tasksPage.range(total: ordered.count)])) { task in
-                    taskRow(task, project: project).id(task.id)
+                ForEach(Array(ordered[tasksExpansion.range(total: ordered.count)])) { task in
+                    taskRow(task, project: project, height: rowHeight).id(task.id)
                         .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
                 }
             }.animation(animation, value: project.tasks).animation(animation, value: settled)
-            if tasksPage.hasNext(total: ordered.count) {
-                centeredListButton("chevron.down", width: 36, lighter: true, label: "Next tasks") { turnTasksPage(forward: true) }
+            if tasksExpansion.hasMore(total: ordered.count) {
+                centeredListButton("chevron.down", width: 36, lighter: true, label: "Show more tasks") { expandTasks() }
+            }
+            if tasksExpansion.isExpanded {
+                centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer tasks") { collapseTasks() }
             }
             if showingTaskEntry {
                 HStack {
@@ -262,7 +273,12 @@ struct ProjectsView: View {
             } else {
                 centeredListButton("plus", label: "Add task") { showingTaskEntry = true }
             }
-            Spacer(minLength: 0)
+        }
+        }.scrollIndicators(.automatic)
+        .onChange(of: newTaskScrollTarget) { _, id in
+            if let id { withAnimation(animation) { scroll.scrollTo(id, anchor: .bottom) } }
+        }
+        }
         }
     }
 
@@ -290,21 +306,29 @@ struct ProjectsView: View {
         editingList = false; editingProject = nil; projectName = ""
         projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
     }
-    private func turnProjectsPage(forward: Bool) {
+    private func expandProjects() {
         guard finishRename() else { return }
-        if forward { projectsPage.next(total: store.projects.count) }
-        else { projectsPage.previous(total: store.projects.count) }
+        withAnimation(animation) { projectsExpansion.expand(total: store.projects.count) }
         dragSource = nil; insertion = nil
     }
-    private func turnTasksPage(forward: Bool) {
+    private func collapseProjects() {
         guard finishRename() else { return }
-        if forward { tasksPage.next(total: project?.tasks.count ?? 0) }
-        else { tasksPage.previous(total: project?.tasks.count ?? 0) }
+        withAnimation(animation) { projectsExpansion.collapse() }
+        dragSource = nil; insertion = nil
+    }
+    private func expandTasks() {
+        guard finishRename() else { return }
+        withAnimation(animation) { tasksExpansion.expand(total: project?.tasks.count ?? 0) }
+        dragSource = nil; insertion = nil
+    }
+    private func collapseTasks() {
+        guard finishRename() else { return }
+        withAnimation(animation) { tasksExpansion.collapse() }
         dragSource = nil; insertion = nil
     }
     private func cancelTaskEntry() { showingTaskEntry = false; newTask = ""; newTaskFocused = false; error = nil }
 
-    private func taskRow(_ task: ProjectTask, project: WorkProject) -> some View {
+    private func taskRow(_ task: ProjectTask, project: WorkProject, height: CGFloat) -> some View {
         let finished = settled.contains(task.id) || swiping.contains(task.id)
         return HStack(spacing: 9) {
             Button {
@@ -334,8 +358,8 @@ struct ProjectsView: View {
                 deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
             } else if task.completedAt == nil { workButton(project, task: task) }
         }
-        .frame(minHeight: 26)
-        .padding(.vertical, 6).padding(.horizontal, 4)
+        .frame(height: height)
+        .padding(.horizontal, 4)
         .help(task.title)
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
@@ -379,7 +403,7 @@ struct ProjectsView: View {
 
     private func openProject(_ project: WorkProject) {
         selectedProject = project.id; editingList = false; editingProject = nil; editingTask = nil
-        tasksPage = ChecklistPage(size: 7); cancelTaskEntry()
+        tasksExpansion = ChecklistExpansion(size: 7); cancelTaskEntry()
         error = nil; dragSource = nil; insertion = nil
     }
     private func toggleEditing() {
@@ -423,8 +447,8 @@ struct ProjectsView: View {
         perform {
             let id = try store.addProject(projectName, color: projectColor.tagHex)
             selectedProject = id
-            if let position = store.projects.firstIndex(where: { $0.id == id }) { projectsPage.reveal(itemAt: position, total: store.projects.count) }
-            tasksPage = ChecklistPage(size: 7); cancelTaskEntry()
+            if let position = store.projects.firstIndex(where: { $0.id == id }) { projectsExpansion.reveal(itemAt: position, total: store.projects.count) }
+            tasksExpansion = ChecklistExpansion(size: 7); cancelTaskEntry()
             projectEditor = false
         }
     }
@@ -433,7 +457,8 @@ struct ProjectsView: View {
             let id = try store.addTask(newTask, project: project.id)
             if let updated = store.projects.first(where: { $0.id == project.id }),
                let position = orderedTasks(updated).firstIndex(where: { $0.id == id }) {
-                tasksPage.reveal(itemAt: position, total: updated.tasks.count)
+                tasksExpansion.reveal(itemAt: position, total: updated.tasks.count)
+                newTaskScrollTarget = id
             }
             cancelTaskEntry()
         }
