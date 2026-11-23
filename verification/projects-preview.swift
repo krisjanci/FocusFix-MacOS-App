@@ -38,7 +38,9 @@ import AppKit
             try! store.addTask(title, project: id)
         }
         try! store.completeTask(store.projects.first { $0.id == id }!.tasks.last!.id, project: id, at: Date().addingTimeInterval(-10))
+        for index in 1...5 { try! store.addTask("Extra task \(index)", project: id) }
         _ = try! store.addProject("CS 600", color: "#7963CF")
+        for index in 1...7 { _ = try! store.addProject("Extra project \(index)", color: SessionTags.palette[index % SessionTags.palette.count]) }
         return store
     }()
 }
