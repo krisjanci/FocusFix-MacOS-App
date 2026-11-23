@@ -149,6 +149,7 @@ struct ContentView: View {
 
     private var collectorContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 14) {
                 Button { sharingPresented = true } label: {
                     ProfileAvatar(profile: account.session == nil ? profile.profile : account.profile, size: 30)
@@ -253,16 +254,7 @@ struct ContentView: View {
 
             DailyProgressCard(tracker: tracker)
             }
-            // The timer content remains the layout reference, preserving both window dimensions.
-            .opacity(showingProjects ? 0 : 1)
-            .allowsHitTesting(!showingProjects)
-            .accessibilityHidden(showingProjects)
-            .overlay {
-                ProjectsView(store: projects, tracker: tracker, close: { showingProjects = false })
-                    .opacity(showingProjects ? 1 : 0)
-                    .allowsHitTesting(showingProjects)
-                    .accessibilityHidden(!showingProjects)
-            }
+
 
             HStack(spacing: 12) {
                 Button {
@@ -340,6 +332,18 @@ struct ContentView: View {
                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
                     .background(teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
+            }
+            // Keep the original layout as the size reference while tasks use all of its space.
+            .opacity(showingProjects ? 0 : 1)
+            .allowsHitTesting(!showingProjects)
+            .accessibilityHidden(showingProjects)
+            .overlay {
+                ProjectsView(store: projects, tracker: tracker, close: { showingProjects = false })
+                    .opacity(showingProjects ? 1 : 0)
+                    .allowsHitTesting(showingProjects)
+                    .accessibilityHidden(!showingProjects)
+            }
+
             HStack {
                 Button { togglePanel(.groups) } label: {
                     HStack(spacing: 6) {
