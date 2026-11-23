@@ -27,6 +27,6 @@ nonisolated struct ChecklistExpansion: Equatable {
 
     // Base rows fill the viewport; expansion keeps their height and adds content below.
     func rowHeight(available: Double, reserved: Double, divider: Double = 0) -> Double {
-        max(44, (available - reserved) / Double(size) - divider)
+        max(40, (available - reserved) / Double(size) - divider)
     }
 }
