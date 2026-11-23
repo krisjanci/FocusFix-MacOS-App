@@ -5,7 +5,7 @@ FocusFix is a personal macOS app for recording computer activity, marking work t
 ## Getting started
 
 1. Open FocusFix and choose whether to enable recording. Grant macOS Input Monitoring access if you want activity capture.
-2. Select **Start work** for a manual session, or choose **Add tags** or **Work target** in the timer card and confirm **Start work**.
+2. Select **Start work** for a manual session, or choose **Task** to open projects and use **Work on this**, or choose **Work target** and confirm **Start work**.
 3. Use **Take a break** and **I’m back** for explicit breaks. **End work** saves a manual session.
 4. Open **Sessions** to review, export, or delete local recordings. Days with multiple recordings appear as expandable folders. Batch exports use the same day folders; days with one recording stay as single entries.
 5. Open **Quick tour** for a nine-step practice flow. The tour uses demo data and changes no settings or recordings.
@@ -62,7 +62,15 @@ New awards show a full-window badge celebration over a blurred background and se
 
 Activity labels now follow **Start work** and **End work**, including timer-card setup and menu-bar equivalents. Automatic recording outside declared work is **Unknown**. Manual context menus and history corrections are no longer offered. Breaks remain separate from activity context. Local exports map historical `non_work` context fields to `unknown` in intervals, revision history, reminder requests, and study check-in prompts. Export notes explain this conversion; saved originals and hosted uploads are unchanged.
 
-The timer card offers matching **Add tags** and **Work target** controls. When you are not working, confirming either editor with **Start work** begins work, including when automatic capture is currently Unknown. Cancel leaves recording unchanged. During work, **Done** saves the edit without restarting; target changes retain credit already earned in that work period. Library tag edits remain edits to saved recordings.
+The timer card offers **Task** (a document icon) and **Work target**. Task replaces the timer area with projects and checklists inside the same main window, without changing its dimensions or the Groups/Analytics panel. Projects are optional: Start work can record without a project. Create a project with a custom color, add and reorder tasks, then use a task’s play button (**Work on this**) or the project’s **Untasked Work** action. These actions start work when idle or switch assignments during work without resetting the timer or work target. Browsing and editing never start recording.
+
+Checking a task shows a green tick immediately. Three seconds later it shrinks to 85%, becomes muted, and slides to the completed rows at the bottom. Unchecking restores its canonical checklist position; drag ordering or Move up/Move down updates that order. Completing the active task immediately continues as Untasked Work in the same project. Unchecking does not resume it automatically. Reduce Motion uses a brief fade. Completed tasks remain visible and editable.
+
+Project colors use the timer’s existing background tint. Each assignment change preserves earlier time; breaks and Unknown activity are excluded. New work periods begin without a project, while breaks retain the assignment. Renaming or deleting projects/tasks preserves historical name/color snapshots. Deleting the active task switches to Untasked Work; deleting its project switches to no project.
+
+Projects and tasks save privately on this Mac in `projects.json`. Recording assignment history lives separately in `work_assignments.json`, appears in Sessions, and is included in local exports. Neither file is included in shared recording uploads. Older tags remain readable in session history and exports; new work uses projects instead. There are no due dates, priorities, subtasks, notes, or account sync in this version.
+
+When idle, confirming **Work target** with **Start work** begins work, including when automatic capture is Unknown. During work, **Done** changes the target without restarting or losing credit already earned. Cancel leaves recording unchanged.
 
 Unanswered personal check-ins repeat their notification every 10 minutes while recording and outside breaks, until answered or explicitly skipped. Repeats belong to the same check-in and do not use another daily slot; the 30-minute minimum applies to new check-ins. The same question and **Answer**/**Skip** actions appear directly below **Start work**/**End work**. Opening the survey pauses repeats; closing it without answering leaves it pending and starts another ten-minute wait. Breaks defer the pending reminder. Stopping recording or turning check-ins off cancels it.
 
