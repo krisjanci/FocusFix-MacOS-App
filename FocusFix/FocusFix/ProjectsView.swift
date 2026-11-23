@@ -223,7 +223,7 @@ struct ProjectsView: View {
     }
 
     private func orderedTasks(_ project: WorkProject) -> [ProjectTask] {
-        project.tasks.filter { !settled.contains($0.id) } + project.completedTasks.filter { settled.contains($0.id) }
+        project.tasks.filter { $0.completedAt == nil || !settled.contains($0.id) } + project.completedTasks.filter { settled.contains($0.id) }
     }
 
     private func checklist(_ project: WorkProject) -> some View {
