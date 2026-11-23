@@ -223,9 +223,7 @@ struct ProjectsView: View {
                         if project.tasks.isEmpty {
                             Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
                         }
-                        let ordered = project.tasks.filter { !settled.contains($0.id) } + project.tasks.filter { settled.contains($0.id) }.sorted {
-                            ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast)
-                        }
+                        let ordered = project.tasks.filter { !settled.contains($0.id) } + project.completedTasks.filter { settled.contains($0.id) }
                         ForEach(ordered) { task in
                             taskRow(task, project: project).id(task.id)
                                 .transition(usesReducedMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
@@ -272,9 +270,9 @@ struct ProjectsView: View {
         .scaleEffect(finished && !editingList && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished && !editingList ? 0.6 : 1)
         .offset(x: swiping.contains(task.id) && !usesReducedMotion ? 430 : 0)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
-        .modifier(ChecklistReorderRow(item: .task(project: project.id, id: task.id), enabled: task.completedAt == nil,
+        .modifier(ChecklistReorderRow(item: .task(project: project.id, id: task.id, completed: task.completedAt != nil),
             source: $dragSource, insertion: $insertion) { dragging, after in
-                guard case .task(let parent, let id) = dragging, parent == project.id else { return }
+                guard case .task(let parent, let id, _) = dragging, parent == project.id else { return }
                 perform {
                     if after { try store.moveTask(id, after: task.id, project: project.id) }
                     else { try store.moveTask(id, before: task.id, project: project.id) }
@@ -355,7 +353,7 @@ struct ProjectsView: View {
         perform { try store.renameTask(task.id, project: project.id, title: taskTitle); editingTask = nil }
     }
     private func move(_ task: ProjectTask, project: WorkProject, direction: Int) {
-        let tasks = project.tasks.filter { $0.completedAt == nil }
+        let tasks = task.completedAt == nil ? project.tasks.filter { $0.completedAt == nil } : project.completedTasks
         guard let index = tasks.firstIndex(where: { $0.id == task.id }), tasks.indices.contains(index + direction) else { return }
         perform {
             if direction < 0 { try store.moveTask(task.id, before: tasks[index - 1].id, project: project.id) }
