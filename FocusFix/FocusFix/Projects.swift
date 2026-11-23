@@ -20,6 +20,17 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     }
     // Canonical order includes completed tasks, preserving their restoration position.
     var tasks: [ProjectTask] = []
+    var completedTaskOrder: [UUID]?
+
+    var completedTasks: [ProjectTask] {
+        let completed = tasks.filter { $0.completedAt != nil }.sorted { $0.completedAt! < $1.completedAt! }
+        let lookup = Dictionary(completed.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<UUID>()
+        return ((completedTaskOrder ?? []) + completed.map(\.id)).compactMap { id in
+            guard seen.insert(id).inserted else { return nil }
+            return lookup[id]
+        }
+    }
 }
 
 @MainActor final class ProjectStore: ObservableObject {
@@ -126,16 +137,22 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
         try editTask(id, project: project) { $0.title = try Self.title(title, limit: 200) }
     }
     func completeTask(_ id: UUID, project: UUID, at date: Date? = Date()) throws {
-        try editTask(id, project: project) { $0.completedAt = date }
+        try edit(project) { value in
+            guard let index = value.tasks.firstIndex(where: { $0.id == id }) else { throw SessionTags.TagError("This task no longer exists.") }
+            let order = value.completedTasks.map(\.id).filter { $0 != id }
+            value.tasks[index].completedAt = date
+            value.completedTaskOrder = date == nil ? order : order + [id]
+        }
     }
     func deleteTask(_ id: UUID, project: UUID) throws {
-        try edit(project) { $0.tasks.removeAll { $0.id == id } }
+        try edit(project) { $0.tasks.removeAll { $0.id == id }; $0.completedTaskOrder?.removeAll { $0 == id } }
     }
     func moveTask(_ id: UUID, before target: UUID, project: UUID) throws {
         guard id != target else { return }
         try edit(project) { value in
             guard let old = value.tasks.firstIndex(where: { $0.id == id }),
                   value.tasks.contains(where: { $0.id == target }) else { return }
+            reorderCompleted(id, relativeTo: target, after: false, in: &value)
             let task = value.tasks.remove(at: old)
             let index = value.tasks.firstIndex { $0.id == target }!
             value.tasks.insert(task, at: index)
@@ -146,10 +163,19 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
         try edit(project) { value in
             guard let old = value.tasks.firstIndex(where: { $0.id == id }),
                   value.tasks.contains(where: { $0.id == target }) else { return }
+            reorderCompleted(id, relativeTo: target, after: true, in: &value)
             let task = value.tasks.remove(at: old)
             let index = value.tasks.firstIndex { $0.id == target }!
             value.tasks.insert(task, at: index + 1)
         }
+    }
+    private func reorderCompleted(_ id: UUID, relativeTo target: UUID, after: Bool, in value: inout WorkProject) {
+        var order = value.completedTasks.map(\.id)
+        guard let old = order.firstIndex(of: id), order.contains(target) else { return }
+        order.remove(at: old)
+        let index = order.firstIndex(of: target)!
+        order.insert(id, at: index + (after ? 1 : 0))
+        value.completedTaskOrder = order
     }
     private func edit(_ id: UUID, change: (inout WorkProject) throws -> Void) throws {
         var values = projects
