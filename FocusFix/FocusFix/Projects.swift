@@ -11,6 +11,13 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
     var color: String
+    var lastWorkedAt: Date?
+    var builtIn: Bool?
+    var isRandomTasks: Bool { builtIn == true }
+    static let randomTasksID = UUID(uuidString: "72746173-6B73-4000-8000-000000000001")!
+    static var randomTasks: WorkProject {
+        WorkProject(id: randomTasksID, name: "Random Tasks", color: "#168B80", builtIn: true)
+    }
     // Canonical order includes completed tasks, preserving their restoration position.
     var tasks: [ProjectTask] = []
 }
@@ -29,7 +36,7 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
 
     func reload() {
         do {
-            let values = FileManager.default.fileExists(atPath: file.path)
+            var values = FileManager.default.fileExists(atPath: file.path)
                 ? try JSONDecoder().decode([WorkProject].self, from: Data(contentsOf: file)) : []
             guard Set(values.map(\.id)).count == values.count else { throw CocoaError(.fileReadCorruptFile) }
             for project in values {
@@ -38,6 +45,17 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
                 guard Set(project.tasks.map(\.id)).count == project.tasks.count else { throw CocoaError(.fileReadCorruptFile) }
                 for task in project.tasks { _ = try Self.title(task.title, limit: 200) }
             }
+            guard values.filter(\.isRandomTasks).count <= 1 else { throw CocoaError(.fileReadCorruptFile) }
+            var migrated = false
+            if let index = values.firstIndex(where: \.isRandomTasks) {
+                if values[index].name != "Random Tasks" { values[index].name = "Random Tasks"; migrated = true }
+            } else if let index = values.firstIndex(where: { SessionTags.key($0.name) == SessionTags.key("Random Tasks") }) {
+                // Adopt a user's existing folder without changing its ID or task references.
+                values[index].builtIn = true; values[index].name = "Random Tasks"; migrated = true
+            } else {
+                values.insert(.randomTasks, at: 0); migrated = true
+            }
+            if migrated { try write(values) }
             projects = values; loaded = true; notice = nil
         } catch { loaded = false; notice = "Projects could not be opened. Your saved file was kept. \(error.localizedDescription)" }
     }
@@ -52,10 +70,14 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
 
     private func save(_ values: [WorkProject]) throws {
         guard loaded else { throw SessionTags.TagError("Reload your projects before editing them.") }
+        try write(values)
+        projects = values; notice = nil
+    }
+
+    private func write(_ values: [WorkProject]) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                attributes: [.posixPermissions: 0o700])
         try JSONEncoder().encode(values).write(to: file, options: .atomic)
-        projects = values; notice = nil
     }
 
     @discardableResult func addProject(_ name: String, color: String) throws -> UUID {
@@ -64,9 +86,39 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     }
 
     func editProject(_ id: UUID, name: String, color: String) throws {
-        try edit(id) { $0.name = try Self.title(name, limit: 40); $0.color = try SessionTags.color(color) }
+        try edit(id) {
+            let name = try Self.title(name, limit: 40)
+            guard !$0.isRandomTasks || name == "Random Tasks" else { throw SessionTags.TagError("Random Tasks keeps its default name.") }
+            $0.name = name; $0.color = try SessionTags.color(color)
+        }
     }
-    func deleteProject(_ id: UUID) throws { try save(projects.filter { $0.id != id }) }
+    func deleteProject(_ id: UUID) throws {
+        guard !projects.contains(where: { $0.id == id && $0.isRandomTasks }) else {
+            throw SessionTags.TagError("Random Tasks cannot be deleted.")
+        }
+        try save(projects.filter { $0.id != id })
+    }
+
+    // Actual work actions promote a project; merely opening/editing it never changes order.
+    func recordWork(on id: UUID, at date: Date = Date()) throws {
+        var values = projects
+        guard let index = values.firstIndex(where: { $0.id == id }) else { throw SessionTags.TagError("This project no longer exists.") }
+        var project = values.remove(at: index)
+        project.lastWorkedAt = date
+        values.insert(project, at: 0)
+        try save(values)
+    }
+
+    // A manual move persists until a subsequent work action promotes a project again.
+    func moveProject(_ id: UUID, relativeTo target: UUID, after: Bool = false) throws {
+        guard id != target else { return }
+        var values = projects
+        guard let old = values.firstIndex(where: { $0.id == id }), values.contains(where: { $0.id == target }) else { return }
+        let project = values.remove(at: old)
+        let index = values.firstIndex { $0.id == target }!
+        values.insert(project, at: index + (after ? 1 : 0))
+        try save(values)
+    }
     func addTask(_ title: String, project: UUID) throws {
         try edit(project) { $0.tasks.append(ProjectTask(title: try Self.title(title, limit: 200))) }
     }
