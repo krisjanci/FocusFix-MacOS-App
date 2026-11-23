@@ -82,7 +82,9 @@ struct QuickTourDemoView: View {
                 SessionClockFace(time: String(format: "00:00:%02d", tour.elapsed))
                     .contentTransition(.numericText())
                 HStack {
-                    SessionTagButton(tags: [], colors: [:]) {}.disabled(true)
+                    Label("Task", systemImage: "doc.text").font(.caption)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
                     practiceButton("Work target", symbol: "scope", phase: .start, action: .start)
                         .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
                         .background(Color.primary.opacity(0.06), in: Capsule())
