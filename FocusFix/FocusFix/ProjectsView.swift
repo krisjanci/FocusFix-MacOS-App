@@ -27,26 +27,25 @@ struct ProjectsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Button(action: close) { Label("Timer", systemImage: "chevron.left") }.buttonStyle(.plain)
-                Spacer()
-                Text(tracker.isWorking ? tracker.workAssignment.summary : "Ready to focus")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Text(clock).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }
-            Divider()
-            HStack {
-                if project != nil && !projectEditor {
-                    Button { selectedProject = nil } label: { Image(systemName: "chevron.left") }
-                        .buttonStyle(.plain).accessibilityLabel("Back to projects")
-                }
+                Button(action: goBack) {
+                    Image(systemName: "arrow.left").frame(width: 28, height: 22)
+                }.buttonStyle(.bordered).keyboardShortcut(.cancelAction)
+                    .accessibilityLabel(projectEditor ? "Cancel project editing" : project == nil ? "Back to timer" : "Back to projects")
                 Text(projectEditor ? (editingProject == nil ? "New project" : "Edit project") : project?.name ?? "Projects")
-                    .font(.title3.weight(.semibold)).lineLimit(1)
+                    .font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 if !projectEditor {
                     Button {
                         editingProject = nil; projectName = ""; projectColor = Color(tagHex: SessionTags.palette[0]); projectEditor = true
                     } label: { Image(systemName: "plus") }.accessibilityLabel("New project")
                 }
+            }
+            if tracker.isWorking {
+                HStack {
+                    Text(tracker.workAssignment.summary).lineLimit(1)
+                    Spacer()
+                    Text(clock).monospacedDigit()
+                }.font(.caption).foregroundStyle(.secondary)
             }
             if let notice = store.notice {
                 Text(notice).font(.caption).foregroundStyle(.red)
@@ -105,6 +104,7 @@ struct ProjectsView: View {
     private var projectForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder).onSubmit(saveProject)
+                .disabled(store.projects.first { $0.id == editingProject }?.isRandomTasks == true)
             ColorPicker("Project color", selection: $projectColor, supportsOpacity: false)
             HStack {
                 Button("Cancel") { projectEditor = false; error = nil }
@@ -142,11 +142,18 @@ struct ProjectsView: View {
                         Menu { projectActions(value) } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).fixedSize()
                             .accessibilityLabel("Options for \(value.name)")
                     }.padding(.vertical, 11)
+                    .draggable("project:\(value.id.uuidString)")
+                    .dropDestination(for: String.self) { values, location in
+                        guard let text = values.first, text.hasPrefix("project:"),
+                              let id = UUID(uuidString: String(text.dropFirst(8))) else { return false }
+                        perform { try store.moveProject(id, relativeTo: value.id, after: location.y > 20) }
+                        return true
+                    }
+                    .accessibilityAction(named: "Move up") { moveProject(value, direction: -1) }
+                    .accessibilityAction(named: "Move down") { moveProject(value, direction: 1) }
                     Divider()
                 }
-                Button(tracker.isWorking ? "Switch to no project" : "Start work without a project") {
-                    perform { try tracker.workOn(project: nil) }
-                }.buttonStyle(.plain).foregroundStyle(.secondary).padding(.vertical, 12)
+
             }
         }
     }
@@ -248,7 +255,23 @@ struct ProjectsView: View {
         Button("Edit project") {
             editingProject = project.id; projectName = project.name; projectColor = Color(tagHex: project.color); projectEditor = true
         }
-        Button("Delete project", role: .destructive) { deletion = project }
+        Button("Move up") { moveProject(project, direction: -1) }
+            .disabled(store.projects.first?.id == project.id)
+        Button("Move down") { moveProject(project, direction: 1) }
+            .disabled(store.projects.last?.id == project.id)
+        if !project.isRandomTasks {
+            Button("Delete project", role: .destructive) { deletion = project }
+        }
+    }
+    private func goBack() {
+        error = nil
+        if projectEditor { projectEditor = false }
+        else if project != nil { selectedProject = nil; editingTask = nil; newTask = "" }
+        else { close() }
+    }
+    private func moveProject(_ project: WorkProject, direction: Int) {
+        guard let index = store.projects.firstIndex(where: { $0.id == project.id }), store.projects.indices.contains(index + direction) else { return }
+        perform { try store.moveProject(project.id, relativeTo: store.projects[index + direction].id, after: direction > 0) }
     }
     private func saveProject() {
         perform {
