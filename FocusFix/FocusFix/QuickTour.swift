@@ -27,7 +27,7 @@ enum QuickTourPhase: String, CaseIterable {
         case .plan: return "Choose Add work target to plan."
         case .duration: return "Choose 30, 60, or 90 minutes."
         case .confirmStart: return "Click Start when ready."
-        case .work: return "Task opens projects in this window. Work on a task or choose Untasked Work; projects are optional."
+        case .work: return "Task opens projects. Choose tasks or Untasked Work."
         case .takeBreak: return "Click Take a break to recharge."
         case .startBreak: return "Click Start break."
         case .returned: return "Back? Click I’m back."
