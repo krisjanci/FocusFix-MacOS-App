@@ -43,7 +43,8 @@ import Foundation
         let broken = ProjectStore(file: file)
         precondition(broken.notice != nil)
         fails { _ = try broken.addProject("Must not overwrite", color: "#168B80") }
-        precondition(try String(contentsOf: file, encoding: .utf8) == "broken")
+        let kept = try String(contentsOf: file, encoding: .utf8)
+        precondition(kept == "broken")
         // A write failure leaves published state unchanged.
         let blocked = root.appendingPathComponent("blocked")
         let writer = ProjectStore(file: blocked.appendingPathComponent("projects.json"))
