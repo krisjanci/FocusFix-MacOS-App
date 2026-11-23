@@ -22,6 +22,7 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var movementRows = 0
     @Published private(set) var sessionFolder: URL?
     @Published private(set) var sessionConditions: [SessionCondition] = []
+    @Published private(set) var workAssignment = WorkAssignment.none
     @Published private(set) var sessionTags: [String] = []
     @Published private(set) var sessionTagColors: [String: String] = [:]
     @Published private(set) var message = "Ready when you are."
@@ -251,8 +252,7 @@ final class ActivityTracker: ObservableObject {
         AutomaticRecordingPreferences.shared.setUserPaused(false, notify: false)
         lifecycle.failed = false
         start(fatigue: nil, prompt: nil, plan: SessionWorkPlan(),
-              tags: sessionFolder == nil ? sessionTags : [],
-              tagColors: sessionFolder == nil ? sessionTagColors : [:],
+              tags: [], tagColors: [:],
               mode: automatic ? .automatic : .manual)
         if automatic, isRecording { setContext(.work) }
     }
@@ -308,6 +308,33 @@ final class ActivityTracker: ObservableObject {
             guard isWorking else { throw SessionTags.TagError(message) }
         }
     }
+    // The same explicit start path serves task rows and the main Start work button.
+    func workOn(project: WorkProject?, task: ProjectTask? = nil) throws {
+        guard task?.completedAt == nil else { throw SessionTags.TagError("Uncheck this task before working on it.") }
+        if !isWorking { requestStart() }
+        guard isWorking, let writer else { return }
+        let assignment = WorkAssignment(projectID: project?.id, projectName: project?.name,
+            projectColor: project?.color, taskID: task?.id, taskTitle: task?.title)
+        let time = now
+        guard time - lastSamplingTick <= 5 else {
+            stop(reason: "capture_gap", observedEnd: lastObservedTime)
+            throw SessionTags.TagError("Recording stopped after an activity gap. Start work again.")
+        }
+        try writer.selectAssignment(assignment, at: time)
+        workAssignment = assignment
+    }
+
+    func reconcileWorkAssignment(projects: [WorkProject]) {
+        guard isWorking, let id = workAssignment.projectID else { return }
+        let project = projects.first { $0.id == id }
+        let task = project?.tasks.first { $0.id == workAssignment.taskID && $0.completedAt == nil }
+        let updated = WorkAssignment(projectID: project?.id, projectName: project?.name,
+            projectColor: project?.color, taskID: task?.id, taskTitle: task?.title)
+        guard updated != workAssignment else { return }
+        do { try workOn(project: project, task: task) }
+        catch { fail(error) }
+    }
+
     func endWork() {
         guard isRecording, userContext == .work else { return }
         if recordingMode == .automatic { setContext(.unknown) }
@@ -321,6 +348,10 @@ final class ActivityTracker: ObservableObject {
         do {
             updateProgress(at: time)
             if breakPolicy.phase != .resting { append(mouse.stop(at: time)) }
+            if context == .work, userContext != .work {
+                try writer.selectAssignment(.none, at: time)
+                workAssignment = .none
+            }
             try writer.changeContext(context, at: time, effectiveAt: Date(), source: source)
             if userContext != writer.contract.currentContext {
                 reminderEligibility.invalidate()
@@ -459,6 +490,7 @@ final class ActivityTracker: ObservableObject {
             let newWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: startedAt,
                 mode: mode, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions, tags: tags, tagColors: tagColors, conditions: conditions)
             writer = newWriter
+            workAssignment = .none
             sessionFolder = newWriter.folder
             sessionConditions = conditions
             sessionTags = tags
@@ -708,6 +740,7 @@ final class ActivityTracker: ObservableObject {
         let replacement = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString,
             startedAt: nextStart, mode: recordingMode, continuingContract: next, researchIdentity: capturedResearchIdentity, studyConfiguration: sessionStudyConfiguration, surveyOptions: sessionSurveyOptions,
             tags: sessionTags, tagColors: sessionTagColors, conditions: sessionConditions)
+        try replacement.selectAssignment(workAssignment, at: time)
         writer = replacement; sessionFolder = replacement.folder
         segmentWorkDays = [:]; pendingWorkSlices = []; segmentWorkIntervals = []
         captureAccountKey = activeAccountKey
