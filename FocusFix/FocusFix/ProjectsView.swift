@@ -177,7 +177,7 @@ struct ProjectsView: View {
                                 .buttonStyle(.plain).accessibilityLabel("Open \(value.name)")
                         }
                     }.padding(.vertical, 11)
-                    .modifier(ChecklistReorderRow(item: .project(value.id), source: $dragSource, insertion: $insertion) { dragging, after in
+                    .modifier(ChecklistReorderRow(item: .project(value.id), enabled: editingProject != value.id, source: $dragSource, insertion: $insertion) { dragging, after in
                         guard case .project(let id) = dragging else { return }
                         perform { try store.moveProject(id, relativeTo: value.id, after: after) }
                     })
@@ -191,7 +191,8 @@ struct ProjectsView: View {
 
     private func projectNameField(_ project: WorkProject) -> some View {
         TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder)
-            .focused($renameFocus, equals: project.id).onAppear { renameFocus = project.id }
+            .focused($renameFocus, equals: project.id)
+            .task { renameFocus = nil; await Task.yield(); renameFocus = project.id }
             .onSubmit { saveProjectName(project) }.onExitCommand { editingProject = nil }
     }
 
@@ -199,7 +200,7 @@ struct ProjectsView: View {
         if editingList {
             ColorPicker("Project color", selection: Binding(get: { Color(tagHex: project.color) }, set: { color in
                 perform { try store.editProject(project.id, name: project.name, color: color.tagHex) }
-            }), supportsOpacity: false).labelsHidden().frame(width: 22)
+            }), supportsOpacity: false).labelsHidden().controlSize(.small).frame(width: 44, height: 26).clipped()
                 .accessibilityLabel("Color for \(project.name)")
         } else { Circle().fill(Color(tagHex: project.color)).frame(width: 10, height: 10) }
     }
@@ -248,7 +249,8 @@ struct ProjectsView: View {
                 .accessibilityValue(task.completedAt == nil ? "Incomplete" : "Complete")
             if editingTask == task.id {
                 TextField("Task title", text: $taskTitle).textFieldStyle(.roundedBorder)
-                    .focused($renameFocus, equals: task.id).onAppear { renameFocus = task.id }
+                    .focused($renameFocus, equals: task.id)
+                    .task { renameFocus = nil; await Task.yield(); renameFocus = task.id }
                     .onSubmit { saveTask(task, project: project) }.onExitCommand { editingTask = nil }
                 Button { saveTask(task, project: project) } label: { Image(systemName: "checkmark") }
                     .buttonStyle(.plain).accessibilityLabel("Save task name")
@@ -270,7 +272,7 @@ struct ProjectsView: View {
         .scaleEffect(finished && !editingList && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished && !editingList ? 0.6 : 1)
         .offset(x: swiping.contains(task.id) && !usesReducedMotion ? 430 : 0)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
-        .modifier(ChecklistReorderRow(item: .task(project: project.id, id: task.id, completed: task.completedAt != nil),
+        .modifier(ChecklistReorderRow(item: .task(project: project.id, id: task.id, completed: task.completedAt != nil), enabled: editingTask != task.id,
             source: $dragSource, insertion: $insertion) { dragging, after in
                 guard case .task(let parent, let id, _) = dragging, parent == project.id else { return }
                 perform {
@@ -313,11 +315,11 @@ struct ProjectsView: View {
     }
     private func beginProjectRename(_ project: WorkProject) {
         guard !project.isRandomTasks, finishRename() else { return }
-        editingProject = project.id; projectName = project.name; renameFocus = project.id
+        editingProject = project.id; projectName = project.name; renameFocus = nil
     }
     private func beginTaskRename(_ task: ProjectTask) {
         guard finishRename() else { return }
-        editingTask = task.id; taskTitle = task.title; renameFocus = task.id
+        editingTask = task.id; taskTitle = task.title; renameFocus = nil
     }
     private func finishRename() -> Bool {
         if let id = editingProject, let project = store.projects.first(where: { $0.id == id }), !saveProjectName(project) { return false }
