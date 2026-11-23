@@ -1,7 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let checklistDragType = UTType(exportedAs: "io.github.krisjanci.focusfix.checklist-item", conformingTo: .data)
+// Standard UTF-8 transport works across AppKit drag sessions; only matching local UUID tokens can move rows.
+private let checklistDragType = UTType.utf8PlainText
 
 struct ChecklistReorderRow: ViewModifier {
     let item: ChecklistDragItem
