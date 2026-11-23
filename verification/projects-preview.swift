@@ -59,11 +59,11 @@ struct ProjectsPreview: View {
                     VStack {
                         Text("17:04").font(.system(size: 46, weight: .light, design: .rounded))
                         Button { tasks = true } label: { Label("Task", systemImage: "doc.text") }
-                        Text(tracker.workAssignment.summary).font(.caption)
+                        Label("Work target", systemImage: "scope").font(.caption)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
                         HStack(spacing: 8) {
-                            Label("Work target", systemImage: "scope").font(.caption)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Color.primary.opacity(0.06), in: Capsule())
+                            Text(tracker.workAssignment.summary).font(.caption).lineLimit(2)
                             if tracker.isWorking, tracker.workAssignment.taskID != nil {
                                 Button { tracker.finishCurrentTask() } label: {
                                     Label("Finished task", systemImage: "checkmark").font(.caption)
