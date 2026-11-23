@@ -22,13 +22,19 @@ import Foundation
         try writer.changeContext(.unknown, at: 20, effectiveAt: started, source: .userAction)
         try writer.changeContext(.work, at: 25, effectiveAt: started, source: .userAction)
         try writer.selectAssignment(.none, at: 25)
+        // Coverage contains a check-in and an unavailable gap; neither counts as task time.
+        for (start, end, phase) in [(0.0, 12.0, "work"), (16, 17, "work"), (17, 18, "check_in"), (18, 19, "work"), (20, 30, "work")] {
+            writer.append([MouseSummary(start: start, end: end, distance: 0, events: 0, secondsSinceMovement: nil, activityPhase: phase)])
+        }
         try writer.finish(startedAt: started, duration: 30, reason: "test")
         let journal = try WorkAssignmentJournal.load(from: writer.folder)
         let intervals = journal.intervals(in: writer.contract)
         precondition(intervals.map { $0.end - $0.start } == [10, 2, 4, 5])
         precondition(intervals.map(\.assignment) == [a, b, b, .none])
         let saved = try SavedSession(folder: writer.folder)
-        precondition(saved.assignedWork == intervals && saved.assignmentNotice == nil)
+        precondition(saved.assignedWork.map { $0.end - $0.start } == [10, 2, 1, 1, 5])
+        precondition(saved.assignedWork.map(\.assignment) == [a, b, b, b, .none])
+        precondition(saved.assignmentNotice == nil)
         let export = fm.temporaryDirectory.appendingPathComponent("assignment-export-\(UUID())", isDirectory: true)
         defer { try? fm.removeItem(at: export) }
         try fm.createDirectory(at: export, withIntermediateDirectories: true)
@@ -51,6 +57,13 @@ import Foundation
         try rotated.selectAssignment(a, at: 30)
         try rotated.finish(startedAt: started, duration: 40, reason: "test")
         precondition(rotated.assignments.intervals(in: rotated.contract) == [AssignedWorkInterval(start: 30, end: 40, assignment: a)])
+        let sidecar = rotated.folder.appendingPathComponent(WorkAssignmentJournal.filename)
+        try fm.removeItem(at: sidecar)
+        try fm.createDirectory(at: sidecar, withIntermediateDirectories: false)
+        let preserved = rotated.assignments
+        // Finalized recordings reject new assignments before any file mutation.
+        do { try rotated.selectAssignment(b, at: 41); preconditionFailure("Expected finalized writer failure") } catch { }
+        precondition(rotated.assignments == preserved)
         // Renaming/deleting the catalog cannot change frozen assignment snapshots.
         precondition(journal.changes.first?.assignment.projectName == "Private project")
         try fm.removeItem(at: writer.folder.appendingPathComponent(WorkAssignmentJournal.filename))
