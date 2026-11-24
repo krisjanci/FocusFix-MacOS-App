@@ -139,6 +139,8 @@ final class ActivityTracker: ObservableObject {
         return max(0, Double(duration.seconds) + Double(duration.attoseconds) / 1e18)
     }
     // Load the saved-session list and arrange to finish a recording when the app quits.
+    private var savingCompletedTaskTimes = false
+
     private init() {
         loadProgress()
         do { _ = try SessionFiles.recoverPending(in: SessionFiles.root()) }
@@ -160,6 +162,7 @@ final class ActivityTracker: ObservableObject {
         SurveyPreferences.shared.onRevoke = { [weak self] in self?.revokeStudyCheckIns() }
         SurveyPreferences.shared.onPersonalChange = { [weak self] in self?.personalSurveyPreferencesChanged() }
         installLifecycleObservers()
+        savePendingTaskTimes()
     }
     // Connect macOS notification actions to the same controls used by the app.
     func configureNotifications() {
@@ -336,13 +339,49 @@ final class ActivityTracker: ObservableObject {
     }
 
     func finishCurrentTask() {
-        guard isWorking, let projectID = workAssignment.projectID, let taskID = workAssignment.taskID else { return }
+        let store = ProjectStore.shared
+        guard isWorking, let projectID = workAssignment.projectID, let taskID = workAssignment.taskID,
+              let project = store.projects.first(where: { $0.id == projectID }),
+              let task = project.tasks.first(where: { $0.id == taskID }) else { return }
+        let finish = Date()
+        let summary = CompletedTaskWork(projectID: projectID, projectName: project.name,
+            taskTitle: task.title, finishedAt: finish)
         do {
-            try ProjectStore.shared.completeTask(taskID, project: projectID)
-            reconcileWorkAssignment(projects: ProjectStore.shared.projects)
+            // Save the completion intent first so an interrupted total can be retried on launch.
+            try store.completeTask(taskID, project: projectID, at: finish, work: summary)
+            do { try workOn(project: nil, promoteProject: false) }
+            catch {
+                try store.completeTask(taskID, project: projectID, at: task.completedAt, work: task.completedWork)
+                throw error
+            }
+            savePendingTaskTimes()
         } catch {
             hasError = true
             message = "The task could not be finished. \(error.localizedDescription)"
+        }
+    }
+
+    private func savePendingTaskTimes() {
+        guard !savingCompletedTaskTimes else { return }
+        savingCompletedTaskTimes = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.savingCompletedTaskTimes = false }
+            do {
+                let root = try SessionFiles.root()
+                while let pending = ProjectStore.shared.projects.flatMap({ $0.tasks }).first(where: {
+                    $0.completedAt != nil && $0.completedWork != nil && $0.completedWork?.seconds == nil
+                }), var summary = pending.completedWork {
+                    let projectID = summary.projectID, taskID = pending.id, finish = summary.finishedAt
+                    summary.seconds = try await Task.detached {
+                        try SavedSession.totalTaskWork(project: projectID, task: taskID, through: finish, root: root)
+                    }.value
+                    try ProjectStore.shared.saveCompletedWork(summary, task: taskID)
+                }
+            } catch {
+                self.hasError = true
+                self.message = "Task time could not be saved. The work history was kept and FocusFix will retry on launch. \(error.localizedDescription)"
+            }
         }
     }
 
