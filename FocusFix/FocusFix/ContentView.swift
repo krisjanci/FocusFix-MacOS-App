@@ -246,7 +246,7 @@ struct ContentView: View {
                                     .background(Color.green.opacity(0.06), in: Capsule())
                                     .overlay { Capsule().stroke(Color.green.opacity(0.75), lineWidth: 1) }
                             }.buttonPressFeedback().buttonStyle(.plain)
-                                .help("Check off this task and continue as Untasked Work")
+                                .help("Check off this task, save its time, and continue work without a project")
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
