@@ -59,3 +59,5 @@ The preview recorder is intentionally synthetic. Real input permissions, account
 
 - Build and new tests cover frozen task/project name snapshots, pending-summary persistence, total persistence/reload, and reopened-task protection. Recording tests verify that ending assignment leaves the Work context running and unfinalized, sums repeated stints across recordings, excludes no-project time, and clips totals at the completion instant even when later task work exists.
 - Completion summaries live only in the private project catalog; the existing private assignment sidecars retain the timed source intervals. Shared recording metadata and upload allowlists are unchanged.
+
+- Final completion refinement: all 47 app test groups and the full Debug build passed. The final catalog validation and completed-row help changes were included in the successful final build. The isolated preview compiled, but the native launcher stalled and returned “Running application not found”; this refinement has no new live UI verification claim.
