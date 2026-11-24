@@ -17,9 +17,15 @@ import AppKit
         if promoteProject, let project { try PreviewProjects.store.recordWork(on: project.id) }
     }
     func finishCurrentTask() {
-        guard isWorking, let project = workAssignment.projectID, let task = workAssignment.taskID else { return }
-        try? PreviewProjects.store.completeTask(task, project: project)
-        reconcileWorkAssignment(projects: PreviewProjects.store.projects)
+        guard isWorking, let projectID = workAssignment.projectID, let task = workAssignment.taskID,
+              let project = PreviewProjects.store.projects.first(where: { $0.id == projectID }) else { return }
+        let finish = Date()
+        let summary = CompletedTaskWork(projectID: projectID, projectName: project.name,
+            taskTitle: workAssignment.taskTitle ?? "Task", finishedAt: finish, seconds: 90)
+        do {
+            try PreviewProjects.store.completeTask(task, project: projectID, at: finish, work: summary)
+            workAssignment = .none
+        } catch { }
     }
     func reconcileWorkAssignment(projects: [WorkProject]) {
         guard isWorking, let id = workAssignment.projectID else { return }
