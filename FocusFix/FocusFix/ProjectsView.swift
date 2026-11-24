@@ -365,7 +365,7 @@ struct ProjectsView: View {
         }
         .frame(height: height)
         .padding(.horizontal, 4)
-        .help(task.title)
+        .help(task.completedWork.map { "\($0.projectName) · \($0.taskTitle)" + ($0.seconds.map { " · " + taskTime($0) } ?? " · Saving task time…") } ?? task.title)
         .background(tracker.isWorking && tracker.workAssignment.taskID == task.id ? Color(tagHex: project.color).opacity(0.09) : .clear,
                     in: RoundedRectangle(cornerRadius: 8))
         .scaleEffect(finished && !editingList && !usesReducedMotion ? 0.85 : 1, anchor: .leading).opacity(finished && !editingList ? 0.6 : 1)
