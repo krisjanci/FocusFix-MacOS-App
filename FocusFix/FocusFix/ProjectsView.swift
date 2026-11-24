@@ -351,8 +351,13 @@ struct ProjectsView: View {
                     Text(task.title).font(.callout).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Rename task \(task.title)")
             } else {
-                Text(task.title).font(.callout).lineLimit(1).foregroundStyle(finished ? .secondary : .primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(task.title).font(.callout).lineLimit(1).foregroundStyle(finished ? .secondary : .primary)
+                    if let work = task.completedWork {
+                        Text(work.seconds.map { "Task time · " + taskTime($0) } ?? "Saving task time…")
+                            .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             if editingList {
                 deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
@@ -376,6 +381,11 @@ struct ProjectsView: View {
             })
         .accessibilityAction(named: "Move up") { move(task, project: project, direction: -1) }
         .accessibilityAction(named: "Move down") { move(task, project: project, direction: 1) }
+    }
+
+    private func taskTime(_ seconds: Double) -> String {
+        let value = Int(max(0, seconds))
+        return String(format: "%d:%02d", value / 60, value % 60)
     }
 
     private func workButton(_ project: WorkProject, task: ProjectTask?) -> some View {
