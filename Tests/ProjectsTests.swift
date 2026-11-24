@@ -22,6 +22,19 @@ import Foundation
         try store.addTask("First", project: id)
         try store.addTask("Second", project: id)
         try store.addTask("Third", project: id)
+        let finishedAt = Date(timeIntervalSince1970: 123456)
+        let pending = CompletedTaskWork(projectID: id, projectName: "Frozen project", taskTitle: "Frozen task", finishedAt: finishedAt)
+        let timedTask = store.projects.first { $0.id == id }!.tasks[0].id
+        try store.completeTask(timedTask, project: id, at: finishedAt, work: pending)
+        let pendingReload = ProjectStore(file: file)
+        precondition(pendingReload.projects.first { $0.id == id }!.tasks[0].completedWork == pending)
+        var complete = pending; complete.seconds = 127.5
+        try store.saveCompletedWork(complete, task: timedTask)
+        let savedTime = ProjectStore(file: file).projects.first { $0.id == id }!.tasks[0].completedWork
+        precondition(savedTime == complete && savedTime?.projectName == "Frozen project" && savedTime?.taskTitle == "Frozen task")
+        try store.completeTask(timedTask, project: id, at: nil)
+        try store.saveCompletedWork(complete, task: timedTask)
+        precondition(store.projects.first { $0.id == id }!.tasks[0].completedWork == nil, "A stale total must not complete a reopened task")
         let original = project().tasks.map(\.id)
         try store.completeTask(original[1], project: id, at: Date(timeIntervalSince1970: 20))
         precondition(project().tasks.map(\.id) == original)
