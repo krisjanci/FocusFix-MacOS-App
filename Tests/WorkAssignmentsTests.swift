@@ -35,6 +35,26 @@ import Foundation
         precondition(saved.assignedWork.map { $0.end - $0.start } == [10, 2, 1, 1, 5])
         precondition(saved.assignedWork.map(\.assignment) == [a, b, b, b, .none])
         precondition(saved.assignmentNotice == nil)
+        // Finishing an assignment ends its attribution, while the work context continues.
+        let later = started.addingTimeInterval(60)
+        let ongoing = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: later)
+        var renamed = a; renamed.projectName = "Renamed project"; renamed.taskTitle = "Renamed task"
+        try ongoing.selectAssignment(renamed, at: 0)
+        try ongoing.selectAssignment(.none, at: 5)
+        precondition(ongoing.contract.intervals.last?.context == .work && !ongoing.contract.finalized)
+        try ongoing.selectAssignment(renamed, at: 10)
+        try ongoing.selectAssignment(.none, at: 15)
+        ongoing.append([MouseSummary(start: 0, end: 20, distance: 0, events: 0, secondsSinceMovement: nil, activityPhase: "work")])
+        try ongoing.checkpoint(at: 20)
+        let total = try SavedSession.totalTaskWork(project: a.projectID!, task: a.taskID!,
+            through: later.addingTimeInterval(20), root: root)
+        precondition(total == 20, "Sum prior recordings and repeated task stints, excluding no-project work")
+        let clipped = try SavedSession.totalTaskWork(project: a.projectID!, task: a.taskID!,
+            through: later.addingTimeInterval(12), root: root)
+        precondition(clipped == 17, "A completion must exclude subsequent work even if the same task resumes")
+        let otherProject = try SavedSession.totalTaskWork(project: UUID(), task: a.taskID!, through: later, root: root)
+        precondition(otherProject == 0)
+        try ongoing.finish(startedAt: later, duration: 20, reason: "test")
         let export = fm.temporaryDirectory.appendingPathComponent("assignment-export-\(UUID())", isDirectory: true)
         defer { try? fm.removeItem(at: export) }
         try fm.createDirectory(at: export, withIntermediateDirectories: true)
