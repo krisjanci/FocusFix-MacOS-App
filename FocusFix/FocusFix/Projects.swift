@@ -63,7 +63,15 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
                 _ = try Self.title(project.name, limit: 40)
                 _ = try SessionTags.color(project.color)
                 guard Set(project.tasks.map(\.id)).count == project.tasks.count else { throw CocoaError(.fileReadCorruptFile) }
-                for task in project.tasks { _ = try Self.title(task.title, limit: 200) }
+                for task in project.tasks {
+                    _ = try Self.title(task.title, limit: 200)
+                    if let work = task.completedWork {
+                        guard work.projectID == project.id, work.finishedAt == task.completedAt,
+                              work.seconds.map({ $0.isFinite && $0 >= 0 }) ?? true else { throw CocoaError(.fileReadCorruptFile) }
+                        _ = try Self.title(work.projectName, limit: 40)
+                        _ = try Self.title(work.taskTitle, limit: 200)
+                    }
+                }
             }
             guard values.filter(\.isRandomTasks).count <= 1 else { throw CocoaError(.fileReadCorruptFile) }
             var migrated = false
@@ -148,6 +156,10 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
         try editTask(id, project: project) { $0.title = try Self.title(title, limit: 200) }
     }
     func completeTask(_ id: UUID, project: UUID, at date: Date? = Date(), work: CompletedTaskWork? = nil) throws {
+        if let work {
+            guard work.projectID == project, work.finishedAt == date,
+                  work.seconds.map({ $0.isFinite && $0 >= 0 }) ?? true else { throw SessionTags.TagError("The saved task time is invalid.") }
+        }
         try edit(project) { value in
             guard let index = value.tasks.firstIndex(where: { $0.id == id }) else { throw SessionTags.TagError("This task no longer exists.") }
             let order = value.completedTasks.map(\.id).filter { $0 != id }
