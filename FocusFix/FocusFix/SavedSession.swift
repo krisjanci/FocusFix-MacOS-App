@@ -99,6 +99,28 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         return journal.intervals(in: recordingContract, observedWork: coverage.workSlices.map { ($0.start, $0.end) })
     }
 
+    // Sum every recorded stint of this task, clipped to the completion instant.
+    // Reads are performed off the main actor; missing legacy sidecars contain no task work.
+    static func totalTaskWork(project: UUID, task: UUID, through finish: Date, root: URL) throws -> Double {
+        let listing = try SessionFiles.inspect(in: root)
+        guard listing.unreadable == 0 else { throw CocoaError(.fileReadCorruptFile) }
+        var seconds = 0.0
+        var seen = Set<UUID>()
+        for session in listing.sessions {
+            try Task.checkCancellation()
+            guard let contract = session.recordingContract,
+                  FileManager.default.fileExists(atPath: session.folder.appendingPathComponent(WorkAssignmentJournal.filename).path)
+            else { continue }
+            guard seen.insert(contract.segmentID).inserted else { throw CocoaError(.fileReadCorruptFile) }
+            let cutoff = finish.timeIntervalSince(session.startedAt) + contract.elapsedOrigin
+            for interval in try session.assignmentHistory()
+            where interval.assignment.projectID == project && interval.assignment.taskID == task {
+                seconds += max(0, min(interval.end, cutoff) - interval.start)
+            }
+        }
+        return seconds
+    }
+
     var assignmentNotice: String? {
         guard FileManager.default.fileExists(atPath: folder.appendingPathComponent(WorkAssignmentJournal.filename).path) else { return nil }
         do { _ = try WorkAssignmentJournal.load(from: folder); return nil }
