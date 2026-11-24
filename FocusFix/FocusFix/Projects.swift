@@ -1,10 +1,19 @@
 import Foundation
 import Combine
 
+nonisolated struct CompletedTaskWork: Codable, Equatable {
+    let projectID: UUID
+    let projectName: String
+    let taskTitle: String
+    let finishedAt: Date
+    var seconds: Double?
+}
+
 nonisolated struct ProjectTask: Codable, Identifiable, Equatable {
     var id = UUID()
     var title: String
     var completedAt: Date?
+    var completedWork: CompletedTaskWork?
 }
 
 nonisolated struct WorkProject: Codable, Identifiable, Equatable {
@@ -138,13 +147,23 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     func renameTask(_ id: UUID, project: UUID, title: String) throws {
         try editTask(id, project: project) { $0.title = try Self.title(title, limit: 200) }
     }
-    func completeTask(_ id: UUID, project: UUID, at date: Date? = Date()) throws {
+    func completeTask(_ id: UUID, project: UUID, at date: Date? = Date(), work: CompletedTaskWork? = nil) throws {
         try edit(project) { value in
             guard let index = value.tasks.firstIndex(where: { $0.id == id }) else { throw SessionTags.TagError("This task no longer exists.") }
             let order = value.completedTasks.map(\.id).filter { $0 != id }
             value.tasks[index].completedAt = date
+            value.tasks[index].completedWork = date == nil ? nil : work
             value.completedTaskOrder = date == nil ? order : order + [id]
         }
+    }
+    func saveCompletedWork(_ work: CompletedTaskWork, task id: UUID) throws {
+        guard let seconds = work.seconds, seconds.isFinite, seconds >= 0 else {
+            throw SessionTags.TagError("The saved task time is invalid.")
+        }
+        // A background result must not overwrite a task reopened or completed again.
+        guard let task = projects.first(where: { $0.id == work.projectID })?.tasks.first(where: { $0.id == id }),
+              task.completedAt == work.finishedAt, task.completedWork?.finishedAt == work.finishedAt else { return }
+        try editTask(id, project: work.projectID) { $0.completedWork = work }
     }
     func deleteTask(_ id: UUID, project: UUID) throws {
         try edit(project) { $0.tasks.removeAll { $0.id == id }; $0.completedTaskOrder?.removeAll { $0 == id } }
