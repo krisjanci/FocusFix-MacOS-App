@@ -147,7 +147,7 @@ nonisolated enum SessionStorage {
         try manager.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         return stage
     }
-    // Called only for sessions made by this writer, never as a migration of old recordings.
+    // Compact completed recordings only; schemas and original bytes stay unchanged.
     @discardableResult static func compact(_ folder: URL, force: Bool = false, beforeCommit: () throws -> Void = {}) throws -> Bool {
         try synchronized {
             if let value = try manifest(folder) {
@@ -168,7 +168,13 @@ nonisolated enum SessionStorage {
                 if UUID(uuidString: uuid) != nil { try manager.removeItem(at: folder.appendingPathComponent(name)) }
             }
             let metadata = try JSONSerialization.jsonObject(with: data("session.json", in: folder)) as? [String: Any]
-            guard metadata?["status"] as? String != "recording", try RecordingContract.load(from: folder).finalized else { return false }
+            guard let metadata, let status = metadata["status"] as? String,
+                  status != "recording", status != "metadata_unavailable",
+                  let duration = metadata["duration_seconds"] as? Double, duration.isFinite, duration >= 0,
+                  let schema = metadata["schema_version"] as? Int, (1...RecordingContract.schemaVersion).contains(schema) else { return false }
+            if schema == RecordingContract.schemaVersion {
+                guard try RecordingContract.load(from: folder).finalized else { return false }
+            }
             let names = try self.names(in: folder)
             guard names.count <= 128, names.allSatisfy(safeName) else { throw CocoaError(.fileReadCorruptFile) }
             var entries: [String: Entry] = [:], rawSize = 0
@@ -230,19 +236,20 @@ nonisolated enum SessionStorage {
             }
         }
     }
-    static func resumeCompaction(in root: URL) {
+    @discardableResult static func resumeCompaction(in root: URL) -> Task<Void, Never> {
         Task.detached(priority: .utility) {
             guard let folders = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else { return }
             for folder in folders {
                 guard let info = try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                       info.isDirectory == true, info.isSymbolicLink != true else { continue }
-                compactNewSession(folder)
+                do { _ = try compact(folder) }
+                catch { NSLog("Session kept in its existing storage: %@", error.localizedDescription) }
             }
         }
     }
-    static func compactNewSession(_ folder: URL) {
-        guard manager.fileExists(atPath: folder.appendingPathComponent(pendingMarker).path) else { return }
-        Task.detached(priority: .utility) {
+    @discardableResult static func compactNewSession(_ folder: URL) -> Task<Void, Never>? {
+        guard manager.fileExists(atPath: folder.appendingPathComponent(pendingMarker).path) else { return nil }
+        return Task.detached(priority: .utility) {
             do { _ = try compact(folder) }
             catch { NSLog("Session kept uncompressed: %@", error.localizedDescription) }
         }
