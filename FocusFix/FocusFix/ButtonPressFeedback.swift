@@ -76,7 +76,7 @@ import AppKit
             releaseTimer = timer
             RunLoop.main.add(timer, forMode: .common)
         case .leftMouseDragged:
-            if let active { active.pressed?(contains(event, in: active)) }
+            if let active { active.pressed?(active.holdsOutsideBounds || contains(event, in: active)) }
         case .leftMouseUp: release()
         default: break
         }
@@ -92,6 +92,7 @@ import AppKit
 
 @MainActor private final class ButtonPressMarker: NSView {
     var enabled = true
+    var holdsOutsideBounds = false
     var pressed: ((Bool) -> Void)?
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func viewDidMoveToWindow() {
@@ -103,14 +104,15 @@ import AppKit
 
 private struct ButtonPressProbe: NSViewRepresentable {
     let enabled: Bool
+    var holdsOutsideBounds = false
     let pressed: (Bool) -> Void
     func makeNSView(context: Context) -> ButtonPressMarker {
         let marker = ButtonPressMarker()
-        marker.enabled = enabled; marker.pressed = pressed
+        marker.enabled = enabled; marker.holdsOutsideBounds = holdsOutsideBounds; marker.pressed = pressed
         return marker
     }
     func updateNSView(_ marker: ButtonPressMarker, context: Context) {
-        marker.enabled = enabled; marker.pressed = pressed
+        marker.enabled = enabled; marker.holdsOutsideBounds = holdsOutsideBounds; marker.pressed = pressed
     }
     static func dismantleNSView(_ marker: ButtonPressMarker, coordinator: ()) {
         ButtonPressCoordinator.shared.unregister(marker)
@@ -165,4 +167,23 @@ private struct ButtonPressFeedback: ViewModifier {
 
 extension View {
     func buttonPressFeedback() -> some View { modifier(ButtonPressFeedback()) }
+    func checklistPressFeedback(dragging: Bool, released: @escaping () -> Void) -> some View {
+        modifier(ChecklistPressFeedback(dragging: dragging, released: released))
+    }
+}
+
+private struct ChecklistPressFeedback: ViewModifier {
+    let dragging: Bool
+    let released: () -> Void
+    @State private var pressed = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(Color.primary.opacity(pressed || dragging ? 0.09 : 0), in: RoundedRectangle(cornerRadius: 8))
+            .background(ButtonPressProbe(enabled: true, holdsOutsideBounds: true) { value in
+                pressed = value
+                if !value { released() }
+            }.accessibilityHidden(true))
+            .onDisappear { pressed = false; released() }
+    }
 }
