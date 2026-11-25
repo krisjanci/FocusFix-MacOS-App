@@ -103,16 +103,16 @@ struct SessionTagsTests {
         let activeAlias = alias.appendingPathComponent(folder.lastPathComponent, isDirectory: false)
         precondition(SessionFiles.sameFolder(folder, activeAlias))
         fails { try SessionFiles.updateTags(["New"], for: edited, root: storage, active: activeAlias) }
-        fails { _ = try SessionFiles.exportAll(to: root, root: storage, active: activeAlias) }
+        fails { _ = try SessionFiles.exportAllOriginal(to: root, root: storage, active: activeAlias) }
         fails { try SessionFiles.updateTags([""], for: edited, root: storage, active: nil) }
 
         let exports = root.appendingPathComponent("Exports")
         try manager.createDirectory(at: exports, withIntermediateDirectories: false)
-        let single = try SessionFiles.export(edited, to: exports, root: storage, active: nil)
+        let single = try SessionFiles.exportOriginal(edited, to: exports, root: storage, active: nil)
         try checkTags(single, normalized)
         let singleSession = try SavedSession(folder: single)
         precondition(singleSession.tagColors == selectedColors)
-        let batch = try SessionFiles.exportAll(to: exports, root: storage, active: nil)
+        let batch = try SessionFiles.exportAllOriginal(to: exports, root: storage, active: nil)
         let batchCopy = batch.folder.appendingPathComponent(edited.exportName())
         try checkTags(batchCopy, normalized)
         let batchSession = try SavedSession(folder: batchCopy)
