@@ -1,7 +1,7 @@
 import Foundation
 
 @main struct SessionStorageTests {
-    static func expect(_ value: @autoclosure () throws -> Bool) throws { let result = try value(); precondition(result) }
+    static func expect(_ value: @autoclosure () throws -> Bool, file: StaticString = #file, line: UInt = #line) throws { let result = try value(); precondition(result, file: file, line: line) }
     static func fails(_ body: () throws -> Void) { do { try body(); preconditionFailure("Expected failure") } catch {} }
     static func main() throws {
         let fm = FileManager.default
