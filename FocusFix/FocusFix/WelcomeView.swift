@@ -122,7 +122,7 @@ struct CollectorRootView: View {
 
     var body: some View {
         Group {
-            if launch.page == .app { ContentView(tracker: tracker, launchReady: launchFinished && !account.needsFirstAccountTour && !tour.isPresented) }
+            if launch.page == .app { ContentView(tracker: tracker) }
             else { WelcomeView(launch: launch, account: account) }
         }
         .disabled(tour.isPresented && canShowTour)
