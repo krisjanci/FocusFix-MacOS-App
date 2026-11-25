@@ -189,10 +189,6 @@ nonisolated struct RecordingContract: Codable, Hashable {
         try data.write(to: folder.appendingPathComponent("context_intervals.json"), options: .atomic)
     }
     static func load(from folder: URL) throws -> Self {
-        let url = folder.appendingPathComponent("context_intervals.json")
-        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-        guard values.isRegularFile == true, values.isSymbolicLink != true,
-              (values.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw Invalid.contract }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let value = try decoder.singleValueContainer()
@@ -205,7 +201,7 @@ nonisolated struct RecordingContract: Codable, Hashable {
             guard let date = formatter.date(from: string) else { throw Invalid.contract }
             return date
         }
-        let result = try decoder.decode(Self.self, from: Data(contentsOf: url))
+        let result = try decoder.decode(Self.self, from: SessionStorage.data("context_intervals.json", in: folder))
         try result.validate()
         return result
     }
