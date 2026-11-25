@@ -81,8 +81,10 @@ nonisolated enum ResearchArchive {
         var selected: [String] = []
         var total = 0
         for session in sessions {
-            let size = try sources(id: session.id, root: root).reduce(0) { sum, url in
-                sum + (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? maximumRawBytes + 1)
+            let size = try SessionStorage.withFolder(root.appendingPathComponent(session.id)) { folder in
+                try sources(id: session.id, root: folder.deletingLastPathComponent()).reduce(0) { sum, url in
+                    sum + (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? maximumRawBytes + 1)
+                }
             }
             guard size <= maximumRawBytes else { throw AccountFailure(message: "A recording exceeds the session ZIP limit. Export it from Sessions; no recordings were removed.") }
             if total + size > maximumRawBytes { break }
@@ -129,11 +131,13 @@ nonisolated enum ResearchArchive {
         for id in ids {
             let target = staging.appendingPathComponent(id, isDirectory: true)
             try manager.createDirectory(at: target, withIntermediateDirectories: false)
-            for source in try sources(id: id, root: root) {
-                total += try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? maximumRawBytes + 1
-                guard total <= maximumRawBytes else { throw AccountFailure(message: "The ZIP exceeds its raw-data limit. Your recordings are kept locally.") }
-                try manager.copyItem(at: source, to: target.appendingPathComponent(source.lastPathComponent))
-                arguments.append("\(id)/\(source.lastPathComponent)")
+            try SessionStorage.withFolder(root.appendingPathComponent(id)) { readable in
+                for source in try sources(id: id, root: readable.deletingLastPathComponent()) {
+                    total += try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? maximumRawBytes + 1
+                    guard total <= maximumRawBytes else { throw AccountFailure(message: "The ZIP exceeds its raw-data limit. Your recordings are kept locally.") }
+                    try manager.copyItem(at: source, to: target.appendingPathComponent(source.lastPathComponent))
+                    arguments.append("\(id)/\(source.lastPathComponent)")
+                }
             }
         }
         let zip = staging.appendingPathComponent("session.zip")
