@@ -51,7 +51,7 @@ import Foundation
         precondition(total == 20, "Sum prior recordings and repeated task stints, excluding no-project work")
         let clipped = try SavedSession.totalTaskWork(project: a.projectID!, task: a.taskID!,
             through: later.addingTimeInterval(12), root: root)
-        precondition(clipped == 17, "A completion must exclude subsequent work even if the same task resumes")
+        precondition(abs(clipped - 17) < 0.000001, "A completion must exclude subsequent work even if the same task resumes")
         let otherProject = try SavedSession.totalTaskWork(project: UUID(), task: a.taskID!, through: later, root: root)
         precondition(otherProject == 0)
         try ongoing.finish(startedAt: later, duration: 20, reason: "test")
