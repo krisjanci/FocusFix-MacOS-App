@@ -6,6 +6,16 @@ import AppKit
     @Published var isWorking = false
     @Published var declaredWorkSeconds = 1024.0
     @Published var workAssignment = WorkAssignment.none
+    @Published var projectWorkTotals: ProjectWorkTotals? = {
+        var totals = ProjectWorkTotals()
+        for project in PreviewProjects.store.projects {
+            totals.projects[project.id] = 9720
+            for task in project.tasks { totals.tasks[project.id, default: [:]][task.id] = 2700 }
+        }
+        return totals
+    }()
+    let projectWorkNotice: String? = nil
+    func refreshSessions() { }
     let needsPermission = false
     let hasError = false
     let message = ""
@@ -43,6 +53,8 @@ import AppKit
         for title in ["Design the new task checklist", "Review session time assignments", "Polish the completion animation", "Test keyboard navigation", "Prepare the next release"] {
             try! store.addTask(title, project: id)
         }
+        let first = store.projects.first { $0.id == id }!.tasks[0].id
+        try! store.updateTaskDetails(first, project: id, description: "Explore the task layout and interactions.", estimate: 2.5)
         try! store.completeTask(store.projects.first { $0.id == id }!.tasks.last!.id, project: id, at: Date().addingTimeInterval(-10))
         for index in 1...5 { try! store.addTask("Extra task \(index)", project: id) }
         _ = try! store.addProject("CS 600", color: "#7963CF")
