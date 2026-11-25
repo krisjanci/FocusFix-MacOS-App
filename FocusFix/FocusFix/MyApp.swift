@@ -7,6 +7,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var progressTimer: Timer?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        do { try RetiredDailySurvey.cleanup() }
+        catch { NSLog("Retired daily survey cleanup will retry next launch: %@", error.localizedDescription) }
         BadgeController.shared.start(tracker: ActivityTracker.shared)
         progressTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
             Task { @MainActor in ActivityTracker.shared.reconcileProgress() }
