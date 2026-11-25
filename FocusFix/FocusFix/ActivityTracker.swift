@@ -793,6 +793,7 @@ final class ActivityTracker: ObservableObject {
         let retained = try SessionFiles.retainRecording(previous.folder, duration: time - previous.contract.elapsedOrigin, root: root)
         if let retained {
             DevelopmentSharingController.shared.finished(folder: retained, startedAt: startedAt, captured: developmentConsent)
+            SessionStorage.compactNewSession(retained)
         }
         let nextStart = Date()
         let next = RecordingContract(recordingID: previous.contract.recordingID, mode: recordingMode,
