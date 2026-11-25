@@ -9,6 +9,7 @@ source_dir="FocusFix/FocusFix"
 run_test() {
     local name="$1"
     shift
+    if [[ -n "${FOCUSFIX_TEST_FILTER:-}" && ! "$name" =~ ^($FOCUSFIX_TEST_FILTER)$ ]]; then return; fi
     echo "Testing $name"
     local sources=("$source_dir/SessionTags.swift" "$source_dir/WorkAssignments.swift") candidate existing duplicate
     for candidate in "$source_dir/SessionStorage.swift" "$source_dir/DailyTimeline.swift" "$source_dir/SessionConditions.swift" "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/ResearchArchiveContract.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
@@ -20,6 +21,8 @@ run_test() {
     "$test_build_dir/$name"
 }
 
+run_test SessionStorageTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift" "$source_dir/DevelopmentSharing.swift"
+run_test DailyTimelineTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test ChecklistPageTests "$source_dir/ChecklistPage.swift"
 run_test ChecklistReorderingTests "$source_dir/ChecklistReordering.swift"
 run_test ProjectsTests "$source_dir/Projects.swift"
