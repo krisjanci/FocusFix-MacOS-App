@@ -49,11 +49,7 @@ nonisolated struct WorkAssignmentJournal: Codable, Hashable {
         try JSONEncoder().encode(self).write(to: folder.appendingPathComponent(Self.filename), options: .atomic)
     }
     static func load(from folder: URL) throws -> Self {
-        let file = folder.appendingPathComponent(filename)
-        let properties = try file.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey])
-        guard properties.isSymbolicLink != true, properties.isRegularFile == true,
-              (properties.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw RecordingContract.Invalid.contract }
-        let journal = try JSONDecoder().decode(Self.self, from: Data(contentsOf: file))
+        let journal = try JSONDecoder().decode(Self.self, from: SessionStorage.data(filename, in: folder))
         var previous = -Double.infinity
         for change in journal.changes {
             guard change.elapsed.isFinite, change.elapsed >= 0, change.elapsed > previous else { throw RecordingContract.Invalid.bounds }
