@@ -210,8 +210,8 @@ nonisolated enum DailyTimeline {
                         try emit(file: name, index: index, kind: kinds[name]!, at: elapsed, fields: fields, original: line)
                     }
                 }
+                let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970; encoder.outputFormatting = [.sortedKeys]
                 if let contract {
-                    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970
                     for (index, interval) in contract.intervals.enumerated() {
                         let original = String(decoding: try encoder.encode(interval), as: UTF8.self)
                         try emit(file: "context_intervals.json", index: index + 1, kind: "context_interval", at: interval.start,
@@ -220,13 +220,13 @@ nonisolated enum DailyTimeline {
                 }
                 for (index, change) in assignments.changes.enumerated() {
                     try emit(file: WorkAssignmentJournal.filename, index: index + 1, kind: "assignment_change", at: change.elapsed,
-                             original: String(decoding: try JSONEncoder().encode(change), as: UTF8.self))
+                             original: String(decoding: try encoder.encode(change), as: UTF8.self))
                 }
                 // Break lifecycle snapshots retain the original action time; explicit intervals supply midnight continuations.
                 for (index, item) in assignments.breaks.enumerated() {
                     try emit(file: WorkAssignmentJournal.filename, index: assignments.changes.count + index + 1,
                              kind: "break_interval", at: item.start, end: item.end ?? through,
-                             fields: ["break_id": item.id], original: String(decoding: try JSONEncoder().encode(item), as: UTF8.self), phase: "explicit_break")
+                             fields: ["break_id": item.id], original: String(decoding: try encoder.encode(item), as: UTF8.self), phase: "explicit_break")
                 }
                 try emit(file: "session.json", index: 1, kind: "segment_end", at: through, original: "{}")
             }
