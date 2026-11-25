@@ -687,7 +687,7 @@ private struct TaskPopupPositioner: NSViewRepresentable {
             stopObserving()
             guard window != nil else { return }
             for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification,
-                         NSWindow.didBeginSheetNotification, NSWindow.didBecomeKeyNotification] {
+                         NSWindow.willBeginSheetNotification, NSWindow.didBecomeKeyNotification] {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
                     MainActor.assumeIsolated {
                         guard let self, let changed = note.object as? NSWindow,
