@@ -7,11 +7,12 @@ import Foundation
         var result: [[String: String]] = []
         while let line = try reader.next(csv: true) {
             let cells = try TimelineRecords.cells(line)
-            precondition(cells.count == header.count)
+            try expect(cells.count == header.count)
             result.append(Dictionary(uniqueKeysWithValues: zip(header, cells)))
         }
         return result
     }
+    static func expect(_ value: @autoclosure () throws -> Bool) throws { let result = try value(); precondition(result) }
     static func fails(_ body: () throws -> Void) { do { try body(); preconditionFailure("Expected failure") } catch {} }
     static func main() throws {
         let fm = FileManager.default, utc = TimeZone(secondsFromGMT: 0)!
@@ -54,34 +55,34 @@ import Foundation
         let legacy = try SavedSession(folder: legacyFolder)
         let result = try SessionFiles.exportSelected([legacy, saved], to: destination, root: root, active: nil, timeZone: utc)
         let files = try fm.contentsOfDirectory(atPath: result.folder.path).sorted()
-        precondition(files == ["activity-2026-11-25.csv", "activity-2026-11-26.csv", "metadata.json"])
+        try expect(files == ["activity-2026-11-25.csv", "activity-2026-11-26.csv", "metadata.json"])
         let firstDay = try rows(result.folder.appendingPathComponent(files[0]))
         let nextDay = try rows(result.folder.appendingPathComponent(files[1]))
         let all = firstDay + nextDay
         let events = all.filter { $0["source_file"] == "events.csv" && $0["row_type"] == "input_event" }
-        precondition(events.count == 6 && events.filter { $0["source_elapsed_seconds"] == "0.250000" }.count == 2)
-        precondition(events.first(where: { $0["source_elapsed_seconds"] == "5.000000" })?["coverage_eligible"] == "false")
-        precondition(events.first(where: { $0["session_id"] == "legacy" })?["activity_context"] == "unknown")
-        precondition(events.first(where: { $0["session_id"] == "legacy" })?["intervention_phase"] == "normal")
+        try expect(events.count == 6 && events.filter { $0["source_elapsed_seconds"] == "0.250000" }.count == 2)
+        try expect(events.first(where: { $0["source_elapsed_seconds"] == "5.000000" })?["coverage_eligible"] == "false")
+        try expect(events.first(where: { $0["session_id"] == "legacy" })?["activity_context"] == "unknown")
+        try expect(events.first(where: { $0["session_id"] == "legacy" })?["intervention_phase"] == "normal")
         let intervals = all.filter { $0["row_type"] == "mouse_interval" }
-        precondition(intervals.count == 1 && intervals[0]["source_distance_screen_points"] == "123.125000")
+        try expect(intervals.count == 1 && intervals[0]["source_distance_screen_points"] == "123.125000")
         let continuations = nextDay.filter { $0["row_type"] == "interval_continuation" }
-        precondition(!continuations.isEmpty && continuations.allSatisfy { $0["source_distance_screen_points"] == "" && !$0["continues_row_id"]!.isEmpty })
+        try expect(!continuations.isEmpty && continuations.allSatisfy { $0["source_distance_screen_points"] == "" && !$0["continues_row_id"]!.isEmpty })
         let response = all.first { $0["row_type"] == "check_in_response" }!
-        precondition(response["check_in_id"] == "check" && response["source_fatigue_0_10"] == "" && response["source_productivity_0_10"] == "")
-        precondition(all.filter { $0["row_type"] == "check_in_action" }.count == 2)
-        precondition(all.first { $0["row_type"] == "reminder_action" }?["source_record_json"] == log)
+        try expect(response["check_in_id"] == "check" && response["source_fatigue_0_10"] == "" && response["source_productivity_0_10"] == "")
+        try expect(all.filter { $0["row_type"] == "check_in_action" }.count == 2)
+        try expect(all.first { $0["row_type"] == "reminder_action" }?["source_record_json"] == log)
         let displayed = events.first { $0["session_id"] == "first" }!["project_name"]!
-        precondition(displayed == "'" + project.projectName!)
+        try expect(displayed == "'" + project.projectName!)
         let metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: result.folder.appendingPathComponent("metadata.json"))) as! [String: Any]
-        precondition(metadata["time_zone"] as? String == "GMT")
-        precondition(metadata["export_schema"] as? String == DailyTimeline.version)
-        precondition(try SessionStorage.data("events.csv", in: writer.folder) == originalEvents)
+        try expect(metadata["time_zone"] as? String == "GMT")
+        try expect(metadata["export_schema"] as? String == DailyTimeline.version)
+        try expect(try SessionStorage.data("events.csv", in: writer.folder) == originalEvents)
         let again = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: utc)
-        for file in files { precondition(try Data(contentsOf: result.folder.appendingPathComponent(file)) == Data(contentsOf: again.folder.appendingPathComponent(file))) }
+        for file in files { try expect(try Data(contentsOf: result.folder.appendingPathComponent(file)) == Data(contentsOf: again.folder.appendingPathComponent(file))) }
         // Zone changes regroup days consistently for the whole export.
         let east = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: TimeZone(identifier: "America/New_York")!)
-        precondition(try fm.contentsOfDirectory(atPath: east.folder.path).sorted() == ["activity-2026-11-25.csv", "metadata.json"])
+        try expect(try fm.contentsOfDirectory(atPath: east.folder.path).sorted() == ["activity-2026-11-25.csv", "metadata.json"])
         let beforeFailure = try fm.contentsOfDirectory(atPath: destination.path).sorted()
         fails { _ = try SessionFiles.exportSelected([saved, saved], to: destination, root: root, active: nil) }
         fails { _ = try SessionFiles.exportSelected([saved], to: destination, root: root, active: saved.folder) }
@@ -89,7 +90,7 @@ import Foundation
         // Malformed source data removes the entire incomplete batch, not just the last file.
         try Data("elapsed_seconds,event_type\n1,\"unterminated".utf8).write(to: legacyFolder.appendingPathComponent("events.csv"))
         fails { _ = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil) }
-        precondition(try fm.contentsOfDirectory(atPath: destination.path).sorted() == beforeFailure)
+        try expect(try fm.contentsOfDirectory(atPath: destination.path).sorted() == beforeFailure)
         print("PASS: daily merging, exact events, midnight references, blank ratings, repeated requests, CRLF, multiline text, mixed formats and atomic failure cleanup")
     }
 }
