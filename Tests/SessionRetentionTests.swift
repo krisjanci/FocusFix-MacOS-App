@@ -64,7 +64,7 @@ struct SessionRetentionTests {
         for invalid in [-1.0, Double.nan, Double.infinity] {
             precondition(!SessionFiles.qualifies(duration: invalid))
         }
-        let exported = try SessionFiles.exportAll(to: root, root: sessions, active: nil)
+        let exported = try SessionFiles.exportAllOriginal(to: root, root: sessions, active: nil)
         precondition(exported.count == 6)
         // Reopening the library reads the same six recordings from disk.
         let reopened = try SessionFiles.list(in: sessions)
@@ -86,7 +86,7 @@ struct SessionRetentionTests {
         let mixed = try SessionFiles.list(in: sessions)
         let mixedGroups = SessionDay.groups(mixed, calendar: calendar)
         precondition(mixedGroups.count == 2 && mixedGroups[0].sessions.count == 1 && mixedGroups[1].sessions.count == 6)
-        let mixedExport = try SessionFiles.exportAll(to: root, root: sessions, active: nil)
+        let mixedExport = try SessionFiles.exportAllOriginal(to: root, root: sessions, active: nil)
         let mixedContents = try FileManager.default.contentsOfDirectory(at: mixedExport.folder, includingPropertiesForKeys: nil)
         precondition(mixedExport.count == 7 && mixedContents.count == 2)
         precondition(mixedContents.contains { $0.lastPathComponent.hasPrefix("FocusFix Session [") })
