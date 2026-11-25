@@ -96,6 +96,21 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     }
 
     // Sum every recorded stint of this task, clipped to the completion instant.
+    static func projectWorkTotals(in sessions: [SavedSession]) throws -> ProjectWorkTotals {
+        var result = ProjectWorkTotals()
+        var seen = Set<UUID>()
+        for session in sessions {
+            try Task.checkCancellation()
+            guard let contract = session.recordingContract, contract.finalized else { continue }
+            guard seen.insert(contract.segmentID).inserted else { throw CocoaError(.fileReadCorruptFile) }
+            if try SessionStorage.contains(WorkAssignmentJournal.filename, in: session.folder) {
+                result.add(try session.assignmentHistory())
+            }
+        }
+        return result
+    }
+
+    // Sum every recorded stint of this task, clipped to the completion instant.
     // Reads are performed off the main actor; missing legacy sidecars contain no task work.
     static func totalTaskWork(project: UUID, task: UUID, through finish: Date, root: URL) throws -> Double {
         let listing = try SessionFiles.inspect(in: root)
