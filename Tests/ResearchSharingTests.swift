@@ -35,7 +35,7 @@ struct ResearchSharingTests {
         let folder = sessions.appendingPathComponent(first)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         for name in ResearchArchive.files { try Data("synthetic fixture".utf8).write(to: folder.appendingPathComponent(name)) }
-        let tagMetadata = try JSONSerialization.data(withJSONObject: ["schema_version": 10, "tags": ["Focused work", "My custom tag"],
+        let tagMetadata = try JSONSerialization.data(withJSONObject: ["schema_version": 10, "status": "test", "duration_seconds": 100, "tags": ["Focused work", "My custom tag"],
             "tag_colors": ["Focused work": "#168B80", "My custom tag": "#C64B66"]])
         try tagMetadata.write(to: folder.appendingPathComponent("session.json"))
         // New context-bearing schemas cannot use the legacy research allowlist.
@@ -81,6 +81,22 @@ struct ResearchSharingTests {
         try FileManager.default.createSymbolicLink(at: event, withDestinationURL: folder.appendingPathComponent("profile.json"))
         do { _ = try ResearchArchive.prepare(ids: [first], root: sessions, destination: destination); preconditionFailure("Symlink file accepted") } catch { }
         precondition(FileManager.default.fileExists(atPath: folder.appendingPathComponent("profile.json").path))
+        // Existing research payloads also work after local compaction, without sharing private extras.
+        try FileManager.default.removeItem(at: event)
+        try Data("synthetic fixture".utf8).write(to: event)
+        _ = try SessionStorage.compact(folder, force: true)
+        let compactedIDs = try ResearchArchive.select(records, root: sessions)
+        precondition(compactedIDs == [first])
+        let compactedZIP = root.appendingPathComponent("compacted.zip")
+        _ = try ResearchArchive.prepare(ids: compactedIDs, root: sessions, destination: compactedZIP)
+        let inspect = Process(), compactedOutput = Pipe()
+        inspect.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        inspect.arguments = ["-p", compactedZIP.path]; inspect.standardOutput = compactedOutput
+        try inspect.run()
+        let payload = String(decoding: compactedOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        inspect.waitUntilExit()
+        precondition(inspect.terminationStatus == 0 && !payload.contains("private name and photo"))
+        precondition(!payload.contains("archive") && !payload.contains("sha256"))
         print("Research consent snapshots, cancellation, retry batches and ZIP allowlisting passed")
     }
 }
