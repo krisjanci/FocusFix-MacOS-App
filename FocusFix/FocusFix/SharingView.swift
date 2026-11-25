@@ -50,8 +50,6 @@ struct PrivacyResearchSettings: View {
                 Label("Privacy & Data Sharing", systemImage: "hand.raised").font(.title2.weight(.semibold))
                 ProfilePhotoPrivacySettings()
                 Divider()
-                StartOfDaySurveySettings()
-                Divider()
                 PersonalSurveySettings()
                 Divider()
                 Toggle("Allow activity recording", isOn: Binding(get: { recordingEnabled }, set: { value in
