@@ -14,6 +14,7 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = "system"
     @State private var sharingPresented = false
     @State private var showingProjects = false
+    @State private var browsedProjectTint: String?
     @ObservedObject private var projects = ProjectStore.shared
     @State private var editingConditions = false
     @State private var editingActivity = false
@@ -359,7 +360,13 @@ struct ContentView: View {
             }
         }
         .padding(30).frame(width: 490)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                if showingProjects, let browsedProjectTint { TagTintBackground(colors: [browsedProjectTint]) }
+            }
+        }
+        .onPreferenceChange(BrowsedProjectTintKey.self) { browsedProjectTint = $0 }
         .onChange(of: tour.isPresented) { _, shown in if shown { sharingPresented = false } }
         .sheet(isPresented: $sharingPresented) { SharingView() }
         .sheet(isPresented: $editingActivity) { BreakActivityEditor(tracker: tracker) }
