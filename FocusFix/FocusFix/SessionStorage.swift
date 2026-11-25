@@ -210,6 +210,16 @@ nonisolated enum SessionStorage {
             }
         }
     }
+    static func resumeCompaction(in root: URL) {
+        Task.detached(priority: .utility) {
+            guard let folders = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else { return }
+            for folder in folders {
+                guard let info = try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                      info.isDirectory == true, info.isSymbolicLink != true else { continue }
+                compactNewSession(folder)
+            }
+        }
+    }
     static func compactNewSession(_ folder: URL) {
         guard manager.fileExists(atPath: folder.appendingPathComponent(pendingMarker).path) else { return }
         Task.detached(priority: .utility) {
