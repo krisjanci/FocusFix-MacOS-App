@@ -58,7 +58,7 @@ import Foundation
         let export = fm.temporaryDirectory.appendingPathComponent("assignment-export-\(UUID())", isDirectory: true)
         defer { try? fm.removeItem(at: export) }
         try fm.createDirectory(at: export, withIntermediateDirectories: true)
-        let copy = try SessionFiles.export(saved, to: export, root: root, active: nil)
+        let copy = try SessionFiles.exportOriginal(saved, to: export, root: root, active: nil)
         precondition(fm.fileExists(atPath: copy.appendingPathComponent(WorkAssignmentJournal.filename).path))
         // No names in session.json; upload allowlist excludes the sidecar.
         let metadata = try String(contentsOf: writer.folder.appendingPathComponent("session.json"), encoding: .utf8)
