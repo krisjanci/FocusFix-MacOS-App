@@ -536,6 +536,7 @@ private struct ProjectTaskDetails: View {
     @State private var editingEstimate = false
     @State private var editingTitle = false
     @State private var titleDraft = ""
+    @State private var titleError: String?
     @FocusState private var titleFocused: Bool
 
     init(store: ProjectStore, tracker: ActivityTracker, projectID: UUID, task: ProjectTask) {
@@ -562,7 +563,7 @@ private struct ProjectTaskDetails: View {
                 if editingTitle {
                     TextField("Task title", text: $titleDraft).textFieldStyle(.plain)
                         .focused($titleFocused).onSubmit { _ = saveTitle() }
-                        .onExitCommand { editingTitle = false; titleFocused = false; saveError = nil }
+                        .onExitCommand { editingTitle = false; titleFocused = false; titleError = nil }
                         .accessibilityLabel("Task title")
                 } else {
                     Text(task?.title ?? "Task no longer available")
@@ -577,6 +578,7 @@ private struct ProjectTaskDetails: View {
                         }
                 }
             }.font(.title3.weight(.semibold))
+            if let titleError { Text(titleError).font(.caption).foregroundStyle(.red) }
             Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Description (optional)").font(.callout.weight(.medium))
@@ -655,10 +657,10 @@ private struct ProjectTaskDetails: View {
         guard editingTitle else { return true }
         do {
             try store.renameTask(taskID, project: projectID, title: titleDraft)
-            editingTitle = false; titleFocused = false; saveError = nil
+            editingTitle = false; titleFocused = false; titleError = nil
             return true
         } catch {
-            saveError = error.localizedDescription; titleFocused = true
+            titleError = error.localizedDescription; titleFocused = true
             return false
         }
     }
@@ -679,6 +681,7 @@ private struct TaskPopupPositioner: NSViewRepresentable {
 
     final class Probe: NSView {
         private var observers: [NSObjectProtocol] = []
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             stopObserving()
