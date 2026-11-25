@@ -18,7 +18,11 @@ struct ChecklistReorderRow: ViewModifier {
             content
                 .contentShape(Rectangle())
                 .checklistPressFeedback(dragging: source == item) {
-                    if source == item { source = nil; insertion = nil }
+                    // Let AppKit deliver performDrop before clearing the local payload.
+                    // The same cleanup handles releases outside any accepted target.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if NSEvent.pressedMouseButtons & 1 == 0, source == item { source = nil; insertion = nil }
+                    }
                 }
                 .background(GeometryReader { geometry in
                     Color.clear.onAppear { height = geometry.size.height }
