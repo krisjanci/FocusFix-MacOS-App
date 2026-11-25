@@ -52,6 +52,9 @@ import Foundation
         try fm.createDirectory(at: legacyFolder, withIntermediateDirectories: false)
         try Data("{\"started_at_utc\":\"2026-11-26T00:00:00Z\",\"schema_version\":5,\"status\":\"test\",\"duration_seconds\":1}".utf8).write(to: legacyFolder.appendingPathComponent("session.json"))
         try Data("elapsed_seconds,event_type,activity_phase\r\n0.000000,key_down,work\r\n".utf8).write(to: legacyFolder.appendingPathComponent("events.csv"))
+        // A legacy break may cross midnight without work_assignments.json.
+        try (BreakLogEntry.header + "0.000000,break_start,p,legacy-break,4.000000,0.000000,,,,Rest,,,,0.000000\n" +
+             "1.000000,break_end,p,legacy-break,4.000000,0.000000,1.000000,1.000000,0.000000,Rest,Rest,return,,0.000000\n").write(to: legacyFolder.appendingPathComponent("breaks.csv"), atomically: true, encoding: .utf8)
         let legacy = try SavedSession(folder: legacyFolder)
         let result = try SessionFiles.exportSelected([legacy, saved], to: destination, root: root, active: nil, timeZone: utc)
         let files = try fm.contentsOfDirectory(atPath: result.folder.path).sorted()
@@ -64,6 +67,8 @@ import Foundation
         try expect(events.first(where: { $0["source_elapsed_seconds"] == "5.000000" })?["coverage_eligible"] == "false")
         try expect(events.first(where: { $0["session_id"] == "legacy" })?["activity_context"] == "unknown")
         try expect(events.first(where: { $0["session_id"] == "legacy" })?["intervention_phase"] == "normal")
+        try expect(all.contains { $0["row_type"] == "break_interval" && $0["break_id"] == "legacy-break" })
+        try expect(Set(all.compactMap { $0["row_id"] }).count == all.count)
         let intervals = all.filter { $0["row_type"] == "mouse_interval" }
         try expect(intervals.count == 1 && intervals[0]["source_distance_screen_points"] == "123.125000")
         let continuations = nextDay.filter { $0["row_type"] == "interval_continuation" }
