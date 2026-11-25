@@ -707,8 +707,7 @@ private struct TaskPopupPositioner: NSViewRepresentable {
                 guard let sheet = self?.window, let parent = sheet.sheetParent,
                       let content = parent.contentView else { return }
                 let bounds = parent.convertToScreen(content.bounds)
-                let origin = NSPoint(x: bounds.minX + min(490, bounds.width) / 2 - sheet.frame.width / 2,
-                                     y: bounds.midY - sheet.frame.height / 2)
+                let origin = TaskPopupLayout.origin(parentContent: bounds, popupSize: sheet.frame.size)
                 if abs(sheet.frame.minX - origin.x) > 0.5 || abs(sheet.frame.minY - origin.y) > 0.5 {
                     sheet.setFrameOrigin(origin)
                 }
