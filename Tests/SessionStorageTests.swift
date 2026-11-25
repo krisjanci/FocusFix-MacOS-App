@@ -88,7 +88,7 @@ import Foundation
         let conditioned = try SavedSession(folder: tagged.folder)
         try expect(conditioned.conditions == conditions)
         try SessionFiles.correctContext(.unknown, start: 10, end: 20, for: conditioned, root: root, active: nil,
-                                        expectedRevision: conditioned.recordingContract!.revision)
+                                        expectedRevision: conditioned.recordingContract!.revisions.count)
         let corrected = try SavedSession(folder: tagged.folder)
         try expect(tryCoverage(corrected).work == 90 && tryData("events.csv", tagged.folder) == originals["events.csv"])
         let beforeFailedEdit = try Data(contentsOf: tagged.folder.appendingPathComponent(SessionStorage.marker))
