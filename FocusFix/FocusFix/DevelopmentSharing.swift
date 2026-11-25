@@ -67,6 +67,13 @@ nonisolated enum DevelopmentArchive {
     }
 
     static func prepare(id: String, root: URL, consent: DevelopmentConsent, destination: URL) throws -> Data {
+        return try SessionStorage.synchronized {
+        let folder = root.appendingPathComponent(id)
+        if SessionStorage.isArchived(folder) {
+            return try SessionStorage.withFolder(folder) { stage in
+                try prepare(id: id, root: stage.deletingLastPathComponent(), consent: consent, destination: destination)
+            }
+        }
         let sources = try sources(id: id, root: root)
         let manager = FileManager.default
         let stage = destination.deletingLastPathComponent().appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -100,5 +107,6 @@ nonisolated enum DevelopmentArchive {
         try data.write(to: destination, options: .atomic)
         try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
         return data
+        }
     }
 }
