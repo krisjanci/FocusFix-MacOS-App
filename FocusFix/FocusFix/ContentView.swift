@@ -319,11 +319,13 @@ struct ContentView: View {
             .opacity(showingProjects ? 0 : 1)
             .allowsHitTesting(!showingProjects)
             .accessibilityHidden(showingProjects)
+            .disabled(showingProjects)
             .overlay {
                 ProjectsView(store: projects, tracker: tracker, close: { showingProjects = false })
                     .opacity(showingProjects ? 1 : 0)
                     .allowsHitTesting(showingProjects)
                     .accessibilityHidden(!showingProjects)
+                    .disabled(!showingProjects)
             }
 
             HStack {
