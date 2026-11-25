@@ -27,14 +27,10 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     init(folder: URL) throws {
         self.folder = folder
         let values = try folder.resourceValues(forKeys: [.creationDateKey])
-        let metadataURL = folder.appendingPathComponent("session.json")
         let metadata: [String: Any]
         let metadataData: Data
-        if FileManager.default.fileExists(atPath: metadataURL.path) {
-            let properties = try metadataURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-            guard properties.isRegularFile == true, properties.isSymbolicLink != true,
-                  (properties.fileSize ?? Int.max) <= 16 * 1024 * 1024 else { throw RecordingContract.Invalid.contract }
-            metadataData = try Data(contentsOf: metadataURL)
+        if try SessionStorage.contains("session.json", in: folder) {
+            metadataData = try SessionStorage.data("session.json", in: folder)
             guard let decoded = try JSONSerialization.jsonObject(with: metadataData) as? [String: Any] else {
                 throw RecordingContract.Invalid.contract
             }
@@ -42,7 +38,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         } else { metadata = [:]; metadataData = Data("{}".utf8) }
         schemaVersion = metadata["schema_version"] as? Int ?? 0
         if schemaVersion < RecordingContract.schemaVersion,
-           FileManager.default.fileExists(atPath: folder.appendingPathComponent("context_intervals.json").path) { throw RecordingContract.Invalid.contract }
+           try SessionStorage.contains("context_intervals.json", in: folder) { throw RecordingContract.Invalid.contract }
         if schemaVersion >= RecordingContract.schemaVersion {
             guard schemaVersion == RecordingContract.schemaVersion,
                   metadata["recording_format"] as? String == RecordingContract.format,
@@ -109,7 +105,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         for session in listing.sessions {
             try Task.checkCancellation()
             guard let contract = session.recordingContract,
-                  FileManager.default.fileExists(atPath: session.folder.appendingPathComponent(WorkAssignmentJournal.filename).path)
+                  try SessionStorage.contains(WorkAssignmentJournal.filename, in: session.folder)
             else { continue }
             guard seen.insert(contract.segmentID).inserted else { throw CocoaError(.fileReadCorruptFile) }
             let cutoff = finish.timeIntervalSince(session.startedAt) + contract.elapsedOrigin
@@ -122,7 +118,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
     }
 
     var assignmentNotice: String? {
-        guard FileManager.default.fileExists(atPath: folder.appendingPathComponent(WorkAssignmentJournal.filename).path) else { return nil }
+        guard (try? SessionStorage.contains(WorkAssignmentJournal.filename, in: folder)) == true else { return nil }
         do { _ = try WorkAssignmentJournal.load(from: folder); return nil }
         catch { return "Project/task history could not be read. The original file was kept." }
     }
@@ -183,6 +179,7 @@ nonisolated enum SessionFiles {
         guard qualifies(duration: duration) else { throw RecordingContract.Invalid.bounds }
         let destination = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
         try FileManager.default.moveItem(at: folder, to: destination)
+        SessionStorage.compactNewSession(destination)
         return destination
     }
 
@@ -214,6 +211,7 @@ nonisolated enum SessionFiles {
                 try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
                 let destination = root.appendingPathComponent(folder.lastPathComponent)
                 try FileManager.default.moveItem(at: folder, to: destination)
+                SessionStorage.compactNewSession(destination)
                 count += 1
             } catch { failures += 1 }
         }
@@ -234,6 +232,12 @@ nonisolated enum SessionFiles {
     }
     static func updateConditions(_ values: [SessionCondition], for session: SavedSession, root: URL, active: URL?) throws {
         try validate(session.folder, in: root, active: active)
+        if SessionStorage.isArchived(session.folder) {
+            try SessionStorage.edit(session.folder) { stage in
+                try updateConditions(values, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+            }
+            return
+        }
         let valid = try SessionConditions.validated(values)
         let url = session.folder.appendingPathComponent("session.json")
         var metadata: [String: Any]
@@ -255,6 +259,12 @@ nonisolated enum SessionFiles {
     // Edit labels without recreating metadata or touching activity/survey files.
     static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
         try validate(session.folder, in: root, active: active)
+        if SessionStorage.isArchived(session.folder) {
+            try SessionStorage.edit(session.folder) { stage in
+                try updateTags(tags, colors: colors, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+            }
+            return
+        }
         let valid = try SessionTags.validated(tags)
         let validColors = try SessionTags.colors(colors, for: valid)
         let url = session.folder.appendingPathComponent("session.json")
@@ -284,6 +294,12 @@ nonisolated enum SessionFiles {
                                for session: SavedSession, root: URL, active: URL?,
                                actionID: UUID = UUID(), expectedRevision: Int) throws {
         try validate(session.folder, in: root, active: active)
+        if SessionStorage.isArchived(session.folder) {
+            try SessionStorage.edit(session.folder) { stage in
+                try correctContext(context, start: start, end: end, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil, actionID: actionID, expectedRevision: expectedRevision)
+            }
+            return
+        }
         var contract = try RecordingContract.load(from: session.folder)
         try contract.correctContext(context, start: start, end: end,
             effectiveAt: session.startedAt.addingTimeInterval(start - contract.elapsedOrigin),
