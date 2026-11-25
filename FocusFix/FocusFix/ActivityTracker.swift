@@ -145,6 +145,7 @@ final class ActivityTracker: ObservableObject {
         loadProgress()
         do { _ = try SessionFiles.recoverPending(in: SessionFiles.root()) }
         catch { recoveryNotice = "An interrupted recording could not be finalized; original files were kept." }
+        if let root = try? SessionFiles.root() { SessionStorage.resumeCompaction(in: root) }
         refreshSessions()
         AutomaticRecordingPreferences.shared.onChange = { [weak self] in self?.automaticPreferencesChanged() }
         captureState = RecordingNotice().enabled ? .ready : .disabled
@@ -655,12 +656,13 @@ final class ActivityTracker: ObservableObject {
                 ResearchSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: researchConsent)
                 DevelopmentSharingController.shared.finished(folder: sessionFolder, startedAt: startedAt, captured: developmentConsent)
             }
+            if let sessionFolder { SessionStorage.compactNewSession(sessionFolder) }
             researchConsent = nil
             developmentConsent = nil
             if sessionFolder == nil {
                 message = "Recording stopped. Check Sessions for your saved recordings."
             } else {
-                message = reason == "user_stop" ? "Session saved. Your CSV files are ready." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
+                message = reason == "user_stop" ? "Session saved. Export daily activity CSVs from Sessions." : "Session saved and stopped (\(reason.replacingOccurrences(of: "_", with: " ")))."
             }
             if let checkInSaveError {
                 hasError = true
@@ -1494,8 +1496,8 @@ final class ActivityTracker: ObservableObject {
     func exportSavedSessions(_ selected: [SavedSession]?) async throws -> (folder: URL, count: Int)? {
         let panel = NSOpenPanel()
         panel.title = selected == nil ? "Export all saved sessions" : "Export selected sessions"
-        panel.message = selected.map { "Copies \($0.count) selected sessions into one folder." }
-            ?? "Copies all saved sessions into one folder. The current recording is skipped."
+        panel.message = selected.map { "Combines \($0.count) selected sessions into one activity CSV per day." }
+            ?? "Combines saved sessions into one activity CSV per day. The current recording is skipped."
         panel.prompt = "Export here"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -1519,7 +1521,7 @@ final class ActivityTracker: ObservableObject {
         try SessionFiles.validate(session.folder, in: SessionFiles.root(),
             active: isRecording ? sessionFolder : nil)
         let panel = NSOpenPanel()
-        panel.title = "Export session CSV files"
+        panel.title = "Export daily activity CSVs"
         panel.prompt = "Export here"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
