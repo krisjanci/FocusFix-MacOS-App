@@ -23,6 +23,39 @@ final class ActivityTracker: ObservableObject {
     @Published private(set) var sessionFolder: URL?
     @Published private(set) var sessionConditions: [SessionCondition] = []
     @Published private(set) var workAssignment = WorkAssignment.none
+    @Published private var savedProjectWork: ProjectWorkTotals?
+    @Published private(set) var projectWorkNotice: String?
+    private var projectWorkLoading: Task<Void, Never>?
+
+    var projectWorkTotals: ProjectWorkTotals? {
+        guard var totals = savedProjectWork else { return nil }
+        if let writer {
+            let origin = writer.contract.elapsedOrigin
+            let start = startedAt.timeIntervalSince1970
+            let observed = segmentWorkIntervals.map { ($0.start - start + origin, $0.end - start + origin) }
+            totals.add(writer.assignments.intervals(in: writer.contract, observedWork: observed))
+        }
+        return totals
+    }
+
+    private func refreshProjectWork(_ sessions: [SavedSession], unreadable: Int) {
+        projectWorkLoading?.cancel()
+        savedProjectWork = nil
+        projectWorkNotice = nil
+        projectWorkLoading = Task { [weak self] in
+            do {
+                guard unreadable == 0 else { throw CocoaError(.fileReadCorruptFile) }
+                let worker = Task.detached { try SavedSession.projectWorkTotals(in: sessions) }
+                let totals = try await withTaskCancellationHandler { try await worker.value }
+                    onCancel: { worker.cancel() }
+                guard !Task.isCancelled else { return }
+                self?.savedProjectWork = totals
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.projectWorkNotice = "Work totals unavailable. Refresh to retry; recorded history was kept."
+            }
+        }
+    }
     @Published private(set) var sessionTags: [String] = []
     @Published private(set) var sessionTagColors: [String: String] = [:]
     @Published private(set) var message = "Ready when you are."
@@ -1395,6 +1428,9 @@ final class ActivityTracker: ObservableObject {
 
     // Reload saved session metadata so the library matches the local files.
     func refreshSessions() {
+        projectWorkLoading?.cancel()
+        savedProjectWork = nil
+        projectWorkNotice = nil
         do {
             let root = try SessionFiles.root()
             sessionLoader.load(root: root) { [weak self] result in
@@ -1402,17 +1438,21 @@ final class ActivityTracker: ObservableObject {
                 switch result {
                 case .success(let listing):
                     self.sessions = listing.sessions
+                    self.refreshProjectWork(listing.sessions, unreadable: listing.unreadable)
                     let unreadable = listing.unreadable > 0 ? "\(listing.unreadable) unreadable or unsupported recordings were kept. Compatible history remains available; Export All is blocked until those files are reviewed." : nil
                     let notices = [self.recoveryNotice, unreadable].compactMap { $0 }
                     self.libraryNotice = notices.isEmpty ? nil : notices.joined(separator: "\n")
                     self.libraryError = nil
                     self.reconcileSavedProgress()
-                case .failure(let error): self.libraryError = error.localizedDescription
+                case .failure(let error):
+                    self.libraryError = error.localizedDescription
+                    self.projectWorkNotice = "Work totals unavailable. Refresh to retry."
                 }
             }
         } catch {
             sessionLoader.cancel()
             libraryError = error.localizedDescription
+            projectWorkNotice = "Work totals unavailable. Refresh to retry."
         }
     }
     // Check whether a library entry is the session currently being recorded.
