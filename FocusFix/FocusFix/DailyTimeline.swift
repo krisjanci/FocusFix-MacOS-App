@@ -131,7 +131,9 @@ nonisolated enum DailyTimeline {
                     guard date.timeIntervalSince1970.isFinite else { throw RecordingContract.Invalid.bounds }
                     let context = contract?.intervals.last(where: { $0.start <= elapsed && elapsed < ($0.end ?? through) })?.context.rawValue ?? "unknown"
                     let assignment = assignments.changes.last(where: { $0.elapsed <= elapsed })?.assignment ?? .none
-                    let eligible = elapsed >= origin && (end.map { $0 <= through } ?? (elapsed <= through))
+                    let withinEnd = end.map { $0 <= through } ??
+                        (kind == "input_event" && fields["event_type"] != "session_stop" ? elapsed < through : elapsed <= through)
+                    let eligible = elapsed >= origin && withinEnd
                     let id = "\(session.id)/\(file)/\(index)"
                     var row: [String: String] = ["row_id": id, "row_type": kind, "session_id": session.id,
                         "recording_id": contract?.recordingID.uuidString ?? "", "segment_id": contract?.segmentID.uuidString ?? "",
