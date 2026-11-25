@@ -179,7 +179,6 @@ nonisolated enum SessionFiles {
         guard qualifies(duration: duration) else { throw RecordingContract.Invalid.bounds }
         let destination = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
         try FileManager.default.moveItem(at: folder, to: destination)
-        SessionStorage.compactNewSession(destination)
         return destination
     }
 
@@ -211,8 +210,7 @@ nonisolated enum SessionFiles {
                 try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
                 let destination = root.appendingPathComponent(folder.lastPathComponent)
                 try FileManager.default.moveItem(at: folder, to: destination)
-                SessionStorage.compactNewSession(destination)
-                count += 1
+                        count += 1
             } catch { failures += 1 }
         }
         if failures > 0 {
@@ -371,7 +369,7 @@ nonisolated enum SessionFiles {
     }
 
     // Copy a session to a new export folder, adding a suffix instead of overwriting an existing export.
-    static func export(_ session: SavedSession, to destination: URL, root: URL, active: URL?) throws -> URL {
+    static func exportOriginal(_ session: SavedSession, to destination: URL, root: URL, active: URL?) throws -> URL {
         try validate(session.folder, in: root, active: active)
         let target = try exportDestination(destination, root: root)
         let name = session.exportName()
@@ -382,7 +380,9 @@ nonisolated enum SessionFiles {
             number += 1
         }
         // copyItem fails rather than overwriting if another file appears here.
-        try FileManager.default.copyItem(at: session.folder, to: copy)
+        try SessionStorage.withFolder(session.folder) { source in
+            try FileManager.default.copyItem(at: source, to: copy)
+        }
         do {
             try normalizeExportContexts(in: copy)
             return copy
@@ -486,7 +486,7 @@ nonisolated enum SessionFiles {
 
     // Re-read storage and copy every inactive session into one new folder.
     // Remove an incomplete batch if any copy fails, leaving originals untouched.
-    static func exportAll(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
+    static func exportAllOriginal(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
         let target = try exportDestination(destination, root: root)
         let listing = try inspect(in: root)
         guard listing.unreadable == 0 else { throw RecordingContract.Invalid.contract }
@@ -495,11 +495,11 @@ nonisolated enum SessionFiles {
             throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey:
                 "There are no saved sessions to export. Stop and save the current recording first."])
         }
-        return try exportSelected(sessions, to: target, root: root, active: active)
+        return try exportSelectedOriginal(sessions, to: target, root: root, active: active)
     }
 
     // Validate the entire explicit selection before copying; never silently skip a selected recording.
-    static func exportSelected(_ sessions: [SavedSession], to destination: URL, root: URL,
+    static func exportSelectedOriginal(_ sessions: [SavedSession], to destination: URL, root: URL,
                                active: URL?) throws -> (folder: URL, count: Int) {
         let target = try exportDestination(destination, root: root)
         guard !sessions.isEmpty, Set(sessions.map(\.id)).count == sessions.count else {
@@ -522,7 +522,7 @@ nonisolated enum SessionFiles {
                     try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
                 } else { destination = batch }
                 for session in day.sessions {
-                    _ = try export(session, to: destination, root: root, active: active)
+                    _ = try exportOriginal(session, to: destination, root: root, active: active)
                 }
             }
         } catch {
@@ -530,6 +530,37 @@ nonisolated enum SessionFiles {
             throw error
         }
         return (batch, sessions.count)
+    }
+
+    // User-facing exports combine every selected session into one timeline per day.
+    static func export(_ session: SavedSession, to destination: URL, root: URL, active: URL?) throws -> URL {
+        try exportSelected([session], to: destination, root: root, active: active).folder
+    }
+    static func exportAll(to destination: URL, root: URL, active: URL?) throws -> (folder: URL, count: Int) {
+        let listing = try inspect(in: root)
+        guard listing.unreadable == 0 else { throw RecordingContract.Invalid.contract }
+        return try exportSelected(listing.sessions.filter { !sameFolder($0.folder, active) }, to: destination, root: root, active: active)
+    }
+    static func exportSelected(_ sessions: [SavedSession], to destination: URL, root: URL, active: URL?,
+                               timeZone: TimeZone = .current) throws -> (folder: URL, count: Int) {
+        let target = try exportDestination(destination, root: root)
+        guard !sessions.isEmpty, Set(sessions.map(\.id)).count == sessions.count else {
+            throw NSError(domain: "FocusFix", code: 3, userInfo: [NSLocalizedDescriptionKey: "Select one or more distinct saved sessions to export."])
+        }
+        for session in sessions { try validate(session.folder, in: root, active: active) }
+        let manager = FileManager.default
+        var batch = target.appendingPathComponent("FocusFix Activity"), number = 2
+        while manager.fileExists(atPath: batch.path) {
+            batch = target.appendingPathComponent("FocusFix Activity (\(number))"); number += 1
+        }
+        try manager.createDirectory(at: batch, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        do {
+            try DailyTimeline.export(sessions, to: batch, timeZone: timeZone)
+            return (batch, sessions.count)
+        } catch {
+            try? manager.removeItem(at: batch)
+            throw error
+        }
     }
 
     private static func exportDestination(_ destination: URL, root: URL) throws -> URL {
