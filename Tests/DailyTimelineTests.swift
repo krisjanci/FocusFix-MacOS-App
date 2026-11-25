@@ -52,7 +52,7 @@ import Foundation
         try fm.createDirectory(at: legacyFolder, withIntermediateDirectories: false)
         try Data("{\"started_at_utc\":\"2026-11-26T00:00:00Z\",\"schema_version\":5,\"status\":\"test\",\"duration_seconds\":1}".utf8).write(to: legacyFolder.appendingPathComponent("session.json"))
         try Data("elapsed_seconds,event_type,activity_phase\r\n0.000000,key_down,work\r\n".utf8).write(to: legacyFolder.appendingPathComponent("events.csv"))
-        // A legacy break may cross midnight without work_assignments.json.
+        // Legacy break intervals do not require work_assignments.json.
         try (BreakLogEntry.header + "0.000000,break_start,p,legacy-break,4.000000,0.000000,,,,Rest,,,,0.000000\n" +
              "1.000000,break_end,p,legacy-break,4.000000,0.000000,1.000000,1.000000,0.000000,Rest,Rest,return,,0.000000\n").write(to: legacyFolder.appendingPathComponent("breaks.csv"), atomically: true, encoding: .utf8)
         let legacy = try SavedSession(folder: legacyFolder)
