@@ -68,45 +68,45 @@ nonisolated enum DevelopmentArchive {
 
     static func prepare(id: String, root: URL, consent: DevelopmentConsent, destination: URL) throws -> Data {
         return try SessionStorage.synchronized {
-        let folder = root.appendingPathComponent(id)
-        if SessionStorage.isArchived(folder) {
-            return try SessionStorage.withFolder(folder) { stage in
-                try prepare(id: id, root: stage.deletingLastPathComponent(), consent: consent, destination: destination)
+            let folder = root.appendingPathComponent(id)
+            if SessionStorage.isArchived(folder) {
+                return try SessionStorage.withFolder(folder) { stage in
+                    try prepare(id: id, root: stage.deletingLastPathComponent(), consent: consent, destination: destination)
+                }
             }
-        }
-        let sources = try sources(id: id, root: root)
-        let manager = FileManager.default
-        let stage = destination.deletingLastPathComponent().appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try manager.createDirectory(at: stage, withIntermediateDirectories: true,
-                                    attributes: [.posixPermissions: 0o700])
-        defer { try? manager.removeItem(at: stage) }
-        let target = stage.appendingPathComponent(id, isDirectory: true)
-        try manager.createDirectory(at: target, withIntermediateDirectories: false)
-        for source in sources {
-            try manager.copyItem(at: source, to: target.appendingPathComponent(source.lastPathComponent))
-        }
-        let manifest = ["purpose": "FocusFix product development", "format": "development-v1",
-                        "consent_id": consent.id.uuidString.lowercased(),
-                        "policy_version": consent.policyVersion]
-        let manifestURL = target.appendingPathComponent("sharing_manifest.json")
-        try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
-            .write(to: manifestURL, options: .atomic)
-        let zip = stage.appendingPathComponent("recording.zip")
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-        process.currentDirectoryURL = stage
-        process.arguments = ["-q", "-X", zip.path] + (files + ["sharing_manifest.json"]).map { "\(id)/\($0)" }
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0,
-              let size = try zip.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              size > 0, size <= maximumZIPBytes else { throw RecordingContract.Invalid.contract }
-        let data = try Data(contentsOf: zip)
-        try data.write(to: destination, options: .atomic)
-        try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
-        return data
+            let sources = try sources(id: id, root: root)
+            let manager = FileManager.default
+            let stage = destination.deletingLastPathComponent().appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try manager.createDirectory(at: stage, withIntermediateDirectories: true,
+                                        attributes: [.posixPermissions: 0o700])
+            defer { try? manager.removeItem(at: stage) }
+            let target = stage.appendingPathComponent(id, isDirectory: true)
+            try manager.createDirectory(at: target, withIntermediateDirectories: false)
+            for source in sources {
+                try manager.copyItem(at: source, to: target.appendingPathComponent(source.lastPathComponent))
+            }
+            let manifest = ["purpose": "FocusFix product development", "format": "development-v1",
+                            "consent_id": consent.id.uuidString.lowercased(),
+                            "policy_version": consent.policyVersion]
+            let manifestURL = target.appendingPathComponent("sharing_manifest.json")
+            try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+                .write(to: manifestURL, options: .atomic)
+            let zip = stage.appendingPathComponent("recording.zip")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            process.currentDirectoryURL = stage
+            process.arguments = ["-q", "-X", zip.path] + (files + ["sharing_manifest.json"]).map { "\(id)/\($0)" }
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  let size = try zip.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                  size > 0, size <= maximumZIPBytes else { throw RecordingContract.Invalid.contract }
+            let data = try Data(contentsOf: zip)
+            try data.write(to: destination, options: .atomic)
+            try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+            return data
         }
     }
 }
