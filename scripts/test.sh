@@ -11,7 +11,7 @@ run_test() {
     shift
     echo "Testing $name"
     local sources=("$source_dir/SessionTags.swift" "$source_dir/WorkAssignments.swift") candidate existing duplicate
-    for candidate in "$source_dir/SessionConditions.swift" "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/ResearchArchiveContract.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
+    for candidate in "$source_dir/SessionStorage.swift" "$source_dir/DailyTimeline.swift" "$source_dir/SessionConditions.swift" "$source_dir/SessionTags.swift" "$source_dir/RecordingContract.swift" "$source_dir/ReminderEligibility.swift" "$source_dir/StudyCheckIns.swift" "$source_dir/ResearchArchiveContract.swift" "$source_dir/RecordingCoverage.swift" "$source_dir/SavedSession.swift" "$@"; do
         duplicate=false
         for existing in "${sources[@]}"; do if [ "$candidate" = "$existing" ]; then duplicate=true; break; fi; done
         if [ "$duplicate" = false ]; then sources+=("$candidate"); fi
@@ -24,7 +24,7 @@ run_test ChecklistPageTests "$source_dir/ChecklistPage.swift"
 run_test ChecklistReorderingTests "$source_dir/ChecklistReordering.swift"
 run_test ProjectsTests "$source_dir/Projects.swift"
 run_test WorkAssignmentsTests "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift" "$source_dir/DevelopmentSharing.swift"
-run_test StartOfDaySurveyTests "$source_dir/StartOfDaySurvey.swift" "$source_dir/StartOfDayController.swift"
+run_test RetiredDailySurveyTests "$source_dir/StartOfDaySurvey.swift"
 run_test AutomaticRecordingPreferencesTests "$source_dir/AutomaticRecordingPreferences.swift" "$source_dir/RecordingNotice.swift" "$source_dir/LoginLaunch.swift"
 run_test RecordingLifecycleTests "$source_dir/SystemIdleTime.swift" "$source_dir/RecordingLifecycle.swift" "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
 run_test ContextEditingTests "$source_dir/SavedSession.swift" "$source_dir/RecordingData.swift" "$source_dir/BreakPolicy.swift" "$source_dir/SurveyData.swift" "$source_dir/TimedCheckIn.swift"
