@@ -77,10 +77,10 @@ struct SessionConditionsTests {
         precondition(edited.conditions == selected && edited.tags == saved.tags && edited.duration == saved.duration)
         let exports = root.appendingPathComponent("exports")
         try fm.createDirectory(at: exports, withIntermediateDirectories: false)
-        let exported = try SessionFiles.export(edited, to: exports, root: storage, active: nil)
+        let exported = try SessionFiles.exportOriginal(edited, to: exports, root: storage, active: nil)
         let assertion6 = try SavedSession(folder: exported).conditions == selected
         precondition(assertion6)
-        let batch = try SessionFiles.exportAll(to: exports, root: storage, active: nil)
+        let batch = try SessionFiles.exportAllOriginal(to: exports, root: storage, active: nil)
         let assertion7 = try SavedSession(folder: batch.folder.appendingPathComponent(edited.exportName())).conditions == selected
         precondition(assertion7)
         // Rotation explicitly supplies the old selection; new recordings default empty.
