@@ -11,6 +11,7 @@ struct ChecklistReorderRow: ViewModifier {
     @Binding var insertion: ChecklistInsertion?
     let move: (ChecklistDragItem, Bool) -> Void
     @State private var height: CGFloat = 44
+    @State private var dragGeneration = UUID()
     private let teal = Color(red: 0.02, green: 0.60, blue: 0.54)
 
     @ViewBuilder func body(content: Content) -> some View {
@@ -20,8 +21,9 @@ struct ChecklistReorderRow: ViewModifier {
                 .checklistPressFeedback(dragging: source == item) {
                     // Let AppKit deliver performDrop before clearing the local payload.
                     // The same cleanup handles releases outside any accepted target.
+                    let generation = dragGeneration
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if NSEvent.pressedMouseButtons & 1 == 0, source == item { source = nil; insertion = nil }
+                        if generation == dragGeneration, source == item { source = nil; insertion = nil }
                     }
                 }
                 .background(GeometryReader { geometry in
@@ -38,8 +40,11 @@ struct ChecklistReorderRow: ViewModifier {
                     }
                 }
                 .onDrag {
+                    dragGeneration = UUID()
                     source = item; insertion = nil
                     return ChecklistDragPayload.provider(for: item)
+                } preview: {
+                    content.background(Color.primary.opacity(0.09), in: RoundedRectangle(cornerRadius: 8))
                 }
                 .onDrop(of: [checklistDragType], delegate: ChecklistRowDropDelegate(item: item, height: height,
                     source: $source, insertion: $insertion, move: move))
