@@ -83,6 +83,28 @@ import Foundation
         // Zone changes regroup days consistently for the whole export.
         let east = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: TimeZone(identifier: "America/New_York")!)
         try expect(try fm.contentsOfDirectory(atPath: east.folder.path).sorted() == ["activity-2026-11-25.csv", "metadata.json"])
+        // Quoting and UTF-8 work across the streaming reader's 64 KiB boundary.
+        let parserFile = temporary.appendingPathComponent("parser.csv")
+        let longText = String(repeating: "é", count: 32760) + "\"quoted\",\nnext line"
+        try ("a,b\r\n" + ["plain", longText].map(DailyTimeline.cell).joined(separator: ",") + "\r\n").write(to: parserFile, atomically: true, encoding: .utf8)
+        let parser = try TimelineRecords(parserFile)
+        _ = try parser.next(csv: true)
+        try expect(try TimelineRecords.cells(parser.next(csv: true)!) == ["plain", longText])
+        // A fall-back clock change stays in one local day while UTC order remains monotonic.
+        let dstStart = ISO8601DateFormatter().date(from: "2026-11-01T05:59:59Z")!
+        let dst = try RecordingWriter(root: root, id: "dst", startedAt: dstStart)
+        try dst.event(time: 0.5, type: "key_down")
+        try dst.event(time: 1.5, type: "key_up", hold: 1)
+        try dst.finish(startedAt: dstStart, duration: 2, reason: "test")
+        let dstExport = try SessionFiles.exportSelected([SavedSession(folder: dst.folder)], to: destination, root: root, active: nil,
+                                                        timeZone: TimeZone(identifier: "America/New_York")!)
+        let dstEvents = try rows(dstExport.folder.appendingPathComponent("activity-2026-11-01.csv")).filter { $0["row_type"] == "input_event" }
+        try expect(dstEvents[0]["time_local"]!.hasSuffix("-04:00") && dstEvents[1]["time_local"]!.hasSuffix("-05:00"))
+        // Public single and all-session entrypoints use the daily layout too.
+        let single = try SessionFiles.export(saved, to: destination, root: root, active: nil)
+        try expect(try fm.contentsOfDirectory(atPath: single.path).allSatisfy { $0 == "metadata.json" || $0.hasPrefix("activity-") })
+        let everything = try SessionFiles.exportAll(to: destination, root: root, active: nil)
+        try expect(everything.count == 3 && fm.fileExists(atPath: everything.folder.appendingPathComponent("metadata.json").path))
         let beforeFailure = try fm.contentsOfDirectory(atPath: destination.path).sorted()
         fails { _ = try SessionFiles.exportSelected([saved, saved], to: destination, root: root, active: nil) }
         fails { _ = try SessionFiles.exportSelected([saved], to: destination, root: root, active: saved.folder) }
