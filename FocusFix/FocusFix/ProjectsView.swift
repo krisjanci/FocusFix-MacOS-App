@@ -8,6 +8,7 @@ struct ProjectsView: View {
     var reduceMotionOverride: Bool? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedProject: UUID?
+    @State private var detailTask: ProjectTask?
     @State private var projectEditor = false
     @State private var editingProject: UUID?
     @State private var projectName = ""
@@ -67,12 +68,28 @@ struct ProjectsView: View {
                 Text(notice).font(.caption).foregroundStyle(.red)
                 Button("Reload projects") { store.reload() }
             }
+            if let notice = tracker.projectWorkNotice {
+                HStack {
+                    Text(notice).font(.caption).foregroundStyle(.secondary)
+                    Button("Refresh") { tracker.refreshSessions() }.buttonStyle(.plain)
+                }
+            }
             if let error { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             if projectEditor { projectForm }
             else if let project { checklist(project) }
             else { projectList }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            if let project {
+                TagTintBackground(colors: [project.color]).clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .sheet(item: $detailTask) { task in
+            if let project {
+                ProjectTaskDetails(store: store, tracker: tracker, projectID: project.id, task: task)
+            }
+        }
         .onExitCommand(perform: cancelEditingOrGoBack)
         .confirmationDialog("Delete project and its tasks? Recorded work will be kept.", isPresented: Binding(
             get: { deletion != nil }, set: { if !$0 { deletion = nil } }), titleVisibility: .visible) {
@@ -156,8 +173,8 @@ struct ProjectsView: View {
 
     private var projectList: some View {
         GeometryReader { geometry in
-            let rowHeight = projectsExpansion.rowHeight(available: geometry.size.height,
-                reserved: store.projects.count > 8 ? 60 : 30, divider: 1)
+            let rowHeight = max(52, projectsExpansion.rowHeight(available: geometry.size.height,
+                reserved: store.projects.count > 8 ? 60 : 30, divider: 1))
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -172,7 +189,12 @@ struct ProjectsView: View {
                                     Button {
                                         if editingList { beginProjectRename(value) } else { openProject(value) }
                                     } label: {
-                                        Text(value.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(value.name).lineLimit(1)
+                                            Text("Total work time: " + projectTime(value.id))
+                                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                                .padding(.leading, 8)
+                                        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).contentShape(Rectangle())
                                     }.buttonStyle(.plain).disabled(editingList && value.isRandomTasks)
                                         .accessibilityLabel(editingList ? "Rename project \(value.name)" : "Open project \(value.name)")
                                 }
@@ -235,8 +257,8 @@ struct ProjectsView: View {
     private func checklist(_ project: WorkProject) -> some View {
         let ordered = orderedTasks(project)
         return GeometryReader { geometry in
-            let rowHeight = tasksExpansion.rowHeight(available: geometry.size.height,
-                reserved: ordered.count > 7 ? 94 : 64)
+            let rowHeight = max(58, tasksExpansion.rowHeight(available: geometry.size.height,
+                reserved: ordered.count > 7 ? 94 : 64))
             ScrollViewReader { scroll in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -348,16 +370,20 @@ struct ProjectsView: View {
                     .buttonStyle(.plain).accessibilityLabel("Save task name")
             } else if editingList {
                 Button { beginTaskRename(task) } label: {
-                    Text(task.title).font(.callout).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    Text(task.title).font(.system(size: 15)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Rename task \(task.title)")
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.title).font(.callout).lineLimit(1).foregroundStyle(finished ? .secondary : .primary)
-                    if let work = task.completedWork {
-                        Text(work.seconds.map { "Task time · " + taskTime($0) } ?? "Saving task time…")
-                            .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
+                Button { detailTask = task } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title).font(.system(size: 15)).lineLimit(1)
+                            .foregroundStyle(finished ? .secondary : .primary)
+                        HStack(spacing: 12) {
+                            Text("Worked: " + taskTime(task, project: project.id))
+                            Text("Predicted: \(task.estimate.formatted()) FS")
+                        }.font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                            .padding(.leading, 8)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("Details for \(task.title)")
             }
             if editingList {
                 deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
@@ -383,9 +409,17 @@ struct ProjectsView: View {
         .accessibilityAction(named: "Move down") { move(task, project: project, direction: 1) }
     }
 
-    private func taskTime(_ seconds: Double) -> String {
-        let value = Int(max(0, seconds))
-        return String(format: "%d:%02d", value / 60, value % 60)
+    private func taskTime(_ seconds: Double) -> String { ProjectWorkTotals.duration(seconds) }
+
+    private func projectTime(_ id: UUID) -> String {
+        guard let totals = tracker.projectWorkTotals else { return tracker.projectWorkNotice == nil ? "Loading…" : "Unavailable" }
+        return taskTime(totals.projects[id, default: 0])
+    }
+
+    private func taskTime(_ task: ProjectTask, project: UUID) -> String {
+        if let completed = task.completedWork { return completed.seconds.map(taskTime) ?? "Saving…" }
+        guard let totals = tracker.projectWorkTotals else { return tracker.projectWorkNotice == nil ? "Loading…" : "Unavailable" }
+        return taskTime(totals.tasks[project]?[task.id] ?? 0)
     }
 
     private func workButton(_ project: WorkProject, task: ProjectTask?) -> some View {
@@ -488,4 +522,103 @@ struct ProjectsView: View {
         do { try action(); error = nil; return true }
         catch { self.error = error.localizedDescription; return false }
     }
+}
+
+private struct ProjectTaskDetails: View {
+    @ObservedObject var store: ProjectStore
+    @ObservedObject var tracker: ActivityTracker
+    let projectID: UUID
+    let taskID: UUID
+    @Environment(\.dismiss) private var dismiss
+    @State private var description: String
+    @State private var estimate: Double
+    @State private var saveError: String?
+    @State private var saved = true
+
+    init(store: ProjectStore, tracker: ActivityTracker, projectID: UUID, task: ProjectTask) {
+        self.store = store; self.tracker = tracker; self.projectID = projectID; taskID = task.id
+        _description = State(initialValue: task.description ?? "")
+        _estimate = State(initialValue: task.estimate)
+    }
+
+    private var project: WorkProject? { store.projects.first { $0.id == projectID } }
+    private var task: ProjectTask? { project?.tasks.first { $0.id == taskID } }
+    private var worked: String {
+        if let completed = task?.completedWork {
+            return completed.seconds.map(ProjectWorkTotals.duration) ?? "Saving…"
+        }
+        guard let totals = tracker.projectWorkTotals else {
+            return tracker.projectWorkNotice == nil ? "Loading…" : "Unavailable"
+        }
+        return ProjectWorkTotals.duration(totals.tasks[projectID]?[taskID] ?? 0)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(task?.title ?? "Task no longer available").font(.title3.weight(.semibold)).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Description (optional)").font(.callout.weight(.medium))
+                TextEditor(text: $description).font(.body).scrollContentBackground(.hidden)
+                    .padding(6).frame(height: 110)
+                    .background(Color(nsColor: .textBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.12)) }
+                    .accessibilityLabel("Task description")
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Predicted duration").font(.callout.weight(.medium))
+                    Spacer()
+                    Text("\(estimate.formatted()) FS").monospacedDigit()
+                }
+                Slider(value: $estimate, in: 0.5...3, step: 0.5) { Text("Predicted Focus Sessions") }
+                    onEditingChanged: { editing in if !editing { save() } }
+                    .accessibilityValue("\(estimate.formatted()) Focus Sessions")
+                HStack { Text("0.5 FS"); Spacer(); Text("3 FS") }.font(.caption).foregroundStyle(.secondary)
+                Text("1 Focus Session = 1 hour of focused work").font(.caption).foregroundStyle(.secondary)
+            }
+            Text("Worked: " + worked).font(.callout.monospacedDigit())
+            if let saveError {
+                HStack {
+                    Text(saveError).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { save() }
+                }
+            }
+            HStack {
+                Text(saved ? "Saved automatically" : "Saving…").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Done", action: close).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24).frame(width: 420)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .background { if let project { TagTintBackground(colors: [project.color]) } }
+        .overlay { if let project { Color(tagHex: project.color).opacity(0.08).allowsHitTesting(false) } }
+        .interactiveDismissDisabled()
+        .onExitCommand(perform: close)
+        .onChange(of: description) { _, _ in saved = false }
+        .onChange(of: estimate) { _, _ in saved = false }
+        .task(id: description) {
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled else { return }
+            save()
+        }
+    }
+
+    @discardableResult private func save() -> Bool {
+        guard let task else { return true }
+        do {
+            if task.description ?? "" != description || task.estimate != estimate {
+                try store.updateTaskDetails(taskID, project: projectID, description: description, estimate: estimate)
+            }
+            saved = true; saveError = nil
+            return true
+        } catch {
+            saved = false; saveError = "Changes could not be saved. \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    private func close() { if save() { dismiss() } }
 }
