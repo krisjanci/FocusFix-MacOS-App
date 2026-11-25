@@ -38,11 +38,8 @@ nonisolated struct ResearchCaptureManifest: Codable, Equatable {
         try encoder.encode(self).write(to: folder.appendingPathComponent("research_eligibility.json"), options: .atomic)
     }
     static func load(from folder: URL) throws -> Self {
-        let url = folder.appendingPathComponent("research_eligibility.json")
-        let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-        guard info.isRegularFile == true, info.isSymbolicLink != true, (info.fileSize ?? Int.max) <= 1024 * 1024 else { throw RecordingContract.Invalid.contract }
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .secondsSince1970
-        return try decoder.decode(Self.self, from: Data(contentsOf: url))
+        return try decoder.decode(Self.self, from: SessionStorage.data("research_eligibility.json", in: folder, limit: 1024 * 1024))
     }
 }
 nonisolated enum ResearchArchiveContract {
