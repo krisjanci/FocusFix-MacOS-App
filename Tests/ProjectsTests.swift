@@ -141,12 +141,13 @@ import Foundation
         precondition(kept == "broken")
         let blocked = root.appendingPathComponent("blocked")
         let writer = ProjectStore(file: blocked.appendingPathComponent("projects.json"))
+        let blockedTask = try writer.addTask("Keep details", project: WorkProject.randomTasksID)
         let preserved = writer.projects
         try FileManager.default.removeItem(at: blocked)
         try Data().write(to: blocked)
         fails { _ = try writer.addProject("Failure", color: "#168B80") }
         fails { try writer.recordWork(on: WorkProject.randomTasksID) }
-        fails { try writer.updateTaskDetails(UUID(), project: WorkProject.randomTasksID, description: "Failure", estimate: 1) }
+        fails { try writer.updateTaskDetails(blockedTask, project: WorkProject.randomTasksID, description: "Failure", estimate: 2.5) }
         precondition(writer.projects == preserved)
         print("ProjectsTests passed: protected default, migration, tasks, work recency, manual order, persistence and write failures")
     }
