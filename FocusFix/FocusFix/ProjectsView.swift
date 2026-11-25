@@ -534,6 +534,7 @@ private struct ProjectTaskDetails: View {
     @State private var estimate: Double
     @State private var saveError: String?
     @State private var saved = true
+    @State private var editingEstimate = false
 
     init(store: ProjectStore, tracker: ActivityTracker, projectID: UUID, task: ProjectTask) {
         self.store = store; self.tracker = tracker; self.projectID = projectID; taskID = task.id
@@ -573,7 +574,7 @@ private struct ProjectTaskDetails: View {
                     Text("\(estimate.formatted()) FS").monospacedDigit()
                 }
                 Slider(value: $estimate, in: 0.5...3, step: 0.5) { Text("Predicted Focus Sessions") }
-                    onEditingChanged: { editing in if !editing { save() } }
+                    onEditingChanged: { editing in editingEstimate = editing; if !editing { save() } }
                     .accessibilityValue("\(estimate.formatted()) Focus Sessions")
                 HStack { Text("0.5 FS"); Spacer(); Text("3 FS") }.font(.caption).foregroundStyle(.secondary)
                 Text("1 Focus Session = 1 hour of focused work").font(.caption).foregroundStyle(.secondary)
@@ -592,13 +593,19 @@ private struct ProjectTaskDetails: View {
             }
         }
         .padding(24).frame(width: 420)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .background { if let project { TagTintBackground(colors: [project.color]) } }
-        .overlay { if let project { Color(tagHex: project.color).opacity(0.08).allowsHitTesting(false) } }
+        .background {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                if let project { TagTintBackground(colors: [project.color]) }
+            }
+        }
         .interactiveDismissDisabled()
         .onExitCommand(perform: close)
         .onChange(of: description) { _, _ in saved = false }
-        .onChange(of: estimate) { _, _ in saved = false }
+        .onChange(of: estimate) { _, _ in
+            saved = false
+            if !editingEstimate { save() }
+        }
         .task(id: description) {
             do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
             guard !Task.isCancelled else { return }
