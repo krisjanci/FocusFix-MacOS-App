@@ -175,15 +175,17 @@ extension View {
 private struct ChecklistPressFeedback: ViewModifier {
     let dragging: Bool
     let released: () -> Void
+    @Environment(\.isEnabled) private var enabled
     @State private var pressed = false
 
     func body(content: Content) -> some View {
         content
-            .background(Color.primary.opacity(pressed || dragging ? 0.09 : 0), in: RoundedRectangle(cornerRadius: 8))
-            .background(ButtonPressProbe(enabled: true, holdsOutsideBounds: true) { value in
+            .background(Color.primary.opacity(enabled && (pressed || dragging) ? 0.09 : 0), in: RoundedRectangle(cornerRadius: 8))
+            .background(ButtonPressProbe(enabled: enabled, holdsOutsideBounds: true) { value in
                 pressed = value
                 if !value { released() }
             }.accessibilityHidden(true))
+            .onChange(of: enabled) { _, value in if !value { pressed = false; released() } }
             .onDisappear { pressed = false; released() }
     }
 }
