@@ -6,7 +6,6 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var tracker: ActivityTracker
-    var launchReady = true
     @ObservedObject private var profile = ProfileController.shared
     @ObservedObject private var account = AccountController.shared
     @ObservedObject private var tour = QuickTourController.shared
