@@ -589,7 +589,7 @@ private struct ProjectTaskDetails: View {
                 }
             }
             HStack {
-                Text(saved ? "Saved automatically" : "Saving…").font(.caption).foregroundStyle(.secondary)
+                Text(saveError != nil ? "Not saved" : saved ? "Saved automatically" : "Saving…").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Done", action: close).keyboardShortcut(.defaultAction)
             }
