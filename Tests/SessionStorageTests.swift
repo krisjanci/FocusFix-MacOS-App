@@ -3,7 +3,7 @@ import Foundation
 @main struct SessionStorageTests {
     static func expect(_ value: @autoclosure () throws -> Bool, file: StaticString = #file, line: UInt = #line) throws { let result = try value(); precondition(result, file: file, line: line) }
     static func fails(_ body: () throws -> Void) { do { try body(); preconditionFailure("Expected failure") } catch {} }
-    static func main() throws {
+    static func main() async throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("storage-tests-\(UUID())")
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -80,9 +80,48 @@ import Foundation
         try old.finish(startedAt: start, duration: 0, reason: "test")
         try fm.removeItem(at: old.folder.appendingPathComponent(SessionStorage.pendingMarker))
         let oldNames = try fm.contentsOfDirectory(atPath: old.folder.path).sorted()
-        SessionStorage.resumeCompaction(in: root)
-        // No marker identifies existing sessions for automatic compaction.
+        await SessionStorage.resumeCompaction(in: root).value
+        // A tiny recording stays uncompressed when the archive plus index would be larger.
         try expect(try fm.contentsOfDirectory(atPath: old.folder.path).sorted() == oldNames)
+        let conditions = [SessionCondition(categoryID: UUID(), labelID: UUID(), category: "Location", label: "Office")]
+        try SessionFiles.updateConditions(conditions, for: tagged, root: root, active: nil)
+        let conditioned = try SavedSession(folder: tagged.folder)
+        try expect(conditioned.conditions == conditions)
+        try SessionFiles.correctContext(.unknown, start: 10, end: 20, for: conditioned, root: root, active: nil,
+                                        expectedRevision: conditioned.recordingContract!.revision)
+        let corrected = try SavedSession(folder: tagged.folder)
+        try expect(tryCoverage(corrected).work == 90 && tryData("events.csv", tagged.folder) == originals["events.csv"])
+        let beforeFailedEdit = try Data(contentsOf: tagged.folder.appendingPathComponent(SessionStorage.marker))
+        fails { try SessionStorage.edit(tagged.folder) { _ in throw Injected.failure } }
+        try expect(try Data(contentsOf: tagged.folder.appendingPathComponent(SessionStorage.marker)) == beforeFailedEdit)
+        // All ten legacy schemas retain their exact bytes and their Unknown context.
+        for schema in 1...10 {
+            let legacy = root.appendingPathComponent(UUID().uuidString)
+            try fm.createDirectory(at: legacy, withIntermediateDirectories: false)
+            let metadata = try JSONSerialization.data(withJSONObject: ["schema_version": schema, "status": "test", "duration_seconds": 100])
+            try metadata.write(to: legacy.appendingPathComponent("session.json"))
+            try originals["events.csv"]!.write(to: legacy.appendingPathComponent("events.csv"))
+            _ = try SessionStorage.compact(legacy)
+            let savedLegacy = try SavedSession(folder: legacy)
+            try expect(SessionStorage.isArchived(legacy) && savedLegacy.legacyContext == .unknown)
+            try expect(try SessionStorage.data("session.json", in: legacy) == metadata)
+        }
+        // Recovery compacts only the checkpoint; raw tails remain recoverable but ineligible.
+        let interrupted = try RecordingWriter(root: SessionFiles.pendingRoot(in: root), id: UUID().uuidString, startedAt: start)
+        for index in 0..<10000 { try interrupted.event(time: Double(index) / 100, type: "key_down") }
+        try interrupted.checkpoint(at: 100)
+        try interrupted.event(time: 101, type: "key_down"); try interrupted.flush()
+        _ = try SessionFiles.recoverPending(in: root)
+        let recoveredFolder = root.appendingPathComponent(interrupted.folder.lastPathComponent)
+        await SessionStorage.resumeCompaction(in: root).value
+        try expect(SessionStorage.isArchived(recoveredFolder))
+        try expect(try SavedSession(folder: recoveredFolder).recordingContract?.observedThrough == 100)
+        try expect(String(decoding: try SessionStorage.data("events.csv", in: recoveredFolder), as: UTF8.self).contains("101.000000"))
+        let unsafe = try RecordingWriter(root: root, id: UUID().uuidString, startedAt: start)
+        try unsafe.finish(startedAt: start, duration: 0, reason: "test")
+        try fm.createSymbolicLink(at: unsafe.folder.appendingPathComponent("external.csv"), withDestinationURL: zip)
+        fails { _ = try SessionStorage.compact(unsafe.folder, force: true) }
+        try expect(!SessionStorage.isArchived(unsafe.folder) && fm.fileExists(atPath: zip.path))
         let selected = try SessionFiles.deleteSelected([tagged], root: root, active: nil, remove: { try fm.removeItem(at: $0) })
         try expect(selected.deleted.count == 1 && !fm.fileExists(atPath: writer.folder.path))
         print("PASS: exact archive recovery, rollback, mixed storage, edits, task history, upload allowlist, corruption and deletion")
