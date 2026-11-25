@@ -73,3 +73,11 @@ The preview recorder is intentionally synthetic. Real input permissions, account
 - The deterministic native placement fixture rendered grey held-row feedback in light mode and a lighter neutral in dark mode, plus the teal insertion line. Cancel drag removed both the background and insertion line. Physical pointer-driven drops could not be established through the native control tool (including noWindowsAvailable errors); no successful pointer-drop verification is claimed. Payload identity, placement/scope, and persisted reordering are covered by the existing tests.
 - All 49 local Swift test groups passed. Added checks cover metadata defaults/persistence/invalid estimates/write failures, project and task totals, active-to-finalized handoff, archived history, deletion and duplicate-segment rejection. The complete Debug macOS app build and final isolated project preview build passed. SwiftUI compiler macro checks required execution outside the shell sandbox. No installation, publication or production recording changes were performed.
 - Each implementation iteration was committed one file at a time.
+
+
+## Full collector tint and popup refinements — 2026-11-25
+
+- Browsed project color now reaches the entire main content area and Groups/Analytics footer. The right-side expansion remains outside that background. A native expanded preview screenshot confirmed tinted left content through the footer and an untinted right panel.
+- Popup titles enter a plain inline text field on double-click, without adding edit controls. Native checks confirmed double-click selection, Enter saving while keeping details open, blank-title validation with retained focus, and Escape restoring the saved title while keeping details open. Leaving the field also saves; Done validates the title before dismissing.
+- A noninteractive native sheet probe positions task details relative to the original 490-point collector and observes parent moves, sheet attachment and resizing. Placement tests verify identical origins for compact and expanded widths, vertical centering after popup size changes, parent movement and narrow content bounds.
+- The complete Debug app build and focused TaskPopupLayoutTests, ProjectsTests and GroupPresentationTests passed. Changes were committed one file per iteration.
