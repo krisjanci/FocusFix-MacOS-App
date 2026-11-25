@@ -151,8 +151,8 @@ nonisolated enum SessionStorage {
     @discardableResult static func compact(_ folder: URL, force: Bool = false) throws -> Bool {
         try synchronized {
             guard !isArchived(folder) else { return true }
-            let session = try SavedSession(folder: folder)
-            guard session.status != "recording", session.recordingContract?.finalized == true else { return false }
+            let metadata = try JSONSerialization.jsonObject(with: data("session.json", in: folder)) as? [String: Any]
+            guard metadata?["status"] as? String != "recording", try RecordingContract.load(from: folder).finalized else { return false }
             let names = try self.names(in: folder)
             guard names.count <= 128, names.allSatisfy(safeName) else { throw CocoaError(.fileReadCorruptFile) }
             var entries: [String: Entry] = [:], rawSize = 0
