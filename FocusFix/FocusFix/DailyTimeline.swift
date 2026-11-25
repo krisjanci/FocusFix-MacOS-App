@@ -122,6 +122,7 @@ nonisolated enum DailyTimeline {
                 }
                 metadata["files"] = originals; sessionMetadata.append(metadata)
                 var order = 0
+                var breakBounds: [String: (start: Double, end: Double?, sourceRow: Int)] = [:]
                 func emit(file: String, index: Int, kind: String, at elapsed: Double, end: Double? = nil,
                           fields: [String: String] = [:], original: String, phase: String = "") throws {
                     guard elapsed.isFinite, elapsed >= 0, end.map({ $0.isFinite && $0 >= elapsed }) ?? true else {
@@ -134,7 +135,7 @@ nonisolated enum DailyTimeline {
                     let withinEnd = end.map { $0 <= through } ??
                         (kind == "input_event" && fields["event_type"] != "session_stop" ? elapsed < through : elapsed <= through)
                     let eligible = elapsed >= origin && withinEnd
-                    let id = "\(session.id)/\(file)/\(index)"
+                    let id = "\(session.id)/\(file)/\(index)/\(kind)"
                     var row: [String: String] = ["row_id": id, "row_type": kind, "session_id": session.id,
                         "recording_id": contract?.recordingID.uuidString ?? "", "segment_id": contract?.segmentID.uuidString ?? "",
                         "source_file": file, "source_row": String(index), "elapsed_seconds": String(elapsed),
@@ -192,6 +193,14 @@ nonisolated enum DailyTimeline {
                         let fields = Dictionary(uniqueKeysWithValues: zip(header, values))
                         let time = number(fields["elapsed_seconds"]) ?? number(fields["answered_elapsed_seconds"]) ?? number(fields["start_seconds"])
                         guard let time else { throw RecordingContract.Invalid.bounds }
+                        if name == "breaks.csv", let id = fields["break_id"], !id.isEmpty,
+                           let start = number(fields["start_seconds"]) {
+                            let finish = number(fields["end_seconds"])
+                            guard start >= 0, finish.map({ $0 >= start }) ?? true else { throw RecordingContract.Invalid.bounds }
+                            let previous = breakBounds[id]
+                            if let previous, previous.start != start { throw RecordingContract.Invalid.bounds }
+                            breakBounds[id] = (start, finish ?? previous?.end, previous?.sourceRow ?? index)
+                        }
                         let end = name == "mouse_movement.csv" ? number(fields["end_seconds"]) : nil
                         try emit(file: name, index: index, kind: kinds[name]!, at: time, end: end, fields: fields,
                                  original: json(fields), phase: fields["activity_phase"] ?? "")
@@ -224,10 +233,20 @@ nonisolated enum DailyTimeline {
                     try emit(file: WorkAssignmentJournal.filename, index: index + 1, kind: "assignment_change", at: change.elapsed,
                              original: String(decoding: try encoder.encode(change), as: UTF8.self))
                 }
-                // Break lifecycle snapshots retain the original action time; explicit intervals supply midnight continuations.
-                for (index, item) in assignments.breaks.enumerated() {
-                    try emit(file: WorkAssignmentJournal.filename, index: assignments.changes.count + index + 1,
-                             kind: "break_interval", at: item.start, end: item.end ?? through,
+                // Lifecycle CSVs also support legacy recordings without an assignment sidecar.
+                for id in breakBounds.keys.sorted() {
+                    let item = breakBounds[id]!
+                    let lower = max(origin, item.start), upper = min(through, item.end ?? through)
+                    guard upper > lower else { continue }
+                    let fields = ["break_id": id, "start_seconds": String(item.start), "end_seconds": item.end.map(String.init(describing:)) ?? ""]
+                    try emit(file: "breaks.csv", index: item.sourceRow, kind: "break_interval", at: lower, end: upper,
+                             fields: fields, original: json(fields), phase: "explicit_break")
+                }
+                for (index, item) in assignments.breaks.enumerated() where breakBounds[item.id] == nil {
+                    let lower = max(origin, item.start), upper = min(through, item.end ?? through)
+                    guard upper > lower else { continue }
+                    try emit(file: WorkAssignmentJournal.filename, index: index + 1,
+                             kind: "break_interval", at: lower, end: upper,
                              fields: ["break_id": item.id], original: String(decoding: try encoder.encode(item), as: UTF8.self), phase: "explicit_break")
                 }
                 try emit(file: "session.json", index: 1, kind: "segment_end", at: through, original: "{}")
