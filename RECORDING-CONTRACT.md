@@ -1,5 +1,17 @@
 # Local recording contract — schema 11
 
+## Compact local storage and daily export schema
+
+Local storage version 1 is separate from recording schema 11. Finalized recordings, including supported legacy schemas 1–10, may be represented by `storage.json` plus its named `recording-UUID.zip`. The index records each original file’s size and SHA-256 and caches session/context/eligibility bytes for history listings. Compression preserves every original byte. A synchronized adapter serves both representations, streams checked decompression to private temporary files, and supplies existing hosted archive allowlists without changing consent or research qualification gates.
+
+ZIP creation and complete decompression/hash verification finish before the atomic index becomes authoritative. Only then may original files be removed. A failure before that point retains originals; interrupted cleanup is verified and retried. Metadata edits build and verify a replacement archive before swapping its index. Unfinished/unreadable recordings and conversions without a net saving retain their existing storage. Capture/checkpoint ordering and recovery bounds are unchanged. Startup compacts completed history in the background; finalization and rotation schedule new recordings.
+
+User-facing exports use `focusfix.daily_timeline.v1`: one `activity-YYYY-MM-DD.csv` per day in the Mac timezone captured at export start, plus `metadata.json`. Rows carry stable source IDs, logical elapsed bounds, anchored UTC/local timestamps, separate context/phase, assignment snapshots, durable-bound eligibility, original CSV fields and original JSON log payloads. Sidecar text, revisions, source schemas and column notes remain in metadata. Rows sort by anchored time, session identity, and source order; duplicate simultaneous events remain distinct. Original interval measurements belong to their start day; midnight continuation rows contain only references, not repeated totals. `[start,end)` semantics apply. Uncheckpointed tails remain identifiable and ineligible; gaps are never filled. Display cells protect spreadsheet formulas while JSON source payloads retain original text.
+
+The retired start-of-day survey has no prompts/settings/export UI. Startup removes its saved local responses and two preferences, retrying failures. Timed session check-ins are unaffected.
+
+The historical sections below describe the original raw recording schema and original-format compatibility exports; daily timeline exports supersede their copying layout.
+
 ## Current controls and local exports
 
 The current UI offers only Work and Unknown through Start work / End work
