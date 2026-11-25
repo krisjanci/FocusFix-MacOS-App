@@ -22,6 +22,9 @@ import Foundation
         try writer.finish(startedAt: start, duration: 100, reason: "test")
         var originals: [String: Data] = [:]
         for name in try SessionStorage.names(in: writer.folder) { originals[name] = try SessionStorage.data(name, in: writer.folder, limit: 512 * 1024 * 1024) }
+        let listingStart = Date()
+        for _ in 0..<20 { _ = try SavedSession(folder: writer.folder) }
+        let rawListingMS = Date().timeIntervalSince(listingStart) * 1000 / 20
         let saved = try SavedSession(folder: writer.folder), before = try RecordingCoverage.load(session: saved)
         let assignmentsBefore = try saved.assignmentHistory()
         enum Injected: Error { case failure }
@@ -39,6 +42,10 @@ import Foundation
             try expect(tryData(name, writer.folder) == bytes)
             try expect(!fm.fileExists(atPath: writer.folder.appendingPathComponent(name).path))
         }
+        let archivedStart = Date()
+        for _ in 0..<20 { _ = try SavedSession(folder: writer.folder) }
+        let archivedListingMS = Date().timeIntervalSince(archivedStart) * 1000 / 20
+        print(String(format: "PERF history metadata: raw %.3f ms, archived %.3f ms/session", rawListingMS, archivedListingMS))
         let reopened = try SavedSession(folder: writer.folder)
         try expect(reopened.startedAt == saved.startedAt && reopened.recordingContract == saved.recordingContract)
         let assignmentsAfter = try reopened.assignmentHistory()
@@ -54,6 +61,10 @@ import Foundation
         try originals["events.csv"]!.write(to: writer.folder.appendingPathComponent("events.csv"))
         _ = try SessionStorage.compact(writer.folder)
         try expect(!fm.fileExists(atPath: writer.folder.appendingPathComponent("events.csv").path))
+        let spare = writer.folder.appendingPathComponent("recording-\(UUID()).zip")
+        try Data("uncommitted archive".utf8).write(to: spare)
+        _ = try SessionStorage.compact(writer.folder)
+        try expect(!fm.fileExists(atPath: spare.path))
         // Existing upload format and file allowlist are unchanged by local compaction.
         let consent = DevelopmentConsent(id: UUID(), owner: UUID(), origin: "https://example.invalid", policyVersion: "test", startedAt: start)
         let zip = root.appendingPathComponent("development.zip")
@@ -91,6 +102,10 @@ import Foundation
                                         expectedRevision: conditioned.recordingContract!.revisions.count)
         let corrected = try SavedSession(folder: tagged.folder)
         try expect(tryCoverage(corrected).work == 90 && tryData("events.csv", tagged.folder) == originals["events.csv"])
+        let exportStart = Date()
+        let exported = try SessionFiles.export(corrected, to: root.deletingLastPathComponent(), root: root, active: nil)
+        defer { try? fm.removeItem(at: exported) }
+        print(String(format: "PERF daily export: 10,000 input events in %.3f seconds", Date().timeIntervalSince(exportStart)))
         let beforeFailedEdit = try Data(contentsOf: tagged.folder.appendingPathComponent(SessionStorage.marker))
         fails { try SessionStorage.edit(tagged.folder) { _ in throw Injected.failure } }
         try expect(try Data(contentsOf: tagged.folder.appendingPathComponent(SessionStorage.marker)) == beforeFailedEdit)
