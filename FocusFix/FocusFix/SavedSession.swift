@@ -230,65 +230,65 @@ nonisolated enum SessionFiles {
     }
     static func updateConditions(_ values: [SessionCondition], for session: SavedSession, root: URL, active: URL?) throws {
         try SessionStorage.synchronized {
-        try validate(session.folder, in: root, active: active)
-        if SessionStorage.isArchived(session.folder) {
-            try SessionStorage.edit(session.folder) { stage in
-                try updateConditions(values, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+            try validate(session.folder, in: root, active: active)
+            if SessionStorage.isArchived(session.folder) {
+                try SessionStorage.edit(session.folder) { stage in
+                    try updateConditions(values, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+                }
+                return
             }
-            return
-        }
-        let valid = try SessionConditions.validated(values)
-        let url = session.folder.appendingPathComponent("session.json")
-        var metadata: [String: Any]
-        if FileManager.default.fileExists(atPath: url.path) {
-            let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-            guard properties.isRegularFile == true, properties.isSymbolicLink != true,
-                  let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
-                throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
+            let valid = try SessionConditions.validated(values)
+            let url = session.folder.appendingPathComponent("session.json")
+            var metadata: [String: Any]
+            if FileManager.default.fileExists(atPath: url.path) {
+                let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard properties.isRegularFile == true, properties.isSymbolicLink != true,
+                      let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
+                    throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
+                }
+                metadata = existing
+            } else {
+                metadata = ["session_id": session.id, "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
+                            "status": session.status]
             }
-            metadata = existing
-        } else {
-            metadata = ["session_id": session.id, "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
-                        "status": session.status]
-        }
-        metadata["conditions"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
-        try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
+            metadata["conditions"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
+            try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
         }
     }
 
     // Edit labels without recreating metadata or touching activity/survey files.
     static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
         try SessionStorage.synchronized {
-        try validate(session.folder, in: root, active: active)
-        if SessionStorage.isArchived(session.folder) {
-            try SessionStorage.edit(session.folder) { stage in
-                try updateTags(tags, colors: colors, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+            try validate(session.folder, in: root, active: active)
+            if SessionStorage.isArchived(session.folder) {
+                try SessionStorage.edit(session.folder) { stage in
+                    try updateTags(tags, colors: colors, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil)
+                }
+                return
             }
-            return
-        }
-        let valid = try SessionTags.validated(tags)
-        let validColors = try SessionTags.colors(colors, for: valid)
-        let url = session.folder.appendingPathComponent("session.json")
-        var metadata: [String: Any]
-        if FileManager.default.fileExists(atPath: url.path) {
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-            guard values.isRegularFile == true, values.isSymbolicLink != true else {
-                throw SessionTags.TagError("This session's metadata is not a regular local file.")
+            let valid = try SessionTags.validated(tags)
+            let validColors = try SessionTags.colors(colors, for: valid)
+            let url = session.folder.appendingPathComponent("session.json")
+            var metadata: [String: Any]
+            if FileManager.default.fileExists(atPath: url.path) {
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true else {
+                    throw SessionTags.TagError("This session's metadata is not a regular local file.")
+                }
+                guard let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
+                    throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
+                }
+                metadata = existing
+            } else {
+                // Unfinished legacy folders may have no metadata yet.
+                metadata = ["session_id": session.id,
+                            "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
+                            "status": session.status]
             }
-            guard let existing = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any] else {
-                throw SessionTags.TagError("This session's metadata could not be read. Its file has been kept.")
-            }
-            metadata = existing
-        } else {
-            // Unfinished legacy folders may have no metadata yet.
-            metadata = ["session_id": session.id,
-                        "started_at_utc": ISO8601DateFormatter().string(from: session.startedAt),
-                        "status": session.status]
-        }
-        metadata["tags"] = valid
-        metadata["tag_colors"] = validColors
-        try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
-            .write(to: url, options: .atomic)
+            metadata["tags"] = valid
+            metadata["tag_colors"] = validColors
+            try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
+                .write(to: url, options: .atomic)
         }
     }
 
@@ -296,18 +296,18 @@ nonisolated enum SessionFiles {
                                for session: SavedSession, root: URL, active: URL?,
                                actionID: UUID = UUID(), expectedRevision: Int) throws {
         try SessionStorage.synchronized {
-        try validate(session.folder, in: root, active: active)
-        if SessionStorage.isArchived(session.folder) {
-            try SessionStorage.edit(session.folder) { stage in
-                try correctContext(context, start: start, end: end, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil, actionID: actionID, expectedRevision: expectedRevision)
+            try validate(session.folder, in: root, active: active)
+            if SessionStorage.isArchived(session.folder) {
+                try SessionStorage.edit(session.folder) { stage in
+                    try correctContext(context, start: start, end: end, for: SavedSession(folder: stage), root: stage.deletingLastPathComponent(), active: nil, actionID: actionID, expectedRevision: expectedRevision)
+                }
+                return
             }
-            return
-        }
-        var contract = try RecordingContract.load(from: session.folder)
-        try contract.correctContext(context, start: start, end: end,
-            effectiveAt: session.startedAt.addingTimeInterval(start - contract.elapsedOrigin),
-            recordedAt: Date(), actionID: actionID, expectedRevision: expectedRevision)
-        try contract.save(to: session.folder)
+            var contract = try RecordingContract.load(from: session.folder)
+            try contract.correctContext(context, start: start, end: end,
+                effectiveAt: session.startedAt.addingTimeInterval(start - contract.elapsedOrigin),
+                recordedAt: Date(), actionID: actionID, expectedRevision: expectedRevision)
+            try contract.save(to: session.folder)
         }
     }
 
@@ -348,18 +348,18 @@ nonisolated enum SessionFiles {
     static func deleteSelected(_ sessions: [SavedSession], root: URL, active: URL?,
                                remove: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws -> DeletionResult {
         return try SessionStorage.synchronized {
-        // Revalidate the entire selection before any recoverable Trash moves.
-        for session in sessions { try validate(session.folder, in: root, active: active) }
-        var result = DeletionResult()
-        for session in sessions {
-            do {
-                try validate(session.folder, in: root, active: active)
-                try remove(session.folder)
-                result.deleted.append(session)
+            // Revalidate the entire selection before any recoverable Trash moves.
+            for session in sessions { try validate(session.folder, in: root, active: active) }
+            var result = DeletionResult()
+            for session in sessions {
+                do {
+                    try validate(session.folder, in: root, active: active)
+                    try remove(session.folder)
+                    result.deleted.append(session)
+                }
+                catch { result.failures.append("\(session.id): \(error.localizedDescription)") }
             }
-            catch { result.failures.append("\(session.id): \(error.localizedDescription)") }
-        }
-        return result
+            return result
         }
     }
 
