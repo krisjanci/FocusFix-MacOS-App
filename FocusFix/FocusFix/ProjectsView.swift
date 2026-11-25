@@ -197,6 +197,7 @@ struct ProjectsView: View {
                                         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).contentShape(Rectangle())
                                     }.buttonStyle(.plain).disabled(editingList && value.isRandomTasks)
                                         .accessibilityLabel(editingList ? "Rename project \(value.name)" : "Open project \(value.name)")
+                                        .accessibilityValue("Total work time: " + projectTime(value.id))
                                 }
                                 Text("\(value.tasks.filter { $0.completedAt == nil }.count)").foregroundStyle(.secondary)
                                 if editingList {
@@ -384,6 +385,7 @@ struct ProjectsView: View {
                             .padding(.leading, 8)
                     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Details for \(task.title)")
+                    .accessibilityValue("Worked: " + taskTime(task, project: project.id) + "; Predicted: \(task.estimate.formatted()) Focus Sessions")
             }
             if editingList {
                 deleteButton("Delete task \(task.title)") { perform { try store.deleteTask(task.id, project: project.id) } }
@@ -575,7 +577,7 @@ private struct ProjectTaskDetails: View {
                 }
                 Slider(value: $estimate, in: 0.5...3, step: 0.5) { Text("Predicted Focus Sessions") }
                     onEditingChanged: { editing in editingEstimate = editing; if !editing { save() } }
-                    .accessibilityValue("\(estimate.formatted()) Focus Sessions")
+                    .labelsHidden().accessibilityValue("\(estimate.formatted()) Focus Sessions")
                 HStack { Text("0.5 FS"); Spacer(); Text("3 FS") }.font(.caption).foregroundStyle(.secondary)
                 Text("1 Focus Session = 1 hour of focused work").font(.caption).foregroundStyle(.secondary)
             }
@@ -593,6 +595,7 @@ private struct ProjectTaskDetails: View {
             }
         }
         .padding(24).frame(width: 420)
+        .tint(Color(tagHex: project?.color ?? "#168B80"))
         .background {
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
