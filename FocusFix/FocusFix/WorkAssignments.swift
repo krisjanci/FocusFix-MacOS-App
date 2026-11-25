@@ -1,5 +1,24 @@
 import Foundation
 
+nonisolated struct ProjectWorkTotals: Equatable {
+    var projects: [UUID: Double] = [:]
+    var tasks: [UUID: [UUID: Double]] = [:]
+
+    mutating func add(_ intervals: [AssignedWorkInterval]) {
+        for interval in intervals {
+            guard let project = interval.assignment.projectID else { continue }
+            let seconds = max(0, interval.end - interval.start)
+            projects[project, default: 0] += seconds
+            if let task = interval.assignment.taskID { tasks[project, default: [:]][task, default: 0] += seconds }
+        }
+    }
+
+    static func duration(_ seconds: Double) -> String {
+        let minutes = Int(max(0, seconds) / 60)
+        return String(format: "%dh %02dmin", minutes / 60, minutes % 60)
+    }
+}
+
 // Private local metadata. Never add this sidecar to recording upload allowlists.
 nonisolated struct WorkAssignment: Codable, Hashable {
     var projectID: UUID?
