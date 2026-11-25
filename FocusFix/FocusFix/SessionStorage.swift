@@ -148,9 +148,25 @@ nonisolated enum SessionStorage {
         return stage
     }
     // Called only for sessions made by this writer, never as a migration of old recordings.
-    @discardableResult static func compact(_ folder: URL, force: Bool = false) throws -> Bool {
+    @discardableResult static func compact(_ folder: URL, force: Bool = false, beforeCommit: () throws -> Void = {}) throws -> Bool {
         try synchronized {
-            guard !isArchived(folder) else { return true }
+            if let value = try manifest(folder) {
+                // Interrupted post-commit cleanup is safe to resume only after verifying the ZIP again.
+                let leftovers = value.entries.keys.filter { manager.fileExists(atPath: folder.appendingPathComponent($0).path) }
+                if !leftovers.isEmpty {
+                    let stage = try temporaryFolder(); defer { try? manager.removeItem(at: stage) }
+                    let verification = Manifest(version: 1, archive: value.archive, entries: value.entries.mapValues { Entry(size: $0.size, sha256: $0.sha256, inline: nil) })
+                    for name in value.entries.keys { try extract(name, manifest: verification, folder: folder, to: stage.appendingPathComponent(name)) }
+                    for name in leftovers { try manager.removeItem(at: folder.appendingPathComponent(name)) }
+                }
+                try? manager.removeItem(at: folder.appendingPathComponent(pendingMarker))
+                return true
+            }
+            // ZIPs created before a crash but without a committed marker are disposable.
+            for name in try manager.contentsOfDirectory(atPath: folder.path) where name.hasPrefix("recording-") && name.hasSuffix(".zip") {
+                let uuid = String(name.dropFirst(10).dropLast(4))
+                if UUID(uuidString: uuid) != nil { try manager.removeItem(at: folder.appendingPathComponent(name)) }
+            }
             let metadata = try JSONSerialization.jsonObject(with: data("session.json", in: folder)) as? [String: Any]
             guard metadata?["status"] as? String != "recording", try RecordingContract.load(from: folder).finalized else { return false }
             let names = try self.names(in: folder)
@@ -181,12 +197,16 @@ nonisolated enum SessionStorage {
             let value = Manifest(version: 1, archive: archiveName, entries: entries)
             let encoded = try JSONEncoder().encode(value)
             let zipSize = try regular(archive, limit: 1024 * 1024 * 1024)
-            guard force || zipSize + encoded.count < rawSize else { return false }
+            guard force || zipSize + encoded.count < rawSize else {
+                try? manager.removeItem(at: folder.appendingPathComponent(pendingMarker))
+                return false
+            }
             // Verify the actual ZIP bytes, including entries also cached inline for listings.
             let verification = Manifest(version: 1, archive: archiveName, entries: entries.mapValues { Entry(size: $0.size, sha256: $0.sha256, inline: nil) })
             let stage = try temporaryFolder(); defer { try? manager.removeItem(at: stage) }
             for name in names { try extract(name, manifest: verification, folder: folder, to: stage.appendingPathComponent(name)) }
             let handle = try FileHandle(forWritingTo: archive); try handle.synchronize(); try handle.close()
+            try beforeCommit()
             try encoded.write(to: folder.appendingPathComponent(marker), options: .atomic)
             committed = true
             // A crash during cleanup leaves duplicate bytes, never an incomplete recording.
