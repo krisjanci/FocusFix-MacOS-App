@@ -70,6 +70,7 @@ struct ProjectsPreview: View {
     @State private var panel = false
     @State private var tasks = true
     @State private var showingGuide = false
+    @State private var browsedProjectTint: String?
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 20) {
@@ -109,6 +110,13 @@ struct ProjectsPreview: View {
                 }
                 HStack { Button("Groups") { panel.toggle() }; Spacer(); Button("Analytics") { panel.toggle() } }
             }.padding(30).frame(width: 490)
+                .background {
+                    ZStack {
+                        Color(nsColor: .windowBackgroundColor)
+                        if tasks, let browsedProjectTint { TagTintBackground(colors: [browsedProjectTint]) }
+                    }
+                }
+                .onPreferenceChange(BrowsedProjectTintKey.self) { browsedProjectTint = $0 }
             if panel { Divider(); Text("Independent side panel").frame(width: 280) }
         }.preferredColorScheme(dark ? .dark : .light)
             .overlay {
