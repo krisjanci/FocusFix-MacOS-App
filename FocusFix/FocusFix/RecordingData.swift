@@ -130,6 +130,7 @@ final class RecordingWriter {
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
+        try Data().write(to: folder.appendingPathComponent(SessionStorage.pendingMarker))
         let eventURL = folder.appendingPathComponent("events.csv")
         let mouseURL = folder.appendingPathComponent("mouse_movement.csv")
         let breakURL = folder.appendingPathComponent("breaks.csv")
