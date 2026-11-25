@@ -86,12 +86,10 @@ nonisolated struct RecordingCoverage: Equatable {
         let origin = contract?.elapsedOrigin ?? 0
         let end = contract?.observedThrough ?? session.duration ?? 0
         func rows(_ name: String) throws -> [[String]] {
-            let url = session.folder.appendingPathComponent(name)
-            guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-            let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-            guard properties.isRegularFile == true, properties.isSymbolicLink != true,
-                  (properties.fileSize ?? Int.max) <= 64 * 1024 * 1024 else { throw RecordingContract.Invalid.contract }
-            return try csv(String(contentsOf: url, encoding: .utf8))
+            guard try SessionStorage.contains(name, in: session.folder) else { return [] }
+            let data = try SessionStorage.data(name, in: session.folder, limit: 64 * 1024 * 1024)
+            guard let text = String(data: data, encoding: .utf8) else { throw RecordingContract.Invalid.contract }
+            return try csv(text)
         }
         var observations: [CoverageSlice] = []
         let mouse = try rows("mouse_movement.csv")
