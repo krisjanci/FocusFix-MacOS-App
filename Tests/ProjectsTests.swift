@@ -35,6 +35,21 @@ import Foundation
         try store.completeTask(timedTask, project: id, at: nil)
         try store.saveCompletedWork(complete, task: timedTask)
         precondition(store.projects.first { $0.id == id }!.tasks[0].completedWork == nil, "A stale total must not complete a reopened task")
+        // Details survive relaunch and are independent of title/completion state.
+        precondition(project().tasks[0].estimate == 1 && project().tasks[0].description == nil)
+        try store.updateTaskDetails(timedTask, project: id, description: "First line\nSecond line", estimate: 2.5)
+        let detailed = ProjectStore(file: file).projects.first { $0.id == id }!.tasks[0]
+        precondition(detailed.description == "First line\nSecond line" && detailed.estimate == 2.5)
+        let detailsBefore = store.projects
+        for invalid in [0, 0.4, 1.2, 3.5, Double.nan, Double.infinity] {
+            fails { try store.updateTaskDetails(timedTask, project: id, description: "Invalid", estimate: invalid) }
+            precondition(store.projects == detailsBefore)
+        }
+        for estimate in stride(from: 0.5, through: 3.0, by: 0.5) {
+            try store.updateTaskDetails(timedTask, project: id, description: "", estimate: estimate)
+            precondition(project().tasks[0].estimate == estimate && project().tasks[0].description == nil)
+        }
+        fails { try store.updateTaskDetails(UUID(), project: id, description: "Missing", estimate: 1) }
         let original = project().tasks.map(\.id)
         try store.completeTask(original[1], project: id, at: Date(timeIntervalSince1970: 20))
         precondition(project().tasks.map(\.id) == original)
@@ -131,6 +146,7 @@ import Foundation
         try Data().write(to: blocked)
         fails { _ = try writer.addProject("Failure", color: "#168B80") }
         fails { try writer.recordWork(on: WorkProject.randomTasksID) }
+        fails { try writer.updateTaskDetails(UUID(), project: WorkProject.randomTasksID, description: "Failure", estimate: 1) }
         precondition(writer.projects == preserved)
         print("ProjectsTests passed: protected default, migration, tasks, work recency, manual order, persistence and write failures")
     }
