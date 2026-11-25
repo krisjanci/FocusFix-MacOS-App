@@ -47,7 +47,7 @@ import CoreGraphics
         let correctedCoverage = try RecordingCoverage.load(session: corrected)
         precondition(correctedCoverage.work == 30 && correctedCoverage.nonWork == 5)
         let unchanged = try Data(contentsOf: rawURL); precondition(unchanged == raw)
-        let copy = try SessionFiles.export(corrected, to: exports, root: root, active: nil)
+        let copy = try SessionFiles.exportOriginal(corrected, to: exports, root: root, active: nil)
         let copied = try Data(contentsOf: copy.appendingPathComponent("mouse_movement.csv")); precondition(copied == raw)
         lifecycle.userPaused = true
         precondition(lifecycle.reconcile(recording: true, mode: .automatic, idle: 0) == .stop("user_pause"))
@@ -62,7 +62,7 @@ import CoreGraphics
         do { _ = try SavedSession(folder: bad); preconditionFailure("Malformed new schema accepted as legacy") } catch { }
         let listing = try SessionFiles.inspect(in: root)
         precondition(listing.sessions.count == 1 && listing.unreadable == 1)
-        do { _ = try SessionFiles.exportAll(to: exports, root: root, active: nil); preconditionFailure("Partial Export All accepted") } catch { }
+        do { _ = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil); preconditionFailure("Partial Export All accepted") } catch { }
         print("PASS: generated consent/permission lifecycle, mixed context, break/coverage scoring, rotation IDs/cooldown, edits, byte-preserving export, pause/resume, research rejection and quarantined malformed history")
     }
 }
