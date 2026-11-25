@@ -95,7 +95,7 @@ nonisolated struct SavedSession: Identifiable, Hashable {
         return journal.intervals(in: recordingContract, observedWork: coverage.workSlices.map { ($0.start, $0.end) })
     }
 
-    // Sum every recorded stint of this task, clipped to the completion instant.
+    // Finalized history only; the tracker supplies live observed work separately.
     static func projectWorkTotals(in sessions: [SavedSession]) throws -> ProjectWorkTotals {
         var result = ProjectWorkTotals()
         var seen = Set<UUID>()
