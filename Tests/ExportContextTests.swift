@@ -64,10 +64,10 @@ import CoreGraphics
             }
             try expect(String(contentsOf: copy.appendingPathComponent("export-notes.txt"), encoding: .utf8).contains("Saved originals are unchanged"))
         }
-        try check(SessionFiles.export(saved, to: exports, root: root, active: nil))
-        let selected = try SessionFiles.exportSelected([saved], to: exports, root: root, active: nil)
+        try check(SessionFiles.exportOriginal(saved, to: exports, root: root, active: nil))
+        let selected = try SessionFiles.exportSelectedOriginal([saved], to: exports, root: root, active: nil)
         try check(selected.folder.appendingPathComponent(saved.exportName()))
-        let all = try SessionFiles.exportAll(to: exports, root: root, active: nil)
+        let all = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil)
         try check(all.folder.appendingPathComponent(saved.exportName()))
         try expect(snapshot(writer.folder) == originals)
 
@@ -79,7 +79,7 @@ import CoreGraphics
         let cleanLog = " {\"request\":{\"context\":\"unknown\"},\"note\":\"non_work\"} \r\n\r\n"
         try cleanLog.write(to: clean.folder.appendingPathComponent("reminders.jsonl"), atomically: true, encoding: .utf8)
         let cleanSaved = try SavedSession(folder: clean.folder)
-        let cleanCopy = try SessionFiles.export(cleanSaved, to: exports, root: root, active: nil)
+        let cleanCopy = try SessionFiles.exportOriginal(cleanSaved, to: exports, root: root, active: nil)
         try expect(String(contentsOf: cleanCopy.appendingPathComponent("reminders.jsonl"), encoding: .utf8) == cleanLog)
         try expect(Data(contentsOf: cleanCopy.appendingPathComponent("context_intervals.json")) == Data(contentsOf: clean.folder.appendingPathComponent("context_intervals.json")))
         let beforeFailure = try FileManager.default.contentsOfDirectory(atPath: exports.path).sorted()
@@ -87,9 +87,9 @@ import CoreGraphics
         for kind in 0..<3 {
             do {
                 switch kind {
-                case 0: _ = try SessionFiles.export(saved, to: exports, root: root, active: nil)
-                case 1: _ = try SessionFiles.exportSelected([cleanSaved, saved], to: exports, root: root, active: nil)
-                default: _ = try SessionFiles.exportAll(to: exports, root: root, active: nil)
+                case 0: _ = try SessionFiles.exportOriginal(saved, to: exports, root: root, active: nil)
+                case 1: _ = try SessionFiles.exportSelectedOriginal([cleanSaved, saved], to: exports, root: root, active: nil)
+                default: _ = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil)
                 }
                 preconditionFailure("Malformed logs must fail and remove incomplete exports")
             } catch {}
@@ -101,7 +101,7 @@ import CoreGraphics
         try reminder.write(to: external, atomically: true, encoding: .utf8)
         try FileManager.default.createSymbolicLink(at: study, withDestinationURL: external)
         do {
-            _ = try SessionFiles.export(saved, to: exports, root: root, active: nil)
+            _ = try SessionFiles.exportOriginal(saved, to: exports, root: root, active: nil)
             preconditionFailure("Context-log symlinks must fail")
         } catch {}
         try expect(String(contentsOf: external, encoding: .utf8) == reminder)
