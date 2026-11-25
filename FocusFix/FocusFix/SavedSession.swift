@@ -210,7 +210,7 @@ nonisolated enum SessionFiles {
                 try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: url, options: .atomic)
                 let destination = root.appendingPathComponent(folder.lastPathComponent)
                 try FileManager.default.moveItem(at: folder, to: destination)
-                        count += 1
+                count += 1
             } catch { failures += 1 }
         }
         if failures > 0 {
@@ -229,6 +229,7 @@ nonisolated enum SessionFiles {
             == second.resolvingSymlinksInPath().standardizedFileURL.path
     }
     static func updateConditions(_ values: [SessionCondition], for session: SavedSession, root: URL, active: URL?) throws {
+        try SessionStorage.synchronized {
         try validate(session.folder, in: root, active: active)
         if SessionStorage.isArchived(session.folder) {
             try SessionStorage.edit(session.folder) { stage in
@@ -252,10 +253,12 @@ nonisolated enum SessionFiles {
         }
         metadata["conditions"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
         try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
+        }
     }
 
     // Edit labels without recreating metadata or touching activity/survey files.
     static func updateTags(_ tags: [String], colors: [String: String] = [:], for session: SavedSession, root: URL, active: URL?) throws {
+        try SessionStorage.synchronized {
         try validate(session.folder, in: root, active: active)
         if SessionStorage.isArchived(session.folder) {
             try SessionStorage.edit(session.folder) { stage in
@@ -286,11 +289,13 @@ nonisolated enum SessionFiles {
         metadata["tag_colors"] = validColors
         try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
             .write(to: url, options: .atomic)
+        }
     }
 
     static func correctContext(_ context: ActivityContext, start: Double, end: Double,
                                for session: SavedSession, root: URL, active: URL?,
                                actionID: UUID = UUID(), expectedRevision: Int) throws {
+        try SessionStorage.synchronized {
         try validate(session.folder, in: root, active: active)
         if SessionStorage.isArchived(session.folder) {
             try SessionStorage.edit(session.folder) { stage in
@@ -303,6 +308,7 @@ nonisolated enum SessionFiles {
             effectiveAt: session.startedAt.addingTimeInterval(start - contract.elapsedOrigin),
             recordedAt: Date(), actionID: actionID, expectedRevision: expectedRevision)
         try contract.save(to: session.folder)
+        }
     }
 
     // Locate the app's local Sessions directory in Application Support.
@@ -341,6 +347,7 @@ nonisolated enum SessionFiles {
     }
     static func deleteSelected(_ sessions: [SavedSession], root: URL, active: URL?,
                                remove: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws -> DeletionResult {
+        return try SessionStorage.synchronized {
         // Revalidate the entire selection before any recoverable Trash moves.
         for session in sessions { try validate(session.folder, in: root, active: active) }
         var result = DeletionResult()
@@ -353,6 +360,7 @@ nonisolated enum SessionFiles {
             catch { result.failures.append("\(session.id): \(error.localizedDescription)") }
         }
         return result
+        }
     }
 
     // Only operate on a direct session directory, never the storage root or a symlink.
