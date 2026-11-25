@@ -242,10 +242,10 @@ struct ProjectsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             projectColorControl(project)
-                            Text("Untasked Work").font(.callout)
+                            Text("Untasked Work").font(.callout.bold())
                             Spacer()
                             if !editingList { workButton(project, task: nil) }
-                        }
+                        }.padding(.horizontal, 4)
                         VStack(spacing: 0) {
                             if project.tasks.isEmpty {
                                 Text("What would you like to work on?").font(.callout).foregroundStyle(.secondary).padding(.vertical, 18)
