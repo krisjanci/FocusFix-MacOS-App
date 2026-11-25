@@ -17,6 +17,9 @@ struct ChecklistReorderRow: ViewModifier {
         if enabled {
             content
                 .contentShape(Rectangle())
+                .checklistPressFeedback(dragging: source == item) {
+                    if source == item { source = nil; insertion = nil }
+                }
                 .background(GeometryReader { geometry in
                     Color.clear.onAppear { height = geometry.size.height }
                         .onChange(of: geometry.size.height) { _, value in height = value }
