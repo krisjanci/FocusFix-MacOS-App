@@ -153,11 +153,15 @@ nonisolated enum SessionStorage {
             if let value = try manifest(folder) {
                 // Interrupted post-commit cleanup is safe to resume only after verifying the ZIP again.
                 let leftovers = value.entries.keys.filter { manager.fileExists(atPath: folder.appendingPathComponent($0).path) }
-                if !leftovers.isEmpty {
+                let unused = try manager.contentsOfDirectory(atPath: folder.path).filter { name in
+                    name != value.archive && name.hasPrefix("recording-") && name.hasSuffix(".zip") &&
+                    UUID(uuidString: String(name.dropFirst(10).dropLast(4))) != nil
+                }
+                if !leftovers.isEmpty || !unused.isEmpty {
                     let stage = try temporaryFolder(); defer { try? manager.removeItem(at: stage) }
                     let verification = Manifest(version: 1, archive: value.archive, entries: value.entries.mapValues { Entry(size: $0.size, sha256: $0.sha256, inline: nil) })
                     for name in value.entries.keys { try extract(name, manifest: verification, folder: folder, to: stage.appendingPathComponent(name)) }
-                    for name in leftovers { try manager.removeItem(at: folder.appendingPathComponent(name)) }
+                    for name in leftovers + unused { try manager.removeItem(at: folder.appendingPathComponent(name)) }
                 }
                 try? manager.removeItem(at: folder.appendingPathComponent(pendingMarker))
                 return true
@@ -167,14 +171,10 @@ nonisolated enum SessionStorage {
                 let uuid = String(name.dropFirst(10).dropLast(4))
                 if UUID(uuidString: uuid) != nil { try manager.removeItem(at: folder.appendingPathComponent(name)) }
             }
-            let metadata = try JSONSerialization.jsonObject(with: data("session.json", in: folder)) as? [String: Any]
-            guard let metadata, let status = metadata["status"] as? String,
-                  status != "recording", status != "metadata_unavailable",
-                  let duration = metadata["duration_seconds"] as? Double, duration.isFinite, duration >= 0,
-                  let schema = metadata["schema_version"] as? Int, (1...RecordingContract.schemaVersion).contains(schema) else { return false }
-            if schema == RecordingContract.schemaVersion {
-                guard try RecordingContract.load(from: folder).finalized else { return false }
-            }
+            let session = try SavedSession(folder: folder)
+            guard session.status != "recording", session.status != "metadata_unavailable", session.duration != nil,
+                  (1...RecordingContract.schemaVersion).contains(session.schemaVersion),
+                  session.recordingContract.map({ $0.finalized }) ?? true else { return false }
             let names = try self.names(in: folder)
             guard names.count <= 128, names.allSatisfy(safeName) else { throw CocoaError(.fileReadCorruptFile) }
             var entries: [String: Entry] = [:], rawSize = 0
