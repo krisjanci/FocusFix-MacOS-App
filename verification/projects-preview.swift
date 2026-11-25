@@ -102,10 +102,10 @@ struct ProjectsPreview: View {
                         Toggle("Reduce Motion", isOn: $reducedMotion).toggleStyle(.checkbox)
                     }
                 }
-                .opacity(tasks ? 0 : 1).allowsHitTesting(!tasks).accessibilityHidden(tasks)
+                .opacity(tasks ? 0 : 1).allowsHitTesting(!tasks).accessibilityHidden(tasks).disabled(tasks)
                 .overlay {
                     ProjectsView(store: PreviewProjects.store, tracker: tracker, close: { tasks = false }, reduceMotionOverride: reducedMotion)
-                        .opacity(tasks ? 1 : 0).allowsHitTesting(tasks).accessibilityHidden(!tasks)
+                        .opacity(tasks ? 1 : 0).allowsHitTesting(tasks).accessibilityHidden(!tasks).disabled(!tasks)
                 }
                 HStack { Button("Groups") { panel.toggle() }; Spacer(); Button("Analytics") { panel.toggle() } }
             }.padding(30).frame(width: 490)
