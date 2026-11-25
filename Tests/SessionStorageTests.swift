@@ -1,6 +1,7 @@
 import Foundation
 
 @main struct SessionStorageTests {
+    static func expect(_ value: @autoclosure () throws -> Bool) throws { let result = try value(); precondition(result) }
     static func fails(_ body: () throws -> Void) { do { try body(); preconditionFailure("Expected failure") } catch {} }
     static func main() throws {
         let fm = FileManager.default
@@ -17,7 +18,7 @@ import Foundation
         writer.append((0..<100).map { MouseSummary(start: Double($0), end: Double($0 + 1), distance: 0, events: 0, secondsSinceMovement: nil) })
         try writer.checkpoint(at: 100)
         let activeCompact = try SessionStorage.compact(writer.folder)
-        precondition(!activeCompact)
+        try expect(!activeCompact)
         try writer.finish(startedAt: start, duration: 100, reason: "test")
         var originals: [String: Data] = [:]
         for name in try SessionStorage.names(in: writer.folder) { originals[name] = try SessionStorage.data(name, in: writer.folder, limit: 512 * 1024 * 1024) }
@@ -25,33 +26,34 @@ import Foundation
         let assignmentsBefore = try saved.assignmentHistory()
         enum Injected: Error { case failure }
         fails { _ = try SessionStorage.compact(writer.folder, beforeCommit: { throw Injected.failure }) }
-        precondition(!SessionStorage.isArchived(writer.folder))
-        for (name, bytes) in originals { precondition(tryData(name, writer.folder) == bytes) }
+        try expect(!SessionStorage.isArchived(writer.folder))
+        for (name, bytes) in originals { try expect(tryData(name, writer.folder) == bytes) }
         let raw = originals.values.reduce(0) { $0 + $1.count }
         let compacted = try SessionStorage.compact(writer.folder)
-        precondition(compacted && SessionStorage.isArchived(writer.folder))
+        try expect(compacted && SessionStorage.isArchived(writer.folder))
         let contents = try fm.contentsOfDirectory(at: writer.folder, includingPropertiesForKeys: [.fileSizeKey])
-        let size = try contents.reduce(0) { $0 + ($1.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) }
-        precondition(size < raw && contents.count == 2)
+        let size = try contents.reduce(0) { $0 + (try $1.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) }
+        try expect(size < raw && contents.count == 2)
         print("PERF lossless fixture: \(raw) -> \(size) bytes, \(Int(100 * (1 - Double(size) / Double(raw))))% smaller")
         for (name, bytes) in originals {
-            precondition(tryData(name, writer.folder) == bytes)
-            precondition(!fm.fileExists(atPath: writer.folder.appendingPathComponent(name).path))
+            try expect(tryData(name, writer.folder) == bytes)
+            try expect(!fm.fileExists(atPath: writer.folder.appendingPathComponent(name).path))
         }
         let reopened = try SavedSession(folder: writer.folder)
-        precondition(reopened.startedAt == saved.startedAt && reopened.recordingContract == saved.recordingContract)
-        precondition(tryCoverage(reopened) == before && (try reopened.assignmentHistory()) == assignmentsBefore)
+        try expect(reopened.startedAt == saved.startedAt && reopened.recordingContract == saved.recordingContract)
+        let assignmentsAfter = try reopened.assignmentHistory()
+        try expect(tryCoverage(reopened) == before && assignmentsAfter == assignmentsBefore)
         let taskTotal = try SavedSession.totalTaskWork(project: assignment.projectID!, task: assignment.taskID!, through: start.addingTimeInterval(100), root: root)
-        precondition(taskTotal == 100)
+        try expect(taskTotal == 100)
         try SessionFiles.updateTags(["New tag"], for: reopened, root: root, active: nil)
         let tagged = try SavedSession(folder: writer.folder)
-        precondition(tagged.tags == ["New tag"] && SessionStorage.isArchived(writer.folder))
-        precondition(tryData("events.csv", writer.folder) == originals["events.csv"])
-        precondition(tryCoverage(tagged) == before)
+        try expect(tagged.tags == ["New tag"] && SessionStorage.isArchived(writer.folder))
+        try expect(tryData("events.csv", writer.folder) == originals["events.csv"])
+        try expect(tryCoverage(tagged) == before)
         // Interrupted cleanup: marker already committed, stale source bytes remain.
         try originals["events.csv"]!.write(to: writer.folder.appendingPathComponent("events.csv"))
         _ = try SessionStorage.compact(writer.folder)
-        precondition(!fm.fileExists(atPath: writer.folder.appendingPathComponent("events.csv").path))
+        try expect(!fm.fileExists(atPath: writer.folder.appendingPathComponent("events.csv").path))
         // Existing upload format and file allowlist are unchanged by local compaction.
         let consent = DevelopmentConsent(id: UUID(), owner: UUID(), origin: "https://example.invalid", policyVersion: "test", startedAt: start)
         let zip = root.appendingPathComponent("development.zip")
@@ -60,8 +62,8 @@ import Foundation
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         process.arguments = ["-Z1", zip.path]; process.standardOutput = pipe
         try process.run(); let listing = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self); process.waitUntilExit()
-        precondition(Set(listing.split(separator: "\n").map { URL(fileURLWithPath: String($0)).lastPathComponent }) == Set(DevelopmentArchive.files + ["sharing_manifest.json"]))
-        precondition(!listing.contains(WorkAssignmentJournal.filename) && !listing.contains(SessionStorage.marker))
+        try expect(Set(listing.split(separator: "\n").map { URL(fileURLWithPath: String($0)).lastPathComponent }) == Set(DevelopmentArchive.files + ["sharing_manifest.json"]))
+        try expect(!listing.contains(WorkAssignmentJournal.filename) && !listing.contains(SessionStorage.marker))
         // Corruption cannot silently return changed activity.
         let manifest = try JSONDecoder().decode(SessionStorage.Manifest.self, from: Data(contentsOf: writer.folder.appendingPathComponent(SessionStorage.marker)))
         let archive = writer.folder.appendingPathComponent(manifest.archive)
@@ -80,9 +82,9 @@ import Foundation
         let oldNames = try fm.contentsOfDirectory(atPath: old.folder.path).sorted()
         SessionStorage.resumeCompaction(in: root)
         // No marker identifies existing sessions for automatic compaction.
-        precondition(try fm.contentsOfDirectory(atPath: old.folder.path).sorted() == oldNames)
+        try expect(try fm.contentsOfDirectory(atPath: old.folder.path).sorted() == oldNames)
         let selected = try SessionFiles.deleteSelected([tagged], root: root, active: nil, remove: { try fm.removeItem(at: $0) })
-        precondition(selected.deleted.count == 1 && !fm.fileExists(atPath: writer.folder.path))
+        try expect(selected.deleted.count == 1 && !fm.fileExists(atPath: writer.folder.path))
         print("PASS: exact archive recovery, rollback, mixed storage, edits, task history, upload allowlist, corruption and deletion")
     }
     static func tryData(_ name: String, _ folder: URL) -> Data { try! SessionStorage.data(name, in: folder, limit: 512 * 1024 * 1024) }
