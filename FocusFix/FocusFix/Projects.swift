@@ -14,6 +14,15 @@ nonisolated struct ProjectTask: Codable, Identifiable, Equatable {
     var title: String
     var completedAt: Date?
     var completedWork: CompletedTaskWork?
+    var description: String?
+    var predictedFocusSessions: Double?
+    var estimate: Double { predictedFocusSessions ?? 1 }
+
+    static func validateEstimate(_ value: Double) throws {
+        guard value.isFinite, (0.5...3).contains(value), (value * 2).rounded() == value * 2 else {
+            throw SessionTags.TagError("Choose 0.5–3 Focus Sessions in half-session steps.")
+        }
+    }
 }
 
 nonisolated struct WorkProject: Codable, Identifiable, Equatable {
@@ -65,6 +74,7 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
                 guard Set(project.tasks.map(\.id)).count == project.tasks.count else { throw CocoaError(.fileReadCorruptFile) }
                 for task in project.tasks {
                     _ = try Self.title(task.title, limit: 200)
+                    if let estimate = task.predictedFocusSessions { try ProjectTask.validateEstimate(estimate) }
                     if let work = task.completedWork {
                         guard work.projectID == project.id, work.finishedAt == task.completedAt,
                               work.seconds.map({ $0.isFinite && $0 >= 0 }) ?? true else { throw CocoaError(.fileReadCorruptFile) }
@@ -154,6 +164,13 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     }
     func renameTask(_ id: UUID, project: UUID, title: String) throws {
         try editTask(id, project: project) { $0.title = try Self.title(title, limit: 200) }
+    }
+    func updateTaskDetails(_ id: UUID, project: UUID, description: String, estimate: Double) throws {
+        try ProjectTask.validateEstimate(estimate)
+        try editTask(id, project: project) {
+            $0.description = description.isEmpty ? nil : description
+            $0.predictedFocusSessions = estimate
+        }
     }
     func completeTask(_ id: UUID, project: UUID, at date: Date? = Date(), work: CompletedTaskWork? = nil) throws {
         if let work {
