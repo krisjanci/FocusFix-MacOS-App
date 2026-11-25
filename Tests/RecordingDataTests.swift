@@ -114,8 +114,8 @@ struct RecordingDataTests {
         let exports = root.deletingLastPathComponent().appendingPathComponent("focusfix-exports-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: exports) }
-        let copy = try SessionFiles.export(saved, to: exports, root: root, active: nil)
-        let secondCopy = try SessionFiles.export(saved, to: exports, root: root, active: nil)
+        let copy = try SessionFiles.exportOriginal(saved, to: exports, root: root, active: nil)
+        let secondCopy = try SessionFiles.exportOriginal(saved, to: exports, root: root, active: nil)
         precondition(copy != secondCopy && secondCopy.lastPathComponent.hasSuffix(" (2)"))
         let exported = try String(contentsOf: copy.appendingPathComponent("events.csv"), encoding: .utf8)
         precondition(exported == events)
@@ -137,7 +137,7 @@ struct RecordingDataTests {
             preconditionFailure("The storage root must be protected")
         } catch { /* Expected. */ }
         do {
-            _ = try SessionFiles.export(saved, to: saved.folder, root: root, active: nil)
+            _ = try SessionFiles.exportOriginal(saved, to: saved.folder, root: root, active: nil)
             preconditionFailure("Cannot export into session storage")
         } catch { /* Expected. */ }
 
@@ -176,7 +176,7 @@ struct RecordingDataTests {
         precondition(all.count == 3 && !all.contains { $0.folder == link })
 
         // Batch export includes legacy/unfinished sessions, preserves bytes and skips active work.
-        let batch = try SessionFiles.exportAll(to: exports, root: root, active: unfinishedFolder)
+        let batch = try SessionFiles.exportAllOriginal(to: exports, root: root, active: unfinishedFolder)
         precondition(batch.count == 2)
         let batchCopies = try FileManager.default.contentsOfDirectory(at: batch.folder, includingPropertiesForKeys: nil)
         precondition(batchCopies.count == 2)
@@ -185,7 +185,7 @@ struct RecordingDataTests {
         precondition(batchMetadata == historicalData)
         let originalMetadata = try Data(contentsOf: writer.folder.appendingPathComponent("session.json"))
         precondition(originalMetadata == historicalData)
-        let repeatedBatch = try SessionFiles.exportAll(to: exports, root: root, active: nil)
+        let repeatedBatch = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil)
         precondition(repeatedBatch.count == 3 && repeatedBatch.folder != batch.folder)
         precondition(repeatedBatch.folder.lastPathComponent == "FocusFix Sessions (2)")
         precondition(FileManager.default.fileExists(atPath:
@@ -194,7 +194,7 @@ struct RecordingDataTests {
         // Explicit selections export exactly the chosen subset, preserving original bytes.
         let selectionDestination = exports.appendingPathComponent("selected-exports")
         try FileManager.default.createDirectory(at: selectionDestination, withIntermediateDirectories: false)
-        let selectionBatch = try SessionFiles.exportSelected([saved, unfinished], to: selectionDestination,
+        let selectionBatch = try SessionFiles.exportSelectedOriginal([saved, unfinished], to: selectionDestination,
             root: root, active: old.folder)
         precondition(selectionBatch.count == 2)
         let selectionCopies = try FileManager.default.contentsOfDirectory(atPath: selectionBatch.folder.path)
@@ -205,7 +205,7 @@ struct RecordingDataTests {
         let selectionBefore = try FileManager.default.contentsOfDirectory(atPath: selectionDestination.path).sorted()
         for invalidSelection in [[], [saved, saved], [saved, old]] {
             do {
-                _ = try SessionFiles.exportSelected(invalidSelection, to: selectionDestination, root: root, active: old.folder)
+                _ = try SessionFiles.exportSelectedOriginal(invalidSelection, to: selectionDestination, root: root, active: old.folder)
                 preconditionFailure("Empty, duplicate or active selections must fail before copying")
             } catch { }
         }
@@ -215,7 +215,7 @@ struct RecordingDataTests {
         // Identical timestamps must still produce two separate, complete copies.
         let duplicateFolder = root.appendingPathComponent("same-time")
         try FileManager.default.copyItem(at: writer.folder, to: duplicateFolder)
-        let collisionBatch = try SessionFiles.exportAll(to: exports, root: root, active: nil)
+        let collisionBatch = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil)
         precondition(collisionBatch.count == 4)
         let collisionDay = SessionDay.groups([saved])[0].folderName
         let collisionCopy = collisionBatch.folder.appendingPathComponent(collisionDay)
@@ -227,19 +227,19 @@ struct RecordingDataTests {
         try FileManager.default.createSymbolicLink(at: storageAlias, withDestinationURL: root)
         for forbidden in [root, saved.folder, storageAlias] {
             do {
-                _ = try SessionFiles.exportAll(to: forbidden, root: root, active: nil)
+                _ = try SessionFiles.exportAllOriginal(to: forbidden, root: root, active: nil)
                 preconditionFailure("Batch export cannot write into session storage, including aliases")
             } catch { /* Expected. */ }
         }
         let emptyRoot = exports.appendingPathComponent("empty-storage")
         try FileManager.default.createDirectory(at: emptyRoot, withIntermediateDirectories: false)
         do {
-            _ = try SessionFiles.exportAll(to: exports, root: emptyRoot, active: nil)
+            _ = try SessionFiles.exportAllOriginal(to: exports, root: emptyRoot, active: nil)
             preconditionFailure("Empty storage must not report a successful export")
         } catch { /* Expected. */ }
         try FileManager.default.createDirectory(at: emptyRoot.appendingPathComponent("active"), withIntermediateDirectories: false)
         do {
-            _ = try SessionFiles.exportAll(to: exports, root: emptyRoot, active: emptyRoot.appendingPathComponent("active"))
+            _ = try SessionFiles.exportAllOriginal(to: exports, root: emptyRoot, active: emptyRoot.appendingPathComponent("active"))
             preconditionFailure("An active-only library must not report a successful export")
         } catch { /* Expected. */ }
 
@@ -250,7 +250,7 @@ struct RecordingDataTests {
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: unreadable.path) }
         let beforeFailure = try FileManager.default.contentsOfDirectory(atPath: exports.path).sorted()
         do {
-            _ = try SessionFiles.exportAll(to: exports, root: root, active: nil)
+            _ = try SessionFiles.exportAllOriginal(to: exports, root: root, active: nil)
             preconditionFailure("An unreadable source must fail the batch")
         } catch { /* Expected. */ }
         let afterFailure = try FileManager.default.contentsOfDirectory(atPath: exports.path).sorted()
