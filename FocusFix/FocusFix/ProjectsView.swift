@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 struct ProjectsView: View {
@@ -80,11 +81,7 @@ struct ProjectsView: View {
             else { projectList }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            if let project {
-                TagTintBackground(colors: [project.color]).clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-        }
+        .preference(key: BrowsedProjectTintKey.self, value: project?.color)
         .sheet(item: $detailTask) { task in
             if let project {
                 ProjectTaskDetails(store: store, tracker: tracker, projectID: project.id, task: task)
@@ -537,6 +534,9 @@ private struct ProjectTaskDetails: View {
     @State private var saveError: String?
     @State private var saved = true
     @State private var editingEstimate = false
+    @State private var editingTitle = false
+    @State private var titleDraft = ""
+    @FocusState private var titleFocused: Bool
 
     init(store: ProjectStore, tracker: ActivityTracker, projectID: UUID, task: ProjectTask) {
         self.store = store; self.tracker = tracker; self.projectID = projectID; taskID = task.id
@@ -558,8 +558,25 @@ private struct ProjectTaskDetails: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(task?.title ?? "Task no longer available").font(.title3.weight(.semibold)).textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if editingTitle {
+                    TextField("Task title", text: $titleDraft).textFieldStyle(.plain)
+                        .focused($titleFocused).onSubmit { _ = saveTitle() }
+                        .onExitCommand { editingTitle = false; titleFocused = false; saveError = nil }
+                        .accessibilityLabel("Task title")
+                } else {
+                    Text(task?.title ?? "Task no longer available")
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onTapGesture(count: 2) {
+                            guard let task else { return }
+                            titleDraft = task.title; editingTitle = true; titleFocused = true
+                        }
+                        .accessibilityAction(named: "Rename task") {
+                            guard let task else { return }
+                            titleDraft = task.title; editingTitle = true; titleFocused = true
+                        }
+                }
+            }.font(.title3.weight(.semibold))
             Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Description (optional)").font(.callout.weight(.medium))
@@ -602,7 +619,11 @@ private struct ProjectTaskDetails: View {
                 if let project { TagTintBackground(colors: [project.color]) }
             }
         }
+        .background(TaskPopupPositioner())
         .interactiveDismissDisabled()
+        .onChange(of: titleFocused) { _, focused in
+            if !focused, editingTitle { _ = saveTitle() }
+        }
         .onExitCommand(perform: close)
         .onChange(of: description) { _, _ in saved = false }
         .onChange(of: estimate) { _, _ in
@@ -630,5 +651,65 @@ private struct ProjectTaskDetails: View {
         }
     }
 
-    private func close() { if save() { dismiss() } }
+    @discardableResult private func saveTitle() -> Bool {
+        guard editingTitle else { return true }
+        do {
+            try store.renameTask(taskID, project: projectID, title: titleDraft)
+            editingTitle = false; titleFocused = false; saveError = nil
+            return true
+        } catch {
+            saveError = error.localizedDescription; titleFocused = true
+            return false
+        }
+    }
+
+    private func close() { if saveTitle(), save() { dismiss() } }
+}
+
+struct BrowsedProjectTintKey: PreferenceKey {
+    static let defaultValue: String? = nil
+    static func reduce(value: inout String?, nextValue: () -> String?) { value = nextValue() ?? value }
+}
+
+// Keep native task sheets over the original 490-point collector, even when a side panel adds width.
+private struct TaskPopupPositioner: NSViewRepresentable {
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ view: Probe, context: Context) { view.schedulePosition() }
+    static func dismantleNSView(_ view: Probe, coordinator: ()) { view.stopObserving() }
+
+    final class Probe: NSView {
+        private var observers: [NSObjectProtocol] = []
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stopObserving()
+            guard window != nil else { return }
+            for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification,
+                         NSWindow.didBeginSheetNotification, NSWindow.didBecomeKeyNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                    MainActor.assumeIsolated {
+                        guard let self, let changed = note.object as? NSWindow,
+                              changed === self.window || changed === self.window?.sheetParent else { return }
+                        self.schedulePosition()
+                    }
+                })
+            }
+            schedulePosition()
+        }
+        func stopObserving() {
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers.removeAll()
+        }
+        func schedulePosition() {
+            DispatchQueue.main.async { [weak self] in
+                guard let sheet = self?.window, let parent = sheet.sheetParent,
+                      let content = parent.contentView else { return }
+                let bounds = parent.convertToScreen(content.bounds)
+                let origin = NSPoint(x: bounds.minX + min(490, bounds.width) / 2 - sheet.frame.width / 2,
+                                     y: bounds.midY - sheet.frame.height / 2)
+                if abs(sheet.frame.minX - origin.x) > 0.5 || abs(sheet.frame.minY - origin.y) > 0.5 {
+                    sheet.setFrameOrigin(origin)
+                }
+            }
+        }
+    }
 }
