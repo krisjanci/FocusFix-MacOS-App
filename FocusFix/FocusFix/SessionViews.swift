@@ -97,7 +97,7 @@ struct SessionLibraryView: View {
                 }.buttonPressFeedback().disabled(!canActOnSelection)
                 Button(exportingAll ? "Exporting…" : "Export All…") { exportAll() }.buttonPressFeedback()
                     .disabled(exportingAll || tracker.libraryError != nil || !tracker.sessions.contains { !tracker.isActive($0) })
-                    .help("Export all saved sessions into one folder. The current recording is skipped.")
+                    .help("Combine saved sessions into one activity CSV per day. The current recording is skipped.")
                 Button(selectedSessions.count > 1 ? "Export Selected…" : "Export…") { exportSelected() }.buttonPressFeedback()
                     .buttonStyle(.borderedProminent).tint(teal)
                     .disabled(!canActOnSelection)
