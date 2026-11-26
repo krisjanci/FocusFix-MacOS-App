@@ -52,9 +52,10 @@ struct ProjectsView: View {
                         .accessibilityLabel(editingList ? "Finish editing" : "Edit projects and tasks")
                 }
             }
+            .padding(.bottom, project != nil && !projectEditor ? 24 : 0)
             .background {
                 if project != nil, !projectEditor {
-                    ProjectHeaderShade().padding(.horizontal, -30).padding(.top, -30).padding(.bottom, -6)
+                    ProjectHeaderShade().padding(.horizontal, -30).padding(.top, -30)
                 }
             }
             if tracker.isWorking {
@@ -588,8 +589,9 @@ private struct ProjectTaskDetails: View {
             Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 24)
             .background {
-                ProjectHeaderShade().padding(.horizontal, -24).padding(.top, -24).padding(.bottom, -8)
+                ProjectHeaderShade().padding(.horizontal, -24).padding(.top, -24)
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Description (optional)").font(.callout.weight(.medium))
@@ -731,7 +733,7 @@ private struct TaskPopupPositioner: NSViewRepresentable {
 private struct ProjectHeaderShade: View {
     @Environment(\.colorScheme) private var colorScheme
     var body: some View {
-        Color.black.opacity(colorScheme == .dark ? 0.08 : 0.035)
+        Color.black.opacity(colorScheme == .dark ? 0.12 : 0.055)
             .allowsHitTesting(false).accessibilityHidden(true)
     }
 }
