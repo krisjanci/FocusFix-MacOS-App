@@ -18,6 +18,7 @@ struct AccountTests {
         let session = AccountSession(access_token: "test-access", refresh_token: "test-refresh",
             expires_at: Date().addingTimeInterval(3600).timeIntervalSince1970, expires_in: 3600,
             user: AccountUser(id: owner, email: "test@example.invalid"))
+        var clock = Date()
         var requests: [URLRequest] = []
         var stored: Data?
         var reads = 0
@@ -31,7 +32,14 @@ struct AccountTests {
             precondition(request.value(forHTTPHeaderField: "apikey") == config.publicKey)
             var data = Data("{}".utf8)
             var status = 200
-            if request.url!.path.contains("account_profiles") {
+            if request.url!.path.contains("account_profile_state") {
+                if failProfile { status = 503 }
+                else {
+                    let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+                    let unchanged = payload["p_version"] as? String == "fixture"
+                    data = try JSONEncoder().encode(AccountProfileState(version: "fixture", unchanged: unchanged, profile: unchanged ? nil : remote))
+                }
+            } else if request.url!.path.contains("account_profiles") {
                 precondition(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-access")
                 if failProfile { status = 503 }
                 else if request.httpMethod == "GET" {
@@ -48,7 +56,7 @@ struct AccountTests {
             return (data, HTTPURLResponse(url: request.url!, statusCode: statusOverride ?? status, httpVersion: nil, headerFields: retryAfterHeader.map { ["Retry-After": $0] })!)
         }
         let controller = AccountController(configuration: config, transport: transport,
-            readCredential: { reads += 1; return stored }, writeCredential: { stored = $0 }, defaults: preferences)
+            readCredential: { reads += 1; return stored }, writeCredential: { stored = $0 }, defaults: preferences, now: { clock })
         precondition(reads == 0 && requests.isEmpty) // Launch never touches Keychain or network.
         await controller.authenticate(email: "bad", password: "short", create: true)
         precondition(requests.isEmpty)
@@ -91,6 +99,18 @@ struct AccountTests {
         stored = try JSONEncoder().encode(StoredAccount(origin: config.origin.absoluteString, session: session))
         await controller.restore()
         precondition(controller.session?.user.id == owner && reads == 2)
+        let warmCount = requests.count
+        await controller.refreshProfileIfDue()
+        precondition(requests.count == warmCount, "Profile was checked before four hours")
+        let cachedRestore = AccountController(configuration: config, transport: transport,
+            readCredential: { stored }, writeCredential: { _ in }, defaults: preferences, now: { clock })
+        await cachedRestore.restore()
+        precondition(requests.count == warmCount && cachedRestore.profile == remote,
+            "Relaunch fetched an unexpired token or warm profile")
+        clock = clock.addingTimeInterval(4 * 3600 + 1)
+        await controller.refreshProfileIfDue()
+        precondition(requests.count == warmCount + 1 && controller.profile == remote,
+            "Conditional profile refresh lost the cached photo")
         statusOverride = 429; retryAfterHeader = "120"
         let api = AccountAPI(configuration: config, transport: transport)
         do { _ = try await api.signIn(email: "test@example.invalid", password: "test-password"); preconditionFailure("Expected quota failure") }
@@ -98,6 +118,13 @@ struct AccountTests {
             precondition(!error.localizedDescription.contains("test-password"))
             precondition((error as? AccountFailure)?.statusCode == 429 && (error as? AccountFailure)?.retryAfter == 120)
         }
+        let legacyAPI = AccountAPI(configuration: config, transport: { request in
+            let missing = request.url!.path.contains("account_profile_state")
+            let data = missing ? Data("{}".utf8) : try JSONEncoder().encode([AccountProfileRow(user_id: owner, profile: remote)])
+            return (data, HTTPURLResponse(url: request.url!, statusCode: missing ? 404 : 200, httpVersion: nil, headerFields: nil)!)
+        })
+        let legacyProfile = try await legacyAPI.profileState(session: session, version: nil)
+        precondition(legacyProfile.profile == remote && !legacyProfile.unchanged, "Undeployed profile RPC did not use the private legacy read")
         let totals = AccountNetworkMetrics.shared.snapshot()
         precondition(totals["auth/v1/token"]?.failures == 1)
         precondition(totals.keys.allSatisfy { !$0.contains(owner.uuidString) && !$0.contains("test-password") })
