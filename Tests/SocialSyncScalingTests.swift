@@ -39,7 +39,8 @@ import Combine
                 let state = SocialState(timezone: "UTC", progress: try progress(full ? 3600 : nil), groups: groups, invitations: [],
                     declaredWorkSyncVersion: 1, socialSyncVersion: 2, progressRevision: 1, progressIsDelta: !full,
                     removedDays: [], groupsIncluded: changed, groupVersion: show ? version : nil,
-                    acknowledgedWork: sent.map { .init(segmentID: $0.segmentID, revision: $0.revision!) })
+                    acknowledgedWork: sent.map { .init(segmentID: $0.segmentID, revision: $0.revision!) },
+                    progressMetadataVersion: "metadata-1", progressMetadataIncluded: full)
                 if block { await withCheckedContinuation { continuation = $0 } }
                 data = try JSONEncoder().encode(state)
                 return (data, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Retry-After": "120"])!)
@@ -66,8 +67,13 @@ import Combine
         precondition(calls.count == before + 1 && calls.last?["includeGroups"] as? Bool == false)
         precondition(social.ledger?.declaredWorkPending?.isEmpty == true, "Atomic acknowledgement failed")
         precondition(social.groups.first?.members.first?.photo == remotePhoto, "Write-only response cleared groups")
+        // Unchanged polls must not atomically replace the full local history file.
+        let ledgerFile = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("FocusFix/Social"), includingPropertiesForKeys: nil).first { $0.pathExtension == "json" }!
+        let inode = try FileManager.default.attributesOfItem(atPath: ledgerFile.path)[.systemFileNumber] as? NSNumber
         // Omitted unchanged groups and image bytes reuse the current account's cache.
         _ = await social.refresh()
+        let unchangedInode = try FileManager.default.attributesOfItem(atPath: ledgerFile.path)[.systemFileNumber] as? NSNumber
+        precondition(inode == unchangedInode, "Unchanged poll rewrote the full local ledger")
         precondition(social.groups.first?.members.first?.photo == remotePhoto)
         remoteName = "Renamed"; version = "group-2"
         _ = await social.refresh()
@@ -99,7 +105,8 @@ import Combine
         // The cursor and authoritative base survive relaunch together.
         let restored = SocialController(account: account, storageDirectory: root, selectionDefaults: nil)
         _ = await restored.refresh()
-        precondition(calls.last?["progressRevision"] != nil && restored.ledger?.progress.days[today]?.workSeconds == 3600)
+        precondition(calls.last?["progressRevision"] != nil && calls.last?["progressMetadataVersion"] as? String == "metadata-1"
+            && restored.ledger?.progress.days[today]?.workSeconds == 3600)
         stage(600); status = 429
         _ = await social.refresh()
         precondition(social.nextAutomaticSyncAt.timeIntervalSinceNow > 119)
@@ -131,6 +138,11 @@ import Combine
             progressRevision: 2, progressIsDelta: true, removedDays: [today])
         ledger.accept(deletion, sent: [event.id])
         precondition(ledger.progress.days[today] == nil)
+        var metadata = try progress(3600)
+        metadata.frozenDays = ["2026-01-02"]
+        let base = metadata
+        let merged = base.mergingServerDays(try progress(nil), removed: [], includesMetadata: false)
+        precondition(merged.frozenDays == base.frozenDays && merged.protectionStart == base.protectionStart)
         print("PASS: compact atomic sync, hidden/visible windows, versioned image cache, exact in-flight revisions, cursor relaunch, Retry-After, account isolation and authoritative deltas")
     }
 }
