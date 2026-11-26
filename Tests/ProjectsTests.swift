@@ -19,7 +19,13 @@ import Foundation
 
         let id = try store.addProject("  FocusFix  ", color: "#168b80")
         func project() -> WorkProject { store.projects.first { $0.id == id }! }
+        let creationStart = Date()
         try store.addTask("First", project: id)
+        let createdAt = project().tasks[0].createdAt!
+        precondition(createdAt >= creationStart && createdAt <= Date())
+        precondition(ProjectStore(file: file).projects.first { $0.id == id }!.tasks[0].createdAt == createdAt)
+        let legacyTask = try JSONDecoder().decode(ProjectTask.self, from: Data("{\"id\":\"\(UUID())\",\"title\":\"Legacy task\"}".utf8))
+        precondition(legacyTask.createdAt == nil, "Older tasks must not receive an invented creation date")
         try store.addTask("Second", project: id)
         try store.addTask("Third", project: id)
         let finishedAt = Date(timeIntervalSince1970: 123456)
@@ -35,6 +41,7 @@ import Foundation
         try store.completeTask(timedTask, project: id, at: nil)
         try store.saveCompletedWork(complete, task: timedTask)
         precondition(store.projects.first { $0.id == id }!.tasks[0].completedWork == nil, "A stale total must not complete a reopened task")
+        precondition(project().tasks[0].createdAt == createdAt && project().tasks[0].completedAt == nil)
         // Details survive relaunch and are independent of title/completion state.
         precondition(project().tasks[0].estimate == 1 && project().tasks[0].description == nil)
         try store.updateTaskDetails(timedTask, project: id, description: "First line\nSecond line", estimate: 2.5)
