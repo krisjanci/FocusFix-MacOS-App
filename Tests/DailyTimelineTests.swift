@@ -97,21 +97,7 @@ import Foundation
         try expect((exported.metadata["csv_sources"] as! [[String: Any]]).contains { ($0["file"] as? String) == "events.csv" && $0["order"] != nil })
         try expect(try SessionStorage.data("events.csv", in: writer.folder) == originalEvents)
         let again = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: utc)
-        let treeA = try snapshotTree(result.folder), treeB = try snapshotTree(again.folder)
-        for key in treeA.keys.sorted() where treeA[key] != treeB[key] {
-            print("UNSTABLE FILE: \(key)")
-            if key == "metadata.json" {
-                let a = try JSONSerialization.jsonObject(with: treeA[key]!) as! [String: Any]
-                let b = try JSONSerialization.jsonObject(with: treeB[key]!) as! [String: Any]
-                for name in a.keys.sorted() {
-                    let left = try JSONSerialization.data(withJSONObject: a[name]!, options: [.sortedKeys, .fragmentsAllowed])
-                    let right = try JSONSerialization.data(withJSONObject: b[name]!, options: [.sortedKeys, .fragmentsAllowed])
-                    if left != right { print("UNSTABLE KEY: \(name) A=\(String(decoding: left, as: UTF8.self)) B=\(String(decoding: right, as: UTF8.self))") }
-                }
-            }
-        }
-        fflush(stdout)
-        try expect(treeA == treeB)
+        try expect(try snapshotTree(result.folder) == snapshotTree(again.folder))
         let east = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: TimeZone(identifier: "America/New_York")!)
         try expect(try fm.contentsOfDirectory(atPath: east.folder.path).sorted() == ["2026-11-25", "metadata.json", "sessions.csv"])
         // Long quoted UTF-8 fields cross the parser's 64 KiB boundary.
@@ -164,9 +150,12 @@ import Foundation
     }
     static func snapshotTree(_ root: URL) throws -> [String: Data] {
         var result: [String: Data] = [:]
-        for case let url as URL in FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey])! {
+        let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL
+        for case let url as URL in FileManager.default.enumerator(at: canonicalRoot, includingPropertiesForKeys: [.isRegularFileKey])! {
             if try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
-                result[String(url.path.dropFirst(root.path.count + 1))] = try Data(contentsOf: url)
+                let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+                try expect(path.hasPrefix(canonicalRoot.path + "/"))
+                result[String(path.dropFirst(canonicalRoot.path.count + 1))] = try Data(contentsOf: url)
             }
         }
         return result
