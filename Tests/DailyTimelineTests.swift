@@ -110,6 +110,7 @@ import Foundation
                 }
             }
         }
+        fflush(stdout)
         try expect(treeA == treeB)
         let east = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil, timeZone: TimeZone(identifier: "America/New_York")!)
         try expect(try fm.contentsOfDirectory(atPath: east.folder.path).sorted() == ["2026-11-25", "metadata.json", "sessions.csv"])
