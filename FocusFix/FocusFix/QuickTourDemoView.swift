@@ -85,9 +85,6 @@ struct QuickTourDemoView: View {
                     Label("Task", systemImage: "doc.text").font(.caption)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(Color.primary.opacity(0.06), in: Capsule())
-                    practiceButton("Work target", symbol: "scope", phase: .start, action: .start)
-                        .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.primary.opacity(0.06), in: Capsule())
                     Spacer()
                 }
             }
