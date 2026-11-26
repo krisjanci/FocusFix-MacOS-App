@@ -193,8 +193,13 @@ nonisolated enum DailyTimeline {
     }
     static func cell(_ value: String) -> String {
         let safe = needsProtection(value) ? "'" + value : value
-        guard safe.contains(",") || safe.contains("\"") || safe.contains("\n") || safe.contains("\r") else { return safe }
-        return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        // CSV delimiters are bytes. Swift treats CRLF (and some combining
+        // sequences) as a single Character, so Character.contains misses them.
+        guard safe.utf8.contains(where: { [10, 13, 34, 44].contains($0) }) else { return safe }
+        var encoded = Data([34])
+        for byte in safe.utf8 { encoded.append(byte); if byte == 34 { encoded.append(34) } }
+        encoded.append(34)
+        return String(decoding: encoded, as: UTF8.self)
     }
     private static func finite(_ value: String?) throws -> Double {
         guard let value, let result = Double(value), result.isFinite else { throw RecordingContract.Invalid.bounds }
