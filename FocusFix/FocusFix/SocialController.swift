@@ -24,8 +24,9 @@ final class SocialController: ObservableObject {
         account.$session.sink { [weak self] incoming in
             guard let self else { return }
             let incomingKey = incoming.map { "\(account.api?.configuration.origin.absoluteString ?? "")|\($0.user.id)" }
-            if incomingKey != self.identity { self.clearAccountState() }
-            if self.started { Task { @MainActor in self.alignAccount(); await self.refresh() } }
+            let changed = incomingKey != self.identity
+            if changed { self.clearAccountState() }
+            if self.started && changed { Task { @MainActor in self.alignAccount(); await self.automaticRefresh() } }
         }.store(in: &subscriptions)
     }
     private var identitySince = Date()
@@ -36,6 +37,44 @@ final class SocialController: ObservableObject {
     private var inFlight: Set<UUID> = []
     private var started = false
     private var repairedWorkOutbox = false
+    private var groupReaders: Set<UUID> = []
+    private var needsGroupRead = false
+    private var lastGroupRead = Date.distantPast
+    private var groupVersion: String?
+    private var photos: [UUID: (version: String, data: Data)] = [:]
+    private var failures = 0
+    private(set) var nextAutomaticSyncAt = Date.distantPast
+
+    // Multiple windows can display Groups. A disappearing panel must not stop another.
+    func setGroupViewVisible(_ id: UUID, visible: Bool) {
+        if visible {
+            guard groupReaders.insert(id).inserted else { return }
+            if !hasLoadedGroups || Date().timeIntervalSince(lastGroupRead) >= 2 {
+                needsGroupRead = true
+                Task { await automaticRefresh() }
+            }
+        } else { groupReaders.remove(id) }
+    }
+
+    @discardableResult
+    func automaticRefresh(at date: Date = Date()) async -> Bool {
+        alignAccount()
+        guard !busy, date >= nextAutomaticSyncAt, account.session != nil else { return false }
+        let pending = ledger?.pending.isEmpty == false || ledger?.declaredWorkPending?.isEmpty == false
+        guard !groupReaders.isEmpty || pending else { return false }
+        return await refresh(includeGroups: !groupReaders.isEmpty)
+    }
+
+    private func failed(_ error: Error) {
+        failures = min(failures + 1, 8)
+        let exponential = min(3600, 30 * pow(2, Double(failures - 1)))
+        let delay = max(exponential * Double.random(in: 0.8...1.2), (error as? AccountFailure)?.retryAfter ?? 0)
+        nextAutomaticSyncAt = Date().addingTimeInterval(delay)
+    }
+
+    private func succeeded() {
+        failures = 0; nextAutomaticSyncAt = .distantPast
+    }
 
     var enabled: Bool { ledger != nil }
     var declaredWorkSyncHeld: Bool { declaredWorkSyncVersion == 0 && ledger?.declaredWorkPending?.isEmpty == false }
@@ -45,14 +84,14 @@ final class SocialController: ObservableObject {
     func start() {
         guard !started else { return }; started = true
         Timer.publish(every: 30, on: .main, in: .common).autoconnect().sink { [weak self] _ in
-            Task { @MainActor in await self?.refresh() }
+            Task { @MainActor in await self?.automaticRefresh() }
         }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: Notification.Name("FocusFixAccountDeleted")).sink { [weak self] note in
             guard let id = note.userInfo?["userID"] as? UUID, let origin = note.userInfo?["origin"] as? URL else { return }
             Task { @MainActor in self?.discardCache(userID: id, origin: origin) }
         }.store(in: &subscriptions)
         alignAccount()
-        Task { await refresh() }
+        Task { await automaticRefresh() }
     }
 
     var selectedGroup: SocialGroup? { groups.first { $0.id == selection.groupID } ?? groups.first }
@@ -78,9 +117,13 @@ final class SocialController: ObservableObject {
         ledger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
         repairedWorkOutbox = false
+        groupVersion = nil; photos = [:]; lastGroupRead = .distantPast
+        needsGroupRead = !groupReaders.isEmpty
+        succeeded()
     }
     func retry() async {
         repairedWorkOutbox = false
+        groupVersion = nil // Manual retry repairs an evicted/incomplete group cache.
         if !enabled { identity = nil; alignAccount() }
         await refresh()
     }
@@ -230,7 +273,7 @@ final class SocialController: ObservableObject {
     }
 
     @discardableResult
-    func refresh(action: String = "sync", fields: [String: String] = [:]) async -> Bool {
+    func refresh(action: String = "sync", fields: [String: String] = [:], includeGroups: Bool = true) async -> Bool {
         alignAccount()
         if ledger == nil { return await refreshInvitations() }
         guard !busy, let current = ledger, let api = account.api else { return false }
@@ -238,11 +281,29 @@ final class SocialController: ObservableObject {
         let batch = Array(current.pending.prefix(200)); inFlight = Set(batch.map(\.id))
         ledger?.submitted.formUnion(inFlight)
         persist() // A lost response must never allow a submitted summary to be edited on retry.
-        defer { if generation == token { busy = false; inFlight = [] } }
+        if includeGroups { needsGroupRead = false }
+        defer {
+            if generation == token {
+                busy = false; inFlight = []
+                // A group panel may have opened while a write-only request was in flight.
+                if needsGroupRead && !groupReaders.isEmpty { Task { await automaticRefresh() } }
+            }
+        }
         do {
             let session = try await account.validSession()
             guard generation == token else { return false }
+            await repairWorkOutbox(token: token)
+            guard generation == token else { return false }
+            let segments = Array((ledger?.declaredWorkPending ?? [:]).values.filter(\.ready)
+                .sorted { $0.segmentID.uuidString < $1.segmentID.uuidString }.prefix(50))
             var payload: [String: Any] = fields
+            // Old servers ignore these additive fields and retain the tested legacy path.
+            payload["syncVersion"] = 2
+            payload["includeGroups"] = includeGroups || action != "sync"
+            payload["segments"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(segments))
+            if ledger?.serverProgress != nil { payload["progressRevision"] = ledger?.progressRevision }
+            payload["groupVersion"] = groupVersion
+            payload["photoVersions"] = Dictionary(uniqueKeysWithValues: photos.map { ($0.key.uuidString.lowercased(), $0.value.version) })
             payload["timezone"] = current.timezone
             payload["activatedAt"] = current.activatedAt
             payload["events"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(batch))
@@ -250,24 +311,36 @@ final class SocialController: ObservableObject {
             let data = try await api.request(path: "rest/v1/rpc/social_state", body: body, token: session.access_token)
             guard generation == token, account.session?.user.id == session.user.id else { return false }
             if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let message = object["error"] as? String {
-                notice = message; return false
+                notice = message
+                if action == "sync" { failed(AccountFailure(message: message)) }
+                return false
             }
             let state = try JSONDecoder().decode(SocialState.self, from: data)
+            if state.socialSyncVersion == 2 {
+                guard state.progressRevision != nil, state.acknowledgedWork != nil,
+                      state.progressIsDelta != nil,
+                      state.progressIsDelta != true || ledger?.serverProgress != nil else {
+                    throw AccountFailure(message: "Group sync needs a fresh snapshot. Please refresh to retry.")
+                }
+            }
+            try acceptGroups(state)
             ledger?.accept(state, sent: Set(batch.map(\.id)))
+            if state.socialSyncVersion == 2 {
+                ledger?.acknowledgeDeclaredWork(state.acknowledgedWork ?? [], sent: segments)
+            }
             ledger?.progress.reconcile(at: Date(), calendar: calendar)
             invitations = state.invitations ?? []
             invitationNotice = state.invitations == nil ? "Invitations are temporarily unavailable. Refresh to retry." : nil
-            groups = state.groups; hasLoadedGroups = true; syncFailed = false
-            selection.reconcile(groups: groups); saveSelection()
-            notice = nil
+            syncFailed = false; notice = nil
             declaredWorkSyncVersion = state.declaredWorkSyncVersion ?? 0
             persist()
-            if declaredWorkSyncVersion >= 1 {
+            succeeded()
+            if state.socialSyncVersion != 2 && declaredWorkSyncVersion >= 1 {
                 do { try await syncDeclaredWork(api: api, session: session, token: token) }
                 catch {
                     guard generation == token else { return false }
                     notice = "Work progress could not sync. It is saved on this Mac for retry."
-                    syncFailed = true
+                    syncFailed = true; failed(error)
                 }
             }
             pendingConfirmation = ledger?.pending.isEmpty == false || ledger?.declaredWorkPending?.isEmpty == false
@@ -275,11 +348,39 @@ final class SocialController: ObservableObject {
             return true
         } catch {
             guard generation == token else { return false }
-            pendingConfirmation = true; syncFailed = true
+            pendingConfirmation = true; syncFailed = true; failed(error)
             notice = "Groups could not sync. Progress is saved for retry. \(error.localizedDescription)"
             return false
         }
     }
+    private func acceptGroups(_ state: SocialState) throws {
+        guard state.groupsIncluded != false else {
+            if state.groupVersion != nil { lastGroupRead = Date() }
+            return
+        }
+        var updated = state.groups
+        var retained: [UUID: (version: String, data: Data)] = [:]
+        if state.progressIsDelta != nil {
+            for g in updated.indices {
+                for m in updated[g].members.indices {
+                    var member = updated[g].members[m]
+                    if let version = member.photoVersion {
+                        if member.photo == nil, let cached = photos[member.id], cached.version == version { member.photo = cached.data }
+                        guard let data = member.photo else {
+                            groupVersion = nil; photos = [:]
+                            throw AccountFailure(message: "Group photos need a fresh snapshot. Please refresh to retry.")
+                        }
+                        retained[member.id] = (version, data)
+                    } else { member.photo = nil }
+                    updated[g].members[m] = member
+                }
+            }
+        }
+        photos = retained; groupVersion = state.groupVersion
+        groups = updated; hasLoadedGroups = true; lastGroupRead = Date()
+        selection.reconcile(groups: groups); saveSelection()
+    }
+
     private func syncDeclaredWork(api: AccountAPI, session: AccountSession, token: UUID) async throws {
         await repairWorkOutbox(token: token)
         guard generation == token, userID == session.user.id else { throw CancellationError() }
@@ -301,8 +402,8 @@ final class SocialController: ObservableObject {
         guard generation == token, userID == session.user.id else { throw CancellationError() }
         let state = try JSONDecoder().decode(SocialState.self, from: updated)
         self.ledger?.accept(state, sent: [])
-        groups = state.groups; invitations = state.invitations ?? []
-        selection.reconcile(groups: groups); saveSelection()
+        try acceptGroups(state)
+        invitations = state.invitations ?? []
     }
 
     // Recover the outbox itself, even when the separate daily-progress ledger
@@ -358,10 +459,11 @@ final class SocialController: ObservableObject {
                 body: body, token: session.access_token)
             guard generation == token, account.session?.user.id == session.user.id else { return false }
             invitations = try JSONDecoder().decode([GroupInvitation].self, from: data)
-            invitationNotice = nil
+            invitationNotice = nil; succeeded()
             return true
         } catch {
             if generation == token {
+                failed(error)
                 invitationNotice = id == nil ? "Invitations could not load. Please refresh to retry." : "Your response could not be saved. Please try again."
             }
             return false
