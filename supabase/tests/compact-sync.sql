@@ -23,9 +23,10 @@ begin
  if first_state->'progress' is distinct from original->'progress' or first_state->>'progressIsDelta'<>'false'
  or first_state->>'groupsIncluded'<>'true' or first_state::text like '%PRIVATE%' then raise exception 'Initial compact snapshot failed'; end if;
  cursor_value:=(first_state->>'progressRevision')::bigint; version:=first_state->>'groupVersion';
- body:=body||jsonb_build_object('progressRevision',cursor_value,'groupVersion',version,'photoVersions',jsonb_build_object(a::text,md5(photo)));
+ body:=body||jsonb_build_object('progressRevision',cursor_value,'groupVersion',version,'progressMetadataVersion',first_state->>'progressMetadataVersion','photoVersions',jsonb_build_object(a::text,md5(photo)));
  answer:=public.social_state('sync',body);
- if answer->>'groupsIncluded'<>'false' or answer->'groups'<>'[]'::jsonb or answer->'progress'->'days'<>'{}'::jsonb
+ if answer->>'progressMetadataIncluded'<>'false' or answer->'progress' ? 'frozenDays'
+ or answer->>'groupsIncluded'<>'false' or answer->'groups'<>'[]'::jsonb or answer->'progress'->'days'<>'{}'::jsonb
  or octet_length(answer::text)>=octet_length(first_state::text)/2 then raise exception 'Unchanged sync is not compact'; end if;
  -- A changed name sends a new group snapshot without retransmitting the cached image.
  update public.account_profiles set profile=jsonb_set(profile,'{name}','"Renamed"') where user_id=b;
@@ -46,6 +47,10 @@ begin
  body:=jsonb_set(jsonb_set(body,'{segments,0,revision}','2'),'{segments,0,intervals}','[]');
  answer:=public.social_state('sync',body);
  if (answer->'progress'->'days'->day_key->>'workSeconds')::int<>7200 then raise exception 'Backdated correction failed'; end if;
+ begin
+  perform public.social_state('sync',body||'{"timezone":"Not/A/Timezone"}');
+  raise exception 'Invalid timezone accepted' using errcode='P0002';
+ exception when raise_exception then if sqlerrm<>'Invalid scoring timezone' then raise; end if; end;
  -- Missing/future cursors repair fully; explicit day deletions have tombstones.
  answer:=public.social_state('sync',body||'{"progressRevision":9223372036854775807}');
  if answer->>'progressIsDelta'<>'false' or answer->'progress'->'days'='{}'::jsonb then raise exception 'Future cursor did not reset'; end if;
@@ -68,6 +73,8 @@ begin
  or has_table_privilege('authenticated','public.social_streak_cache','SELECT')
  or has_table_privilege('authenticated','public.social_freeze_cache','SELECT')
  or has_function_privilege('authenticated','public.social_cached_streak(uuid,uuid,timestamptz,text)','EXECUTE')
+ or has_function_privilege('authenticated','public.social_compact_progress_metadata(jsonb,jsonb)','EXECUTE')
+ or has_function_privilege('authenticated','public.social_valid_timezone(text)','EXECUTE')
  or has_function_privilege('anon','public.social_state(text,jsonb)','EXECUTE') then raise exception 'Private scaling state exposed'; end if;
  perform set_config('request.jwt.claim.sub',outsider::text,true);
  answer:=public.social_state('sync',body-'segments');
