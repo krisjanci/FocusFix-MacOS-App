@@ -180,11 +180,6 @@ struct ContentView: View {
                             .font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.primary.opacity(0.06), in: Capsule())
                     }.buttonPressFeedback().buttonStyle(.plain).help("Projects and tasks")
-                    Button { tracker.requestWorkTarget() } label: {
-                        Label(tracker.timerTargetMinutes.map { "Work target · \($0) min" } ?? "Work target", systemImage: "scope")
-                            .font(.caption).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.06), in: Capsule())
-                    }.buttonPressFeedback().buttonStyle(.plain).help("Choose a work target")
                     Button {
                         if tracker.canOpenWorkSetup() { editingConditions = true }
                     } label: {
