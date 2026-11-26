@@ -65,6 +65,14 @@ final class AccountController: ObservableObject {
     private(set) var isNewAccount = false
     private var pendingRegistration = false
     private var rememberSession = false
+    private struct ProfileCache: Codable {
+        let checkedAt: Date
+        let state: AccountProfileState
+    }
+    private var cachedProfile: ProfileCache?
+    private var loadingProfile = false
+    private var nextProfileRetry = Date.distantPast
+    private let now: () -> Date
     private let defaults: UserDefaults?
     private static let rememberKey = "focusfix.account.keepSignedIn"
     private var authenticationTask: Task<AccountSession?, Error>?
@@ -94,8 +102,9 @@ final class AccountController: ObservableObject {
     init(configuration: AccountConfiguration?, transport: @escaping AccountAPI.Transport = AccountAPI.send,
          readCredential: @escaping () throws -> Data? = AccountKeychain.read,
          writeCredential: @escaping (Data?) throws -> Void = AccountKeychain.write,
-         defaults: UserDefaults? = .standard) {
+         defaults: UserDefaults? = .standard, now: @escaping () -> Date = Date.init) {
         api = configuration.map { AccountAPI(configuration: $0, transport: transport) }
+        self.now = now
         self.defaults = defaults
         remembersSignIn = defaults?.bool(forKey: Self.rememberKey) ?? false
         self.readCredential = readCredential
@@ -139,7 +148,10 @@ final class AccountController: ObservableObject {
             guard stored.origin == api.configuration.origin.absoluteString else {
                 throw AccountFailure(message: "The saved sign-in belongs to another account service. Sign in again.")
             }
-            let task = Task<AccountSession?, Error> { try await api.refresh(stored.session.refresh_token) }
+            let task = Task<AccountSession?, Error> {
+                if stored.session.expiresAt.timeIntervalSinceNow > 60 { return stored.session }
+                return try await api.refresh(stored.session.refresh_token)
+            }
             authenticationTask = task
             let refreshed = try await task.value
             guard token == generation, !Task.isCancelled, let refreshed else { return }
@@ -189,7 +201,7 @@ final class AccountController: ObservableObject {
         do { try persist(value); setRemembered(rememberSession) }
         catch { setRemembered(false); notice = "Signed in for this launch; Keychain could not save the sign-in." }
         session = value
-        await loadProfile()
+        await loadProfile(force: false)
         guard token == generation else { return }
         if researchAvailable { _ = await refreshResearchAccess() }
     }
@@ -219,25 +231,60 @@ final class AccountController: ObservableObject {
         try writeCredential(JSONEncoder().encode(StoredAccount(origin: api.configuration.origin.absoluteString, session: value)))
     }
 
-    func loadProfile() async {
-        guard let api, session != nil else { return }
+    private var profileCacheKey: String? {
+        guard let session, let api else { return nil }
+        return "focusfix.account.profileCache.\(api.configuration.origin.absoluteString)|\(session.user.id)"
+    }
+    func refreshProfileIfDue() async {
+        guard session != nil, now() >= nextProfileRetry else { return }
+        await loadProfile(force: false)
+    }
+    func loadProfile(force: Bool = true) async {
+        guard !loadingProfile, let api, session != nil else { return }
+        if cachedProfile == nil, let key = profileCacheKey, let data = defaults?.data(forKey: key),
+           let saved = try? JSONDecoder().decode(ProfileCache.self, from: data),
+           saved.checkedAt <= now(), (try? saved.state.profile?.validated()) != nil || saved.state.profile == nil {
+            cachedProfile = saved
+        }
+        if let cache = cachedProfile {
+            profile = cache.state.profile; profileLoaded = true
+            if !force && now().timeIntervalSince(cache.checkedAt) < 4 * 60 * 60 { return }
+        }
         let token = generation
+        loadingProfile = true
+        defer { if token == generation { loadingProfile = false } }
         do {
-            let value = try await api.profile(session: validSession())
+            let value = try await api.profileState(session: validSession(), version: cachedProfile?.state.version)
             guard token == generation else { return }
-            profile = value
+            if !value.unchanged { profile = value.profile }
             profileLoaded = true
-        } catch { if token == generation { notice = "Signed in, but your profile could not load. Retry before editing. \(error.localizedDescription)" } }
+            cachedProfile = ProfileCache(checkedAt: now(), state: AccountProfileState(version: value.version, unchanged: false, profile: profile))
+            persistProfileCache()
+            nextProfileRetry = .distantPast
+        } catch {
+            if token == generation {
+                nextProfileRetry = now().addingTimeInterval(max(300, (error as? AccountFailure)?.retryAfter ?? 0))
+                notice = "Signed in, but your profile could not load. Retry before editing. \(error.localizedDescription)"
+            }
+        }
+    }
+    private func persistProfileCache() {
+        guard let key = profileCacheKey, let cache = cachedProfile, let data = try? JSONEncoder().encode(cache) else { return }
+        defaults?.set(data, forKey: key)
     }
 
     func saveProfile(_ draft: UserProfile) async -> Bool {
         guard !busy, let api, profileLoaded else { return false }
+        let token = generation
         busy = true
-        defer { busy = false }
+        defer { if token == generation { busy = false } }
         do {
             let valid = try draft.validated()
             try await api.saveProfile(valid, session: validSession())
+            guard token == generation else { return false }
             profile = valid
+            cachedProfile = ProfileCache(checkedAt: now(), state: AccountProfileState(version: nil, unchanged: false, profile: valid))
+            persistProfileCache()
             notice = "Profile saved to your account."
             return true
         } catch { notice = error.localizedDescription; return false }
@@ -360,6 +407,8 @@ final class AccountController: ObservableObject {
     }
 
     private func clearSession() {
+        if let key = profileCacheKey { defaults?.removeObject(forKey: key) }
+        cachedProfile = nil; loadingProfile = false; nextProfileRetry = .distantPast
         generation = UUID()
         refreshTask?.cancel()
         refreshTask = nil
