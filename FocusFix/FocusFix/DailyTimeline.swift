@@ -254,16 +254,19 @@ nonisolated enum DailyTimeline {
         }
         for (sessionIndex, input) in sessions.sorted(by: { $0.id < $1.id }).enumerated() {
             try Task.checkCancellation()
+            // Legacy recordings without timestamps use the original folder's creation date,
+            // never the creation date of a temporary archive-extraction directory.
+            let anchoredStart = try SavedSession(folder: input.folder).startedAt
             try SessionStorage.withFolder(input.folder) { readable in
                 let saved = try SavedSession(folder: readable), reference = String(sessionIndex + 1)
                 let origin = saved.recordingContract?.elapsedOrigin ?? 0
                 let through = saved.recordingContract?.observedThrough ?? saved.duration ?? origin
                 let names = try SessionStorage.names(in: readable)
                 if names.contains(WorkAssignmentJournal.filename) { _ = try WorkAssignmentJournal.load(from: readable) }
-                var sessionRow = ["session": reference, "anchor_unix_s": compactNumber(String(saved.startedAt.timeIntervalSince1970))]
+                var sessionRow = ["session": reference, "anchor_unix_s": compactNumber(String(anchoredStart.timeIntervalSince1970))]
                 func emit(table: String, source: Int, index: Int, values: [String: String], at elapsed: Double,
                           span: (Double, Double)? = nil) throws {
-                    let date = saved.startedAt.addingTimeInterval(elapsed - origin)
+                    let date = anchoredStart.addingTimeInterval(elapsed - origin)
                     guard date.timeIntervalSince1970.isFinite else { throw RecordingContract.Invalid.bounds }
                     var row = values; row["session"] = reference
                     for key in row.keys { addColumn(key, table: table) }
@@ -275,7 +278,7 @@ nonisolated enum DailyTimeline {
                     try spool.write(contentsOf: Data("\(stamp)\t\(sessionIndex)\t\(logical)\t\(order)\t\(payload)\n".utf8))
                     if let (start, end) = span {
                         guard start.isFinite, end.isFinite, end >= start else { throw RecordingContract.Invalid.bounds }
-                        let begin = saved.startedAt.addingTimeInterval(start - origin), finish = saved.startedAt.addingTimeInterval(end - origin)
+                        let begin = anchoredStart.addingTimeInterval(start - origin), finish = anchoredStart.addingTimeInterval(end - origin)
                         var cursor = calendar.startOfDay(for: begin), days: [String] = []
                         while cursor < finish {
                             let label = day.string(from: cursor)
@@ -299,7 +302,8 @@ nonisolated enum DailyTimeline {
                         "elapsedOrigin": "elapsed_origin_s", "observedThrough": "observed_through_s"],
                     "research_eligibility.json": ["recordingID": "recording_id", "segmentID": "segment_id", "capturedAtUTC": "anchor_unix_s"]]
                 var parsedDocuments: [(String, DailyExportJSON, [[String: Any]])] = []
-                let documentNames = names.filter { !sourceNames.contains($0) && !$0.hasSuffix(".jsonl") }
+                let logNames = ["reminders.jsonl", "study_check_ins.jsonl"]
+                let documentNames = names.filter { !sourceNames.contains($0) && !logNames.contains($0) }
                 for name in documentNames.sorted(by: { ($0 == "session.json" ? "" : $0) < ($1 == "session.json" ? "" : $1) }) {
                     let data = try SessionStorage.data(name, in: readable)
                     guard let text = String(data: data, encoding: .utf8) else { throw RecordingContract.Invalid.contract }
@@ -409,7 +413,7 @@ nonisolated enum DailyTimeline {
                     }
                     documents.append(["session": reference, "file": name, "remaining_json": node.encoded(), "moves": moves, "collections": collections])
                 }
-                for name in names.filter({ $0.hasSuffix(".jsonl") }).sorted() {
+                for name in names.filter({ logNames.contains($0) }).sorted() {
                     let reader = try TimelineRecords(readable.appendingPathComponent(name)); var identifiers: [Int] = []
                     while let line = try reader.next() {
                         try Task.checkCancellation()
