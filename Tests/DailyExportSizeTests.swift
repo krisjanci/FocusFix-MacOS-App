@@ -24,6 +24,13 @@ import Foundation
             let info = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             if info.isRegularFile == true { bytes += info.fileSize ?? 0; count += 1 }
         }
+        // Measured with this same fixture using v1 at source f99fe15, before replacement.
+        // UUID contents vary, but their serialized lengths and fixture measurements do not.
+        let wideBytes = 7_108_139
+        precondition(DailyTimeline.version == "focusfix.daily_tables.v2")
+        precondition(bytes < wideBytes / 4, "All narrow CSVs plus both lookup files must beat the wide export by at least 75%")
+        precondition(count == 5, "Inputs, movement, changes and the two shared files; no empty break/check-in tables")
+        print(String(format: "SIZE total uncompressed export: %d -> %d bytes (%.2f%% smaller)", wideBytes, bytes, 100 * (1 - Double(bytes) / Double(wideBytes))))
         print("SIZE \(DailyTimeline.version): \(bytes) bytes across \(count) files; \(Date().timeIntervalSince(before)) seconds")
     }
 }
