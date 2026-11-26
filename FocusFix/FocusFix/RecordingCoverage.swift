@@ -5,6 +5,55 @@ nonisolated struct CoverageSlice: Equatable {
     let end: Double
     let phase: InterventionPhase
 }
+// Exact coverage is independent of rounded movement measurements. Each interval is
+// encoded as [start, end, phase], with adjacent equal phases merged across checkpoints.
+nonisolated struct ObservedCoverage: Codable {
+    static let filename = "observed_coverage.json"
+    var version = 1
+    var intervals: [Interval] = []
+    struct Interval: Codable {
+        var start: Double
+        var end: Double
+        let phase: InterventionPhase
+        init(start: Double, end: Double, phase: InterventionPhase) {
+            self.start = start; self.end = end; self.phase = phase
+        }
+        init(from decoder: Decoder) throws {
+            var values = try decoder.unkeyedContainer()
+            start = try values.decode(Double.self); end = try values.decode(Double.self)
+            phase = try values.decode(InterventionPhase.self)
+            guard values.isAtEnd else { throw RecordingContract.Invalid.contract }
+        }
+        func encode(to encoder: Encoder) throws {
+            var values = encoder.unkeyedContainer()
+            try values.encode(start); try values.encode(end); try values.encode(phase)
+        }
+    }
+    mutating func append(start: Double, end: Double, phase: InterventionPhase) {
+        if let last = intervals.last, last.end == start, last.phase == phase {
+            intervals[intervals.count - 1].end = end
+        } else { intervals.append(Interval(start: start, end: end, phase: phase)) }
+    }
+    func save(to folder: URL) throws {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let url = folder.appendingPathComponent(Self.filename)
+        try encoder.encode(self).write(to: url, options: .atomic)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.synchronize()
+    }
+    func slices(origin: Double, through: Double) throws -> [CoverageSlice] {
+        guard version == 1 else { throw RecordingContract.Invalid.contract }
+        var previous = origin
+        return try intervals.compactMap { interval in
+            guard interval.start.isFinite, interval.end.isFinite, interval.start >= previous,
+                  interval.end > interval.start, interval.phase != .explicitBreak else { throw RecordingContract.Invalid.bounds }
+            previous = interval.end
+            let lower = max(origin, interval.start), upper = min(through, interval.end)
+            return upper > lower ? CoverageSlice(start: lower, end: upper, phase: interval.phase) : nil
+        }
+    }
+}
 nonisolated struct RecordingCoverage: Equatable {
     var work: Double = 0
     var nonWork: Double = 0
@@ -92,7 +141,13 @@ nonisolated struct RecordingCoverage: Equatable {
             return try csv(text)
         }
         var observations: [CoverageSlice] = []
-        let mouse = try rows("mouse_movement.csv")
+        let hasExactCoverage = session.schemaVersion >= 12
+        if hasExactCoverage {
+            let data = try SessionStorage.data(ObservedCoverage.filename, in: session.folder, limit: 64 * 1024 * 1024)
+            let coverage = try JSONDecoder().decode(ObservedCoverage.self, from: data)
+            observations = try coverage.slices(origin: origin, through: end)
+        }
+        let mouse = hasExactCoverage ? [] : try rows("mouse_movement.csv")
         if let header = mouse.first, let startIndex = header.firstIndex(of: "start_seconds"),
            let endIndex = header.firstIndex(of: "end_seconds") {
             let phaseIndex = header.firstIndex(of: "activity_phase")
