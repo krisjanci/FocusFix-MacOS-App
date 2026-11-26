@@ -81,3 +81,8 @@ The preview recorder is intentionally synthetic. Real input permissions, account
 - Popup titles enter a plain inline text field on double-click, without adding edit controls. Native checks confirmed double-click selection, Enter saving while keeping details open, blank-title validation with retained focus, and Escape restoring the saved title while keeping details open. Leaving the field also saves; Done validates the title before dismissing.
 - A noninteractive native sheet probe positions task details relative to the original 490-point collector and observes parent moves, sheet attachment and resizing. Placement tests verify identical origins for compact and expanded widths, vertical centering after popup size changes, parent movement and narrow content bounds.
 - The complete Debug app build and focused TaskPopupLayoutTests, ProjectsTests and GroupPresentationTests passed. Changes were committed one file per iteration.
+
+## Subtle header depth — 2026-11-25
+
+- Selected project headings now have a full-width, slightly deeper shade of the existing project tint above the task list. Task popup headings group the task title and project name on the same deeper header surface. A small neutral shade preserves each project's hue, with 3.5% shading in light mode and 8% in dark mode.
+- Native preview screenshots verified both header surfaces in light and dark appearances. The native app and isolated preview builds passed; no behavioral or storage changes were made. Each changed file was committed separately.
