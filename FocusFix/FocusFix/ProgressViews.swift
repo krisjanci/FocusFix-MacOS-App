@@ -22,7 +22,7 @@ struct DailyProgressCard: View {
                 active: tracker.isRecording && tracker.userContext == .work && tracker.breakPhase == .work)
                 .onChange(of: DailyProgress.key(for: context.date, calendar: calendar)) { _, _ in
                     tracker.reconcileProgress()
-                    Task { await social.refresh() }
+                    Task { await social.automaticRefresh() }
                 }
         }
     }
