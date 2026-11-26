@@ -42,5 +42,7 @@ try {
   console.log('Rollback-only live verification script passed locally.');
   await db.exec(await readFile(new URL('declared-work-live.sql', import.meta.url), 'utf8'));
   console.log('Declared-work replacement and optional group-photo checks passed.');
+  await db.exec(await readFile(new URL('compact-sync.sql', import.meta.url), 'utf8'));
+  console.log('Compact sync: atomic writes, deltas, cursor recovery, photo versions, cache invalidation and privacy passed.');
   console.log('PostgreSQL: migrations, RLS, consent versions, withdrawal, deletion, cohort cap and account deletion passed.');
 } finally { await db.close(); }
