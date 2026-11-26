@@ -146,7 +146,8 @@ struct PeoplePanel: View {
         .background(Color(nsColor: .controlBackgroundColor)).tint(.teal)
         .sheet(isPresented: $profilePresented) { SharingView() }
         .onChange(of: social.userID) { _, _ in showingChat = false }
-        .task { social.start(); await social.refresh() }
+        .background(GroupSyncVisibility().frame(width: 0, height: 0))
+        .task { social.start() }
     }
     private var accessCard: some View {
         GroupAccessCard(state: social.accessState, pending: social.pendingConfirmation, notice: social.notice,
