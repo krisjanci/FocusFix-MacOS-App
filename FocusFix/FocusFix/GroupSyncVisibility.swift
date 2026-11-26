@@ -25,7 +25,9 @@ struct GroupSyncVisibility: NSViewRepresentable {
                 })
             }
             observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.stop() }
+                // A closed SwiftUI Window can reuse the same NSView on reopen. Keep
+                // observing its next visible transition until the view is dismantled.
+                Task { @MainActor [weak self] in self?.markHidden() }
             })
             reportVisibility()
         }
@@ -35,10 +37,14 @@ struct GroupSyncVisibility: NSViewRepresentable {
             SocialController.shared.setGroupViewVisible(readerID, visible: visible && !NSApp.isHidden && !isHiddenOrHasHiddenAncestor)
         }
 
+        private func markHidden() {
+            SocialController.shared.setGroupViewVisible(readerID, visible: false)
+        }
+
         func stop() {
             for observer in observers { NotificationCenter.default.removeObserver(observer) }
             observers.removeAll()
-            SocialController.shared.setGroupViewVisible(readerID, visible: false)
+            markHidden()
         }
     }
 }
