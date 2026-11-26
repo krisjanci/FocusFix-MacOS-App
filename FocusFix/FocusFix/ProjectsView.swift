@@ -620,18 +620,9 @@ private struct ProjectTaskDetails: View {
                 Slider(value: $estimate, in: 0.5...3, step: 0.5) { Text("Predicted Focus Sessions") }
                     onEditingChanged: { editing in editingEstimate = editing; if !editing { save() } }
                     .labelsHidden().accessibilityValue("\(estimate.formatted()) Focus Sessions")
-                    .tint(estimate <= 1.5 ? .green : .red)
-                    .background {
-                        GeometryReader { geometry in
-                            HStack(spacing: 0) {
-                                Color.green.opacity(0.16).frame(width: geometry.size.width * 0.4)
-                                Color.red.opacity(0.13)
-                            }
-                            .clipShape(Capsule())
-                        }
-                        .frame(height: 14).padding(.horizontal, 8)
-                        .allowsHitTesting(false)
-                    }
+                    .tint(estimate <= 1.5
+                          ? Color(red: 0.42, green: 0.63, blue: 0.51)
+                          : Color(red: 0.73, green: 0.49, blue: 0.48))
                 HStack { Text("0.5 FS"); Spacer(); Text("3 FS") }.font(.caption).foregroundStyle(.secondary)
                 Text("1 Focus Session = 1 hour of focused work").font(.caption).foregroundStyle(.secondary)
             }
