@@ -8,7 +8,7 @@ import Combine
         let owner = UUID(), other = UUID(), member = UUID(), groupID = UUID()
         let config = AccountConfiguration(url: "https://example.invalid", publicKey: "sb_publishable_fixture")!
         var active = owner, calls: [[String: Any]] = []
-        var status = 200, block = false
+        var status = 200, block = false, omitAcknowledgements = false
         var continuation: CheckedContinuation<Void, Never>?
         var remoteName = "Member", remotePhoto: Data? = Data([1, 2, 3]), version = "group-1"
         let today = DailyProgress.key(for: Date(), calendar: DailyProgress.calendar(timeZone: TimeZone(secondsFromGMT: 0)!))
@@ -39,7 +39,7 @@ import Combine
                 let state = SocialState(timezone: "UTC", progress: try progress(full ? 3600 : nil), groups: groups, invitations: [],
                     declaredWorkSyncVersion: 1, socialSyncVersion: 2, progressRevision: 1, progressIsDelta: !full,
                     removedDays: [], groupsIncluded: changed, groupVersion: show ? version : nil,
-                    acknowledgedWork: sent.map { .init(segmentID: $0.segmentID, revision: $0.revision!) },
+                    acknowledgedWork: omitAcknowledgements ? [] : sent.map { .init(segmentID: $0.segmentID, revision: $0.revision!) },
                     progressMetadataVersion: "metadata-1", progressMetadataIncluded: full)
                 if block { await withCheckedContinuation { continuation = $0 } }
                 data = try JSONEncoder().encode(state)
@@ -144,6 +144,16 @@ import Combine
         _ = await social.automaticRefresh()
         precondition(calls.count == backlogCalls + 2 && social.ledger?.declaredWorkPending?.isEmpty == true,
             "Offline backlog was delayed by another four hours per batch")
+        stage(300); omitAcknowledgements = true
+        clock = clock.addingTimeInterval(4 * 3600 + 1)
+        let missingAckCalls = calls.count
+        _ = await social.automaticRefresh()
+        precondition(calls.count == missingAckCalls + 1 && social.syncFailed
+            && social.nextAutomaticSyncAt > clock && social.ledger?.declaredWorkPending?.isEmpty == false,
+            "A successful response without acknowledgements caused a retry loop or dropped work")
+        omitAcknowledgements = false
+        _ = await social.refresh()
+        precondition(social.ledger?.declaredWorkPending?.isEmpty == true)
         await account.signOut()
         precondition(social.groups.isEmpty)
         active = other
