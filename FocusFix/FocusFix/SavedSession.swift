@@ -37,16 +37,17 @@ nonisolated struct SavedSession: Identifiable, Hashable {
             metadata = decoded
         } else { metadata = [:]; metadataData = Data("{}".utf8) }
         schemaVersion = metadata["schema_version"] as? Int ?? 0
-        if schemaVersion < RecordingContract.schemaVersion,
+        if schemaVersion < 11,
            try SessionStorage.contains("context_intervals.json", in: folder) { throw RecordingContract.Invalid.contract }
-        if schemaVersion >= RecordingContract.schemaVersion {
-            guard schemaVersion == RecordingContract.schemaVersion,
-                  metadata["recording_format"] as? String == RecordingContract.format,
-                  metadata["required_capabilities"] as? [String] == RecordingContract.requiredCapabilities else {
+        if schemaVersion >= 11 {
+            guard (11...RecordingContract.schemaVersion).contains(schemaVersion),
+                  metadata["recording_format"] as? String == "focusfix.recording.v\(schemaVersion)",
+                  metadata["required_capabilities"] as? [String] == RecordingContract.capabilities(for: schemaVersion) else {
                 throw RecordingContract.Invalid.contract
             }
             let contract = try RecordingContract.load(from: folder)
-            guard metadata["recording_id"] as? String == contract.recordingID.uuidString,
+            guard metadata["recording_format"] as? String == contract.format,
+                  metadata["recording_id"] as? String == contract.recordingID.uuidString,
                   metadata["segment_id"] as? String == contract.segmentID.uuidString,
                   metadata["recording_mode"] as? String == contract.mode.rawValue else { throw RecordingContract.Invalid.contract }
             recordingContract = contract
@@ -211,9 +212,10 @@ nonisolated enum SessionFiles {
                 let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 guard properties.isRegularFile == true, properties.isSymbolicLink != true else { throw RecordingContract.Invalid.contract }
                 guard var metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
-                      metadata["schema_version"] as? Int == RecordingContract.schemaVersion,
-                      metadata["recording_format"] as? String == RecordingContract.format,
-                      metadata["required_capabilities"] as? [String] == RecordingContract.requiredCapabilities,
+                      let version = metadata["schema_version"] as? Int, (11...RecordingContract.schemaVersion).contains(version),
+                      metadata["recording_format"] as? String == "focusfix.recording.v\(version)",
+                      metadata["recording_format"] as? String == contract.format,
+                      metadata["required_capabilities"] as? [String] == RecordingContract.capabilities(for: version),
                       metadata["recording_id"] as? String == contract.recordingID.uuidString,
                       metadata["segment_id"] as? String == contract.segmentID.uuidString,
                       metadata["recording_mode"] as? String == contract.mode.rawValue else { throw RecordingContract.Invalid.contract }
