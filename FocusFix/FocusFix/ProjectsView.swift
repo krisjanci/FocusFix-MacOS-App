@@ -52,6 +52,11 @@ struct ProjectsView: View {
                         .accessibilityLabel(editingList ? "Finish editing" : "Edit projects and tasks")
                 }
             }
+            .background {
+                if project != nil, !projectEditor {
+                    ProjectHeaderShade().padding(.horizontal, -30).padding(.top, -30).padding(.bottom, -6)
+                }
+            }
             if tracker.isWorking {
                 HStack {
                     Text(tracker.workAssignment.summary).lineLimit(1)
@@ -559,6 +564,7 @@ private struct ProjectTaskDetails: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
             Group {
                 if editingTitle {
                     TextField("Task title", text: $titleDraft).textFieldStyle(.plain)
@@ -580,6 +586,11 @@ private struct ProjectTaskDetails: View {
             }.font(.title3.weight(.semibold))
             if let titleError { Text(titleError).font(.caption).foregroundStyle(.red) }
             Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                ProjectHeaderShade().padding(.horizontal, -24).padding(.top, -24).padding(.bottom, -8)
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Description (optional)").font(.callout.weight(.medium))
                 TextEditor(text: $description).font(.body).scrollContentBackground(.hidden)
@@ -713,5 +724,14 @@ private struct TaskPopupPositioner: NSViewRepresentable {
                 }
             }
         }
+    }
+}
+
+// Deepen the existing project tint without changing its hue or the title's contrast.
+private struct ProjectHeaderShade: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        Color.black.opacity(colorScheme == .dark ? 0.08 : 0.035)
+            .allowsHitTesting(false).accessibilityHidden(true)
     }
 }
