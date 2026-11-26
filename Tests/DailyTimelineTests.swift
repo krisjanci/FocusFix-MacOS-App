@@ -107,6 +107,7 @@ import Foundation
         let parser = try TimelineRecords(parserFile); _ = try parser.next(csv: true)
         try expect(try TimelineRecords.cells(parser.next(csv: true)!) == ["plain", longText])
         try expect(DailyTimeline.cell("") == "" && DailyTimeline.cell("0") == "0" && DailyTimeline.cell("-0.1") == "-0.1")
+        try expect(DailyTimeline.cell("one\r\ntwo") == "\"one\r\ntwo\"")
         try expect(DailyTimeline.compactNumber("0.1234567890123456789000") == "0.1234567890123456789")
         try expect(DailyTimeline.compactNumber("-0.000000") == "-0" && DailyTimeline.compactNumber("1e-30") == "1e-30")
         // DST clock reversal does not reverse event order or split the local day.
@@ -146,6 +147,10 @@ import Foundation
             "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }.joined(separator: ",") }.joined(separator: "\r\n") + "\r\n").write(to: unusual.appendingPathComponent("events.csv"), atomically: true, encoding: .utf8)
         try Data("unrecognised log; preserved verbatim\r\n".utf8).write(to: unusual.appendingPathComponent("future.jsonl"))
+        // Empty strings, null and missing JSON properties are reconstructed distinctly.
+        var emptyAssignment = try DailyExportJSON.parse(String(decoding: originalFirst[WorkAssignmentJournal.filename]!, as: UTF8.self))
+        emptyAssignment.set(["changes"], to: .array([.object(["elapsed": .number("0"), "assignment": .object(["projectName": .string(""), "taskTitle": .literal("null")])])]))
+        try emptyAssignment.encoded().write(to: unusual.appendingPathComponent(WorkAssignmentJournal.filename), atomically: true, encoding: .utf8)
         let unusualOriginal = try snapshot(unusual)
         _ = try SessionStorage.compact(unusual, force: true)
         let unusualSaved = try SavedSession(folder: unusual)
@@ -158,9 +163,6 @@ import Foundation
         try expect(unusualInput[0]["elapsed_s"] == "1.23" && unusualInput[0]["tag"] == "0001.0000")
         try expect(unusualInput[1]["tag"] == "line one\r\nline two")
         try expect(unusualReader.sessions[0]["session_id"] == "=formula-id")
-        // Empty strings, null and missing JSON properties are reconstructed distinctly.
-        var emptyAssignment = try DailyExportJSON.parse(String(decoding: originalFirst[WorkAssignmentJournal.filename]!, as: UTF8.self))
-        emptyAssignment.set(["changes"], to: .array([.object(["elapsed": .number("0"), "assignment": .object(["projectName": .string(""), "taskTitle": .literal("null")])])]))
         // The original lexical JSON parser also rejects malformed/duplicate fields instead of dropping them.
         fails { _ = try DailyExportJSON.parse("{\"a\":1,\"a\":2}") }
         fails { _ = try DailyExportJSON.parse("{\"a\":01}") }
