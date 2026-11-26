@@ -33,7 +33,7 @@ struct LaunchCoordinatorTests {
             }
             let data: Data
             if path == "/auth/v1/token" || path == "/auth/v1/verify" { data = try JSONEncoder().encode(value) }
-            else if path == "/rest/v1/account_profiles" { data = Data("[]".utf8) }
+            else if path == "/rest/v1/rpc/account_profile_state" { data = Data(#"{"unchanged":false,"profile":null}"#.utf8) }
             else { data = Data("{}".utf8) }
             return (data, HTTPURLResponse(url: request.url!, statusCode: fail ? 503 : 200, httpVersion: nil, headerFields: nil)!)
         }
@@ -85,8 +85,10 @@ struct LaunchCoordinatorTests {
         await transient.authenticate(email: "test@example.invalid", password: "test-password", create: false, remember: false)
         precondition(transient.session != nil && stored == nil && !transient.remembersSignIn)
 
+        let expired = AccountSession(access_token: value.access_token, refresh_token: value.refresh_token,
+            expires_at: Date().addingTimeInterval(-1).timeIntervalSince1970, expires_in: 0, user: value.user)
         // A saved-account failure falls back to welcome rather than trapping the user.
-        stored = try JSONEncoder().encode(StoredAccount(origin: config.origin.absoluteString, session: value))
+        stored = try JSONEncoder().encode(StoredAccount(origin: config.origin.absoluteString, session: expired))
         defaults.set(true, forKey: "focusfix.account.keepSignedIn")
         defaults.set(false, forKey: "focusfix.launch.guest")
         fail = true
