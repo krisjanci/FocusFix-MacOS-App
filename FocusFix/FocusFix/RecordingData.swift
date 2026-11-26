@@ -20,8 +20,8 @@ struct MouseSummary {
     var secondsSinceLastBreak: Double? = nil
     // Serialize one mouse interval's totals without including cursor coordinates.
     var csv: String {
-        [DailyTimeline.roundedNumber(csvNumber(start), places: 0), DailyTimeline.roundedNumber(csvNumber(end), places: 0),
-         csvNumber(distance), String(events), secondsSinceMovement.map { DailyTimeline.roundedNumber(csvNumber($0), places: 2) } ?? ""]
+        [DailyTimeline.roundedNumber(String(start), places: 0), DailyTimeline.roundedNumber(String(end), places: 0),
+         csvNumber(distance), String(events), secondsSinceMovement.map { DailyTimeline.roundedNumber(String($0), places: 2) } ?? ""]
             .joined(separator: ",") + "\n"
     }
 }
