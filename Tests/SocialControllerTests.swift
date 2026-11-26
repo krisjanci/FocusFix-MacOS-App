@@ -220,7 +220,10 @@ import Combine
             "recording_mode": "manual", "started_at_utc": ISO8601DateFormatter().string(from: preciseStart),
             "duration_seconds": 60]
         try JSONSerialization.data(withJSONObject: metadata).write(to: recording.appendingPathComponent("session.json"))
-        try Data("start_seconds,end_seconds,activity_phase\n0,60,work\n".utf8)
+        var exactCoverage = ObservedCoverage()
+        exactCoverage.append(start: 0, end: 60, phase: .normal)
+        try exactCoverage.save(to: recording)
+        try Data("start_seconds,end_seconds\n0,60\n".utf8)
             .write(to: recording.appendingPathComponent("mouse_movement.csv"))
         afterDeletion.stageDeclaredWork(segmentID: savedContract.segmentID, days: ["2026-11-12": 60],
             capturedOwner: owner, capturedOrigin: config.origin.absoluteString,
