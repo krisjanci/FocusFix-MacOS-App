@@ -50,6 +50,16 @@ struct DailyProgress: Codable, Equatable {
         frozenDays = try values.decodeIfPresent(Set<String>.self, forKey: .frozenDays) ?? []
     }
 
+    // Merge an authoritative delta into the last SERVER snapshot, never the optimistic
+    // local progress with unacknowledged events already applied.
+    func mergingServerDays(_ incoming: DailyProgress, removed: [String]) -> DailyProgress {
+        var result = incoming
+        result.days = days
+        for key in removed { result.days.removeValue(forKey: key) }
+        for (key, day) in incoming.days { result.days[key] = day }
+        return result
+    }
+
     mutating func reconcile(at date: Date, calendar: Calendar) {
         let today = Self.key(for: date, calendar: calendar)
         if protectionStart == nil { protectionStart = today }
