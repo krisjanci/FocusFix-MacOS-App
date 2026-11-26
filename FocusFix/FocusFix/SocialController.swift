@@ -32,6 +32,7 @@ final class SocialController: ObservableObject {
     private var identitySince = Date()
     private var identity: String?
     private var file: URL?
+    private var persistedLedger: SocialLedger?
     private var generation = UUID()
     private var subscriptions: Set<AnyCancellable> = []
     private var inFlight: Set<UUID> = []
@@ -68,7 +69,7 @@ final class SocialController: ObservableObject {
     private func failed(_ error: Error) {
         failures = min(failures + 1, 8)
         let exponential = min(3600, 30 * pow(2, Double(failures - 1)))
-        let delay = max(exponential * Double.random(in: 0.8...1.2), (error as? AccountFailure)?.retryAfter ?? 0)
+        let delay = max(min(3600, exponential * Double.random(in: 0.8...1.2)), (error as? AccountFailure)?.retryAfter ?? 0)
         nextAutomaticSyncAt = Date().addingTimeInterval(delay)
     }
 
@@ -114,7 +115,7 @@ final class SocialController: ObservableObject {
     }
     private func clearAccountState() {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
-        ledger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
+        ledger = nil; persistedLedger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
         repairedWorkOutbox = false
         groupVersion = nil; photos = [:]; lastGroupRead = .distantPast
@@ -156,6 +157,7 @@ final class SocialController: ObservableObject {
             file = root.appendingPathComponent("FocusFix/Social/\(name).json")
             if let file, FileManager.default.fileExists(atPath: file.path) {
                 ledger = try JSONDecoder().decode(SocialLedger.self, from: Data(contentsOf: file))
+                persistedLedger = ledger
                 try replayWorkJournal(file: file)
                 pendingConfirmation = true
             }
@@ -173,11 +175,12 @@ final class SocialController: ObservableObject {
     }
 
     private func persist() {
-        guard let file, let ledger else { return }
+        guard let file, let ledger, ledger != persistedLedger else { return }
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
             try JSONEncoder().encode(ledger).write(to: file, options: .atomic)
+            persistedLedger = ledger
             // The snapshot is durable before removing its now-redundant segment updates.
             let journal = workJournal(for: file)
             if FileManager.default.fileExists(atPath: journal.path) { try FileManager.default.removeItem(at: journal) }
@@ -301,7 +304,10 @@ final class SocialController: ObservableObject {
             payload["syncVersion"] = 2
             payload["includeGroups"] = includeGroups || action != "sync"
             payload["segments"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(segments))
-            if ledger?.serverProgress != nil { payload["progressRevision"] = ledger?.progressRevision }
+            if ledger?.serverProgress != nil {
+                payload["progressRevision"] = ledger?.progressRevision
+                payload["progressMetadataVersion"] = ledger?.progressMetadataVersion
+            }
             payload["groupVersion"] = groupVersion
             payload["photoVersions"] = Dictionary(uniqueKeysWithValues: photos.map { ($0.key.uuidString.lowercased(), $0.value.version) })
             payload["timezone"] = current.timezone
@@ -355,7 +361,7 @@ final class SocialController: ObservableObject {
     }
     private func acceptGroups(_ state: SocialState) throws {
         guard state.groupsIncluded != false else {
-            if state.groupVersion != nil { lastGroupRead = Date() }
+            if state.groupVersion != nil { lastGroupRead = Date(); needsGroupRead = false }
             return
         }
         var updated = state.groups
@@ -377,7 +383,7 @@ final class SocialController: ObservableObject {
             }
         }
         photos = retained; groupVersion = state.groupVersion
-        groups = updated; hasLoadedGroups = true; lastGroupRead = Date()
+        groups = updated; hasLoadedGroups = true; lastGroupRead = Date(); needsGroupRead = false
         selection.reconcile(groups: groups); saveSelection()
     }
 
