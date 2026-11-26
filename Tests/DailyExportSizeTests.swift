@@ -1,0 +1,29 @@
+import Foundation
+
+@main struct DailyExportSizeTests {
+    static func main() throws {
+        let fm = FileManager.default
+        let temporary = fm.temporaryDirectory.appendingPathComponent("daily-export-size-\(UUID())")
+        defer { try? fm.removeItem(at: temporary) }
+        let root = temporary.appendingPathComponent("sessions"), exports = temporary.appendingPathComponent("exports")
+        try fm.createDirectory(at: exports, withIntermediateDirectories: true)
+        let start = Date(timeIntervalSince1970: 1_795_608_000)
+        let writer = try RecordingWriter(root: root, id: "size-session", startedAt: start)
+        for index in 0..<10000 {
+            try writer.event(time: Double(index) / 100, type: index % 2 == 0 ? "key_down" : "key_up",
+                             repeated: index % 2 == 0 ? false : nil, hold: index % 2 == 0 ? nil : 0.005)
+        }
+        writer.append((0..<100).map { MouseSummary(start: Double($0), end: Double($0 + 1), distance: 12.125, events: 3, secondsSinceMovement: 0.125) })
+        try writer.finish(startedAt: start, duration: 100, reason: "size_test")
+        let before = Date()
+        let result = try SessionFiles.exportSelected([SavedSession(folder: writer.folder)], to: exports, root: root, active: nil,
+                                                    timeZone: TimeZone(secondsFromGMT: 0)!)
+        let files = fm.enumerator(at: result.folder, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey])!
+        var bytes = 0, count = 0
+        for case let file as URL in files {
+            let info = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            if info.isRegularFile == true { bytes += info.fileSize ?? 0; count += 1 }
+        }
+        print("SIZE \(DailyTimeline.version): \(bytes) bytes across \(count) files; \(Date().timeIntervalSince(before)) seconds")
+    }
+}
