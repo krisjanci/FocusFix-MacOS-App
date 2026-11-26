@@ -57,238 +57,458 @@ nonisolated final class TimelineRecords {
     }
 }
 
-nonisolated enum DailyTimeline {
-    static let version = "focusfix.daily_timeline.v1"
-    static let commonColumns = ["row_id", "row_type", "session_id", "recording_id", "segment_id",
-        "source_file", "source_row", "elapsed_seconds", "end_elapsed_seconds", "time_utc", "time_local", "time_zone",
-        "activity_context", "original_activity_context", "intervention_phase", "coverage_eligible",
-        "project_id", "project_name", "project_color", "task_id", "task_title", "check_in_id", "break_id", "action",
-        "is_continuation", "continues_row_id", "source_record_json"]
-    private static let csvNames = ["events.csv", "mouse_movement.csv", "breaks.csv", "surveys.csv", "survey_prompts.csv"]
-    private static let logNames = ["reminders.jsonl", "study_check_ins.jsonl"]
-    private static let kinds = ["events.csv": "input_event", "mouse_movement.csv": "mouse_interval",
-        "breaks.csv": "break_action", "surveys.csv": "check_in_response", "survey_prompts.csv": "check_in_action",
-        "reminders.jsonl": "reminder_action", "study_check_ins.jsonl": "study_check_in_action"]
+// JSON numbers remain lexical tokens: Foundation JSONSerialization can round
+// fractional timestamps and large integers while decoding/re-encoding a document.
+nonisolated indirect enum DailyExportJSON {
+    case object([String: DailyExportJSON]), array([DailyExportJSON]), string(String), number(String), literal(String)
+    static func parse(_ text: String) throws -> Self {
+        let bytes = Array(text.utf8); var index = 0
+        func whitespace() { while index < bytes.count && [9, 10, 13, 32].contains(bytes[index]) { index += 1 } }
+        func string() throws -> String {
+            let start = index; index += 1
+            while index < bytes.count {
+                if bytes[index] == 92 { index += 2; continue }
+                if bytes[index] == 34 {
+                    index += 1
+                    return try JSONDecoder().decode(String.self, from: Data(bytes[start..<index]))
+                }
+                index += 1
+            }
+            throw RecordingContract.Invalid.contract
+        }
+        func value(depth: Int = 0) throws -> Self {
+            whitespace()
+            guard index < bytes.count, depth < 128 else { throw RecordingContract.Invalid.contract }
+            let first = bytes[index]
+            if first == 34 { return .string(try string()) }
+            if first == 123 || first == 91 {
+                index += 1; whitespace()
+                var object: [String: Self] = [:], array: [Self] = []
+                let end: UInt8 = first == 123 ? 125 : 93
+                if index < bytes.count, bytes[index] == end { index += 1; return first == 123 ? .object(object) : .array(array) }
+                while true {
+                    whitespace()
+                    if first == 123 {
+                        guard index < bytes.count, bytes[index] == 34 else { throw RecordingContract.Invalid.contract }
+                        let key = try string(); whitespace()
+                        guard object[key] == nil, index < bytes.count, bytes[index] == 58 else { throw RecordingContract.Invalid.contract }
+                        index += 1; object[key] = try value(depth: depth + 1)
+                    } else { array.append(try value(depth: depth + 1)) }
+                    whitespace()
+                    guard index < bytes.count else { throw RecordingContract.Invalid.contract }
+                    if bytes[index] == end { index += 1; break }
+                    guard bytes[index] == 44 else { throw RecordingContract.Invalid.contract }
+                    index += 1
+                }
+                return first == 123 ? .object(object) : .array(array)
+            }
+            let start = index
+            while index < bytes.count && ![9, 10, 13, 32, 44, 93, 125].contains(bytes[index]) { index += 1 }
+            let token = String(decoding: bytes[start..<index], as: UTF8.self)
+            if ["true", "false", "null"].contains(token) { return .literal(token) }
+            guard token.range(of: #"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil else {
+                throw RecordingContract.Invalid.contract
+            }
+            return .number(token)
+        }
+        let result = try value(); whitespace()
+        guard index == bytes.count else { throw RecordingContract.Invalid.contract }
+        return result
+    }
+    static func quoted(_ text: String) -> String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.withoutEscapingSlashes]
+        return String(decoding: try! encoder.encode(text), as: UTF8.self)
+    }
+    func encoded() -> String {
+        switch self {
+        case .object(let fields): return "{" + fields.keys.sorted().map { Self.quoted($0) + ":" + fields[$0]!.encoded() }.joined(separator: ",") + "}"
+        case .array(let values): return "[" + values.map { $0.encoded() }.joined(separator: ",") + "]"
+        case .string(let value): return Self.quoted(value)
+        case .number(let value), .literal(let value): return value
+        }
+    }
+    func at(_ path: [String]) -> Self? {
+        guard let first = path.first else { return self }
+        guard case .object(let values) = self else { return nil }
+        return values[first]?.at(Array(path.dropFirst()))
+    }
+    mutating func remove(_ path: [String]) {
+        guard let first = path.first, case .object(var values) = self else { return }
+        if path.count == 1 { values.removeValue(forKey: first) }
+        else { values[first]?.remove(Array(path.dropFirst())) }
+        self = .object(values)
+    }
+    mutating func set(_ path: [String], to value: Self) {
+        guard let first = path.first else { self = value; return }
+        var values: [String: Self]
+        if case .object(let existing) = self { values = existing } else { values = [:] }
+        var child = values[first] ?? .object([:]); child.set(Array(path.dropFirst()), to: value)
+        values[first] = child; self = .object(values)
+    }
+    var scalar: (text: String, type: String)? {
+        switch self {
+        case .number(let value): return (DailyTimeline.compactNumber(value), "number")
+        case .string(let value): return (value, "string")
+        default: return nil // Missing, null, booleans and containers remain in metadata.
+        }
+    }
+}
 
-    // Preserve original text in source_record_json. Prefix spreadsheet formula-like text only in display cells.
+nonisolated enum DailyTimeline {
+    static let version = "focusfix.daily_tables.v2"
+    static let sessionColumns = ["session", "session_id", "recording_id", "segment_id", "start_utc", "end_utc",
+        "anchor_unix_s", "mode", "elapsed_origin_s", "observed_through_s", "duration_s", "status", "schema_version"]
+    static let csvTables = ["events.csv": "inputs.csv", "mouse_movement.csv": "movement.csv", "breaks.csv": "breaks.csv",
+                            "surveys.csv": "checkins.csv", "survey_prompts.csv": "changes.csv"]
+    private static let sourceNames = ["events.csv", "mouse_movement.csv", "breaks.csv", "surveys.csv", "survey_prompts.csv"]
+    private static let aliases = ["elapsed_seconds": "elapsed_s", "event_type": "event", "is_repeat": "repeat",
+        "key_hold_seconds": "hold_s", "scroll_delta_x": "scroll_x", "scroll_delta_y": "scroll_y", "scroll_precise": "precise",
+        "activity_phase": "phase", "seconds_since_last_break": "since_break_s", "start_seconds": "start_s", "end_seconds": "end_s",
+        "distance_screen_points": "distance_points", "seconds_since_last_movement": "since_movement_s",
+        "planned_seconds": "planned_s", "actual_seconds": "actual_s", "extra_idle_seconds": "extra_idle_s",
+        "next_eligible_seconds": "next_eligible_s", "break_id": "break", "prompt_id": "prompt", "session_id": "recorded_session",
+        "shown_elapsed_seconds": "shown_s", "answered_elapsed_seconds": "answered_s", "due_elapsed_seconds": "due_s",
+        "notification_requested_elapsed_seconds": "requested_s", "opened_elapsed_seconds": "opened_s", "reference_break_id": "break"]
+    private static let numericFields: Set<String> = ["elapsed_seconds", "is_repeat", "key_hold_seconds", "scroll_delta_x", "scroll_delta_y",
+        "scroll_precise", "seconds_since_last_break", "start_seconds", "end_seconds", "distance_screen_points", "movement_events",
+        "seconds_since_last_movement", "planned_seconds", "actual_seconds", "extra_idle_seconds", "next_eligible_seconds",
+        "shown_elapsed_seconds", "answered_elapsed_seconds", "due_elapsed_seconds", "notification_requested_elapsed_seconds",
+        "opened_elapsed_seconds", "fatigue_0_10", "productivity_0_10", "workload_0_10"]
+    private struct Spool: Codable {
+        let table: String
+        let source: Int
+        let index: Int
+        let values: [String: String]
+    }
+    // Lexical trimming retains arbitrarily precise decimals, signed zero and exponents.
+    static func compactNumber(_ value: String) -> String {
+        guard value.range(of: #"^-?[0-9]+\.[0-9]+$"#, options: .regularExpression) != nil else { return value }
+        var result = value
+        while result.last == "0" { result.removeLast() }
+        if result.last == "." { result.removeLast() }
+        return result
+    }
+    static func needsProtection(_ value: String) -> Bool {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).first.map { "=+-@".contains($0) } == true && Double(value) == nil
+    }
     static func cell(_ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safe = trimmed.first.map { "=+-@".contains($0) } == true && Double(value) == nil ? "'" + value : value
+        let safe = needsProtection(value) ? "'" + value : value
+        guard safe.contains(",") || safe.contains("\"") || safe.contains("\n") || safe.contains("\r") else { return safe }
         return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
-    private static func json(_ value: Any) throws -> String {
-        String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed]), as: UTF8.self)
-    }
-    private static func number(_ value: Any?) -> Double? {
-        if let text = value as? String { return Double(text).flatMap { $0.isFinite ? $0 : nil } }
-        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite { return number.doubleValue }
-        return nil
-    }
-    private static func text(_ value: Any?) -> String {
-        guard let value, !(value is NSNull) else { return "" }
-        return value as? String ?? (value as? NSNumber)?.stringValue ?? ""
+    private static func finite(_ value: String?) throws -> Double {
+        guard let value, let result = Double(value), result.isFinite else { throw RecordingContract.Invalid.bounds }
+        return result
     }
     static func export(_ sessions: [SavedSession], to folder: URL, timeZone: TimeZone = .current) throws {
-        let manager = FileManager.default
-        let stage = manager.temporaryDirectory.appendingPathComponent("FocusFix-timeline-\(UUID())")
-        try manager.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        defer { try? manager.removeItem(at: stage) }
+        let fm = FileManager.default
+        let stage = fm.temporaryDirectory.appendingPathComponent("FocusFix-daily-tables-\(UUID())")
+        try fm.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: stage) }
         let spoolURL = stage.appendingPathComponent("rows.txt")
-        guard manager.createFile(atPath: spoolURL.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
-        let spool = try FileHandle(forWritingTo: spoolURL)
-        defer { try? spool.close() }
-        var columns = Set<String>(), sessionMetadata: [[String: Any]] = []
+        guard fm.createFile(atPath: spoolURL.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+        let spool = try FileHandle(forWritingTo: spoolURL); defer { try? spool.close() }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
-        let utc = ISO8601DateFormatter(); utc.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let local = ISO8601DateFormatter(); local.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; local.timeZone = timeZone
         let day = DateFormatter(); day.locale = Locale(identifier: "en_US_POSIX"); day.calendar = calendar
         day.timeZone = timeZone; day.dateFormat = "yyyy-MM-dd"
-        for session in sessions.sorted(by: { $0.id < $1.id }) {
+        var columns: [String: [String]] = [:], fieldMaps: [String: [String: String]] = [:]
+        var csvSources: [[String: Any]] = [], documents: [[String: Any]] = [], logs: [[String: Any]] = []
+        var records: [[String: Any]] = [], crossDay: [[String: Any]] = [], lookups: [String: [String: String]] = [:]
+        var reverseLookups: [String: [String: String]] = [:], sessionRows: [[String: String]] = []
+        var folderNames: [String: String] = [:], order = 0
+        func addColumn(_ name: String, table: String) {
+            if !columns[table, default: []].contains(name) { columns[table, default: []].append(name) }
+        }
+        func identity(_ value: String, _ domain: String) -> String {
+            guard !value.isEmpty else { return "" }
+            if let existing = reverseLookups[domain]?[value] { return existing }
+            let prefix = ["break": "b", "check_in": "c", "prompt": "p", "protocol": "q", "session_id": "s"][domain]!
+            let reference = prefix + String(lookups[domain, default: [:]].count + 1)
+            lookups[domain, default: [:]][reference] = value
+            reverseLookups[domain, default: [:]][value] = reference
+            return reference
+        }
+        func domain(_ field: String) -> String? {
+            switch field {
+            case "break_id", "reference_break_id": return "break"
+            case "check_in_id": return "check_in"
+            case "prompt_id": return "prompt"
+            case "question_version": return "protocol"
+            case "session_id": return "session_id"
+            default: return nil
+            }
+        }
+        func fieldColumn(_ field: String, table: String) -> String {
+            if let existing = fieldMaps[table]?[field] { return existing }
+            var result = field == "check_in_id" ? (table == "changes.csv" ? "reference" : "check_in") : aliases[field] ?? field
+            if result.range(of: #"^[A-Za-z_][A-Za-z_0-9]*$"#, options: .regularExpression) == nil { result = "field_" + String(fieldMaps[table, default: [:]].count + 1) }
+            let reserved = table == "changes.csv" ? ["session", "kind", "detail"] : ["session"]
+            let knownAlias = aliases[field] != nil || field == "check_in_id"
+            if reserved.contains(result) || (!knownAlias && aliases.values.contains(result)) || fieldMaps[table, default: [:]].values.contains(result) {
+                result = "field_" + result
+                while fieldMaps[table, default: [:]].values.contains(result) { result = "field_" + result }
+            }
+            fieldMaps[table, default: [:]][field] = result
+            return result
+        }
+        for (sessionIndex, input) in sessions.sorted(by: { $0.id < $1.id }).enumerated() {
             try Task.checkCancellation()
-            try SessionStorage.withFolder(session.folder) { readable in
-                let saved = try SavedSession(folder: readable)
-                let contract = saved.recordingContract
-                let origin = contract?.elapsedOrigin ?? 0, through = contract?.observedThrough ?? saved.duration ?? 0
+            try SessionStorage.withFolder(input.folder) { readable in
+                let saved = try SavedSession(folder: readable), reference = String(sessionIndex + 1)
+                let origin = saved.recordingContract?.elapsedOrigin ?? 0
+                let through = saved.recordingContract?.observedThrough ?? saved.duration ?? origin
                 let names = try SessionStorage.names(in: readable)
-                let assignments = names.contains(WorkAssignmentJournal.filename) ? try WorkAssignmentJournal.load(from: readable) : WorkAssignmentJournal()
-                var metadata: [String: Any] = ["session_id": session.id, "schema_version": saved.schemaVersion,
-                    "elapsed_origin": origin, "observed_through": through, "files": [String: String]()]
-                var originals: [String: String] = [:]
-                // Keep metadata/provenance byte-exact as UTF-8 text; logs become timeline rows below.
-                for name in names where !csvNames.contains(name) && !logNames.contains(name) {
-                    let data = try SessionStorage.data(name, in: readable)
-                    guard let original = String(data: data, encoding: .utf8) else { throw CocoaError(.fileReadCorruptFile) }
-                    originals[name] = original
-                }
-                metadata["files"] = originals; sessionMetadata.append(metadata)
-                var order = 0
-                var breakBounds: [String: (start: Double, end: Double?, sourceRow: Int)] = [:]
-                func emit(file: String, index: Int, kind: String, at elapsed: Double, end: Double? = nil,
-                          fields: [String: String] = [:], original: String, phase: String = "") throws {
-                    guard elapsed.isFinite, elapsed >= 0, end.map({ $0.isFinite && $0 >= elapsed }) ?? true else {
-                        throw RecordingContract.Invalid.bounds
-                    }
+                if names.contains(WorkAssignmentJournal.filename) { _ = try WorkAssignmentJournal.load(from: readable) }
+                var sessionRow = ["session": reference, "anchor_unix_s": String(saved.startedAt.timeIntervalSince1970)]
+                func emit(table: String, source: Int, index: Int, values: [String: String], at elapsed: Double,
+                          span: (Double, Double)? = nil) throws {
                     let date = saved.startedAt.addingTimeInterval(elapsed - origin)
                     guard date.timeIntervalSince1970.isFinite else { throw RecordingContract.Invalid.bounds }
-                    let context = contract?.intervals.last(where: { $0.start <= elapsed && elapsed < ($0.end ?? through) })?.context.rawValue ?? "unknown"
-                    let assignment = assignments.changes.last(where: { $0.elapsed <= elapsed })?.assignment ?? .none
-                    let withinEnd = end.map { $0 <= through } ??
-                        (kind == "input_event" && fields["event_type"] != "session_stop" ? elapsed < through : elapsed <= through)
-                    let eligible = elapsed >= origin && withinEnd
-                    let id = "\(session.id)/\(file)/\(index)/\(kind)"
-                    var row: [String: String] = ["row_id": id, "row_type": kind, "session_id": session.id,
-                        "recording_id": contract?.recordingID.uuidString ?? "", "segment_id": contract?.segmentID.uuidString ?? "",
-                        "source_file": file, "source_row": String(index), "elapsed_seconds": String(elapsed),
-                        "end_elapsed_seconds": end.map(String.init(describing:)) ?? "", "time_utc": utc.string(from: date),
-                        "time_local": local.string(from: date), "time_zone": timeZone.identifier,
-                        "activity_context": context == "non_work" ? "unknown" : context, "original_activity_context": context,
-                        "intervention_phase": phase == "work" ? "normal" : phase, "coverage_eligible": eligible ? "true" : "false",
-                        "project_id": assignment.projectID?.uuidString ?? "", "project_name": assignment.projectName ?? "",
-                        "project_color": assignment.projectColor ?? "", "task_id": assignment.taskID?.uuidString ?? "",
-                        "task_title": assignment.taskTitle ?? "", "check_in_id": fields["check_in_id"] ?? "",
-                        "break_id": fields["break_id"] ?? "", "action": fields["action"] ?? fields["event_type"] ?? "",
-                        "is_continuation": "false", "continues_row_id": "", "source_record_json": original]
-                    for (key, value) in fields { row["source_" + key] = value; columns.insert("source_" + key) }
-                    func write(_ row: [String: String], at stamp: Date) throws {
-                        order += 1
-                        let encoded = String(decoding: try JSONEncoder().encode(row), as: UTF8.self)
-                        let sortTime = String(format: "%.9f", locale: Locale(identifier: "en_US_POSIX"), stamp.timeIntervalSince1970)
-                        try spool.write(contentsOf: Data("\(sortTime)\t\(session.id)\t\(order)\t\(encoded)\n".utf8))
-                    }
-                    try write(row, at: date)
-                    if let end, end > elapsed {
-                        let endDate = saved.startedAt.addingTimeInterval(end - origin)
-                        var boundary = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date))!
-                        var continuations = 0
-                        while boundary < endDate {
-                            // Only a reference, never repeated measurement totals.
-                            row = Dictionary(uniqueKeysWithValues: commonColumns.map { ($0, "") })
-                            row["row_id"] = id + "/" + day.string(from: boundary)
-                            row["row_type"] = "interval_continuation"; row["session_id"] = session.id
-                            row["recording_id"] = contract?.recordingID.uuidString ?? ""; row["segment_id"] = contract?.segmentID.uuidString ?? ""
-                            row["source_file"] = file; row["source_row"] = String(index)
-                            row["time_utc"] = utc.string(from: boundary); row["time_local"] = local.string(from: boundary)
-                            row["time_zone"] = timeZone.identifier; row["is_continuation"] = "true"; row["continues_row_id"] = id
-                            try write(row, at: boundary)
-                            continuations += 1
-                            guard continuations < 36600 else { throw RecordingContract.Invalid.bounds }
-                            boundary = calendar.date(byAdding: .day, value: 1, to: boundary)!
+                    var row = values; row["session"] = reference
+                    for key in row.keys { addColumn(key, table: table) }
+                    order += 1
+                    let record = Spool(table: table, source: source, index: index, values: row)
+                    let payload = String(decoding: try encoder.encode(record), as: UTF8.self)
+                    let stamp = String(format: "%.9f", locale: Locale(identifier: "en_US_POSIX"), date.timeIntervalSince1970)
+                    let logical = String(format: "%.17f", locale: Locale(identifier: "en_US_POSIX"), elapsed)
+                    try spool.write(contentsOf: Data("\(stamp)\t\(sessionIndex)\t\(logical)\t\(order)\t\(payload)\n".utf8))
+                    if let (start, end) = span {
+                        guard start.isFinite, end.isFinite, end >= start else { throw RecordingContract.Invalid.bounds }
+                        let begin = saved.startedAt.addingTimeInterval(start - origin), finish = saved.startedAt.addingTimeInterval(end - origin)
+                        var cursor = calendar.startOfDay(for: begin), days: [String] = []
+                        while cursor < finish {
+                            let label = day.string(from: cursor)
+                            if label != day.string(from: date) { days.append(label) }
+                            guard days.count < 36600, let next = calendar.date(byAdding: .day, value: 1, to: cursor), next > cursor else { throw RecordingContract.Invalid.bounds }
+                            cursor = next
+                        }
+                        if !days.isEmpty {
+                            var item: [String: Any] = ["source_day": day.string(from: date), "days": days]
+                            if source >= 0 { item["csv_source"] = source + 1; item["record"] = index }
+                            else { item["detail"] = index }
+                            crossDay.append(item)
                         }
                     }
                 }
-                try emit(file: "session.json", index: 0, kind: "segment_start", at: origin, original: "{}")
-                for name in csvNames where names.contains(name) {
-                    let reader = try TimelineRecords(readable.appendingPathComponent(name))
-                    guard let first = try reader.next(csv: true) else { throw RecordingContract.Invalid.contract }
-                    let header = try TimelineRecords.cells(first)
-                    guard Set(header).count == header.count else { throw RecordingContract.Invalid.contract }
-                    for key in header { columns.insert("source_" + key) }
-                    var index = 0
+                // Session fields have one owner; other JSON documents refer to this lookup.
+                let sessionMoves = ["session.json": ["session_id": "session_id", "recording_id": "recording_id", "segment_id": "segment_id",
+                    "started_at_utc": "start_utc", "ended_at_utc": "end_utc", "recording_mode": "mode", "duration_seconds": "duration_s",
+                    "status": "status", "schema_version": "schema_version"],
+                    "context_intervals.json": ["recordingID": "recording_id", "segmentID": "segment_id", "mode": "mode",
+                        "elapsedOrigin": "elapsed_origin_s", "observedThrough": "observed_through_s"],
+                    "research_eligibility.json": ["recordingID": "recording_id", "segmentID": "segment_id", "capturedAtUTC": "anchor_unix_s"]]
+                var parsedDocuments: [(String, DailyExportJSON, [[String: Any]])] = []
+                let documentNames = names.filter { !sourceNames.contains($0) && !$0.hasSuffix(".jsonl") }
+                for name in documentNames.sorted(by: { ($0 == "session.json" ? "" : $0) < ($1 == "session.json" ? "" : $1) }) {
+                    let data = try SessionStorage.data(name, in: readable)
+                    guard let text = String(data: data, encoding: .utf8) else { throw RecordingContract.Invalid.contract }
+                    guard name.hasSuffix(".json") else {
+                        documents.append(["session": reference, "file": name, "text": text]); continue
+                    }
+                    var node = try DailyExportJSON.parse(text), moves: [[String: Any]] = []
+                    for (field, column) in (sessionMoves[name] ?? [:]).sorted(by: { $0.key < $1.key }) {
+                        guard let scalar = node.at([field])?.scalar,
+                              sessionRow[column] == nil || compactNumber(sessionRow[column]!) == scalar.text else { continue }
+                        sessionRow[column] = scalar.text
+                        moves.append(["path": [field], "column": column, "type": scalar.type])
+                        node.remove([field])
+                    }
+                    parsedDocuments.append((name, node, moves))
+                }
+                if sessionRow["session_id"] == nil { sessionRow["session_id"] = input.id }
+                if sessionRow["session_id"] != input.id { folderNames[reference] = input.id }
+                if sessionRow["elapsed_origin_s"] == nil { sessionRow["elapsed_origin_s"] = String(origin) }
+                sessionRows.append(sessionRow)
+                // CSV fields retain their own narrow schema. Only constant session/protocol fields move out.
+                for name in sourceNames where names.contains(name) {
+                    let table = csvTables[name]!, url = readable.appendingPathComponent(name)
+                    let scan = try TimelineRecords(url)
+                    guard let line = try scan.next(csv: true) else { throw RecordingContract.Invalid.contract }
+                    let header = try TimelineRecords.cells(line)
+                    guard !header.isEmpty, Set(header).count == header.count else { throw RecordingContract.Invalid.contract }
+                    var constants: [String: String] = [:], count = 0
+                    while let row = try scan.next(csv: true) {
+                        try Task.checkCancellation()
+                        if row.isEmpty { continue }
+                        let cells = try TimelineRecords.cells(row)
+                        guard cells.count == header.count else { throw RecordingContract.Invalid.contract }
+                        count += 1
+                        for field in ["session_id", "question_version"] {
+                            guard let column = header.firstIndex(of: field) else { continue }
+                            if count == 1 { constants[field] = cells[column] }
+                            else if constants[field] != cells[column] { constants.removeValue(forKey: field) }
+                        }
+                    }
+                    var constantMetadata: [String: Any] = [:], mapping: [String: String] = [:]
+                    for field in header {
+                        if let value = constants[field] {
+                            if field == "session_id", value == sessionRow["session_id"] { constantMetadata[field] = ["session_column": "session_id"] }
+                            else { constantMetadata[field] = ["lookup": domain(field)!, "reference": identity(value, domain(field)!)] }
+                        } else {
+                            mapping[field] = fieldColumn(field, table: table)
+                            addColumn(mapping[field]!, table: table)
+                        }
+                    }
+                    let source = csvSources.count
+                    csvSources.append(["session": reference, "file": name, "table": table, "header": header, "columns": mapping,
+                                       "constants": constantMetadata, "records": count])
+                    let reader = try TimelineRecords(url); _ = try reader.next(csv: true); var index = 0
                     while let line = try reader.next(csv: true) {
                         try Task.checkCancellation()
                         if line.isEmpty { continue }
                         index += 1
-                        let values = try TimelineRecords.cells(line)
-                        guard values.count == header.count else { throw RecordingContract.Invalid.contract }
-                        let fields = Dictionary(uniqueKeysWithValues: zip(header, values))
-                        let time = number(fields["elapsed_seconds"]) ?? number(fields["answered_elapsed_seconds"]) ?? number(fields["start_seconds"])
-                        guard let time else { throw RecordingContract.Invalid.bounds }
-                        if name == "breaks.csv", let id = fields["break_id"], !id.isEmpty,
-                           let start = number(fields["start_seconds"]) {
-                            let finish = number(fields["end_seconds"])
-                            guard start >= 0, finish.map({ $0 >= start }) ?? true else { throw RecordingContract.Invalid.bounds }
-                            let previous = breakBounds[id]
-                            if let previous, previous.start != start { throw RecordingContract.Invalid.bounds }
-                            breakBounds[id] = (start, finish ?? previous?.end, previous?.sourceRow ?? index)
+                        let cells = try TimelineRecords.cells(line)
+                        guard cells.count == header.count else { throw RecordingContract.Invalid.contract }
+                        let fields = Dictionary(uniqueKeysWithValues: zip(header, cells))
+                        var row: [String: String] = [:]
+                        if table == "changes.csv" { row["kind"] = "check_in_action" }
+                        for field in header where mapping[field] != nil {
+                            let value = fields[field]!
+                            row[mapping[field]!] = domain(field).map { identity(value, $0) } ?? (numericFields.contains(field) ? compactNumber(value) : value)
                         }
-                        let end = name == "mouse_movement.csv" ? number(fields["end_seconds"]) : nil
-                        try emit(file: name, index: index, kind: kinds[name]!, at: time, end: end, fields: fields,
-                                 original: json(fields), phase: fields["activity_phase"] ?? "")
+                        let at = try finite(fields["elapsed_seconds"] ?? fields["answered_elapsed_seconds"] ?? fields["start_seconds"])
+                        let start = fields["start_seconds"].flatMap(Double.init), end = fields["end_seconds"].flatMap(Double.init)
+                        try emit(table: table, source: source, index: index, values: row, at: at,
+                                 span: start.flatMap { a in end.map { (a, $0) } })
                     }
                 }
-                for name in logNames where names.contains(name) {
-                    let reader = try TimelineRecords(readable.appendingPathComponent(name)); var index = 0
+                // Low-volume JSON records keep only unmapped fields in metadata, with exact numeric lexemes.
+                func jsonRecord(_ original: DailyExportJSON, kind: String, definitions: [(String, [String], String?)], at path: [String], end: [String]? = nil) throws -> Int {
+                    var node = original, moves: [[String: Any]] = [], row = ["kind": kind]
+                    let elapsed = try finite(node.at(path)?.scalar?.text)
+                    for (column, path, lookup) in definitions {
+                        guard let scalar = node.at(path)?.scalar else { continue }
+                        row[column] = lookup.map { identity(scalar.text, $0) } ?? scalar.text
+                        var move: [String: Any] = ["path": path, "column": column, "type": scalar.type]
+                        if let lookup { move["lookup"] = lookup }
+                        moves.append(move); node.remove(path)
+                    }
+                    let detail = records.count + 1
+                    records.append(["remaining_json": node.encoded(), "moves": moves])
+                    row["detail"] = String(detail)
+                    let finish = end.flatMap { original.at($0)?.scalar?.text }.flatMap(Double.init)
+                    try emit(table: "changes.csv", source: -1, index: detail, values: row, at: elapsed, span: finish.map { (elapsed, $0) })
+                    return detail
+                }
+                for (name, original, moves) in parsedDocuments {
+                    var node = original, collections: [[String: Any]] = []
+                    let specifications: [(String, String, String, String?)] = name == "context_intervals.json" ? [("intervals", "context", "start", "end")] :
+                        name == WorkAssignmentJournal.filename ? [("changes", "assignment", "elapsed", nil), ("breaks", "assignment_break", "start", "end")] : []
+                    for (field, kind, time, finish) in specifications {
+                        guard let collection = node.at([field]) else { continue }
+                        guard case .array(let entries) = collection else { throw RecordingContract.Invalid.contract }
+                        var identifiers: [Int] = []
+                        for entry in entries {
+                            let definitions: [(String, [String], String?)] = [("elapsed_s", [time], nil), ("end_s", [finish ?? "end"], nil),
+                                ("context", ["context"], nil), ("reference", ["id"], kind == "assignment_break" ? "break" : nil),
+                                ("project", ["assignment", "projectName"], nil), ("task", ["assignment", "taskTitle"], nil)]
+                            identifiers.append(try jsonRecord(entry, kind: kind, definitions: definitions, at: [time], end: finish.map { [$0] }))
+                        }
+                        node.remove([field]); collections.append(["path": [field], "records": identifiers])
+                    }
+                    documents.append(["session": reference, "file": name, "remaining_json": node.encoded(), "moves": moves, "collections": collections])
+                }
+                for name in names.filter({ $0.hasSuffix(".jsonl") }).sorted() {
+                    let reader = try TimelineRecords(readable.appendingPathComponent(name)); var identifiers: [Int] = []
                     while let line = try reader.next() {
                         try Task.checkCancellation()
-                        if line.trimmingCharacters(in: .whitespaces).isEmpty { continue }
-                        index += 1
-                        guard let object = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-                              let elapsed = number(object["effectiveElapsed"]) ?? number(object["elapsed"]) else { throw RecordingContract.Invalid.contract }
-                        let prompt = object["prompt"] as? [String: Any] ?? object["request"] as? [String: Any] ?? [:]
-                        var fields = ["action": text(object["action"])]
-                        fields["check_in_id"] = text(prompt["id"])
-                        for (key, value) in object where value is String || value is NSNumber { fields[key] = text(value) }
-                        try emit(file: name, index: index, kind: kinds[name]!, at: elapsed, fields: fields, original: line)
+                        if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
+                        let node = try DailyExportJSON.parse(line)
+                        let isReminder = name == "reminders.jsonl", time = isReminder ? "effectiveElapsed" : "elapsed"
+                        let parent = isReminder ? "request" : "prompt"
+                        let definitions: [(String, [String], String?)] = [("elapsed_s", [time], nil), ("action", ["action"], nil),
+                            ("reference", [parent, "id"], isReminder ? "prompt" : "check_in"),
+                            ("context", [parent, isReminder ? "context" : "contextAtPrompt"], nil)]
+                        identifiers.append(try jsonRecord(node, kind: isReminder ? "reminder" : "study_check_in", definitions: definitions, at: [time]))
                     }
+                    logs.append(["session": reference, "file": name, "records": identifiers])
                 }
-                let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .secondsSince1970; encoder.outputFormatting = [.sortedKeys]
-                if let contract {
-                    for (index, interval) in contract.intervals.enumerated() {
-                        let original = String(decoding: try encoder.encode(interval), as: UTF8.self)
-                        try emit(file: "context_intervals.json", index: index + 1, kind: "context_interval", at: interval.start,
-                                 end: interval.end ?? through, original: original)
-                    }
-                }
-                for (index, change) in assignments.changes.enumerated() {
-                    try emit(file: WorkAssignmentJournal.filename, index: index + 1, kind: "assignment_change", at: change.elapsed,
-                             original: String(decoding: try encoder.encode(change), as: UTF8.self))
-                }
-                // Lifecycle CSVs also support legacy recordings without an assignment sidecar.
-                for id in breakBounds.keys.sorted() {
-                    let item = breakBounds[id]!
-                    let lower = max(origin, item.start), upper = min(through, item.end ?? through)
-                    guard upper > lower else { continue }
-                    let fields = ["break_id": id, "start_seconds": String(item.start), "end_seconds": item.end.map(String.init(describing:)) ?? ""]
-                    try emit(file: "breaks.csv", index: item.sourceRow, kind: "break_interval", at: lower, end: upper,
-                             fields: fields, original: json(fields), phase: "explicit_break")
-                }
-                for (index, item) in assignments.breaks.enumerated() where breakBounds[item.id] == nil {
-                    let lower = max(origin, item.start), upper = min(through, item.end ?? through)
-                    guard upper > lower else { continue }
-                    try emit(file: WorkAssignmentJournal.filename, index: index + 1,
-                             kind: "break_interval", at: lower, end: upper,
-                             fields: ["break_id": item.id], original: String(decoding: try encoder.encode(item), as: UTF8.self), phase: "explicit_break")
-                }
-                try emit(file: "session.json", index: 1, kind: "segment_end", at: through, original: "{}")
             }
         }
         try spool.close()
-        let sorted = stage.appendingPathComponent("sorted.txt")
-        let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/sort")
-        process.arguments = ["-t", "\t", "-k1,1n", "-k2,2", "-k3,3n", "-T", stage.path, "-o", sorted.path, spoolURL.path]
+        // Headers are stable across days and selected-session order, without unioning unrelated categories.
+        let preferred = ["session", "elapsed_s", "start_s", "end_s", "kind", "event", "action", "reference", "context", "project", "task",
+            "repeat", "hold_s", "scroll_x", "scroll_y", "precise", "phase", "since_break_s", "distance_points", "movement_events",
+            "since_movement_s", "check_in", "break", "prompt", "due_s", "requested_s", "opened_s", "detail"]
+        for table in columns.keys {
+            columns[table] = columns[table]!.sorted { a, b in
+                let x = preferred.firstIndex(of: a) ?? Int.max, y = preferred.firstIndex(of: b) ?? Int.max
+                return x == y ? a < b : x < y
+            }
+        }
+        let sortedURL = stage.appendingPathComponent("sorted.txt"), process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sort")
+        process.arguments = ["-t", "\t", "-k1,1n", "-k2,2n", "-k3,3n", "-k4,4n", "-T", stage.path, "-o", sortedURL.path, spoolURL.path]
         process.environment = ProcessInfo.processInfo.environment.merging(["LC_ALL": "C"]) { _, new in new }
         process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         try process.run(); process.waitUntilExit()
         guard process.terminationStatus == 0 else { throw CocoaError(.fileWriteUnknown) }
-        let header = commonColumns + columns.sorted()
-        let reader = try TimelineRecords(sorted)
-        var currentDay = "", output: FileHandle?, outputFiles: [String] = []
-        defer { try? output?.close() }
+        var escaped: [[String: Any]] = [], rowCounts: [String: Int] = [:], outputs: [String: FileHandle] = [:]
+        var currentDay = "", previous: [Int: Int] = [:], reordered = Set<Int>()
+        defer { for output in outputs.values { try? output.close() } }
+        func writeRow(_ values: [String: String], header: [String], path: String, handle: FileHandle, row: Int) throws {
+            var cells: [String] = []
+            for column in header {
+                let value = values[column] ?? ""
+                if needsProtection(value) { escaped.append(["file": path, "row": row, "column": column]) }
+                cells.append(cell(value))
+            }
+            try handle.write(contentsOf: Data((cells.joined(separator: ",") + "\n").utf8))
+        }
+        let reader = try TimelineRecords(sortedURL)
         while let line = try reader.next() {
             try Task.checkCancellation()
-            let parts = line.split(separator: "\t", maxSplits: 3, omittingEmptySubsequences: false)
-            guard parts.count == 4, let stamp = Double(parts[0]) else { throw RecordingContract.Invalid.contract }
-            let row = try JSONDecoder().decode([String: String].self, from: Data(parts[3].utf8))
+            let parts = line.split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false)
+            guard parts.count == 5, let stamp = Double(parts[0]) else { throw RecordingContract.Invalid.contract }
+            let item = try JSONDecoder().decode(Spool.self, from: Data(parts[4].utf8))
             let key = day.string(from: Date(timeIntervalSince1970: stamp))
-            if key != currentDay {
-                try output?.close(); currentDay = key
-                let name = "activity-\(key).csv", url = folder.appendingPathComponent(name)
-                guard !manager.fileExists(atPath: url.path), manager.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw CocoaError(.fileWriteFileExists) }
-                output = try FileHandle(forWritingTo: url); outputFiles.append(name)
-                try output!.write(contentsOf: Data((header.map(cell).joined(separator: ",") + "\n").utf8))
+            if currentDay != key {
+                for handle in outputs.values { try handle.close() }; outputs = [:]; currentDay = key
+                try fm.createDirectory(at: folder.appendingPathComponent(key), withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
             }
-            try output!.write(contentsOf: Data((header.map { cell(row[$0] ?? "") }.joined(separator: ",") + "\n").utf8))
+            let path = key + "/" + item.table, header = columns[item.table]!
+            if outputs[item.table] == nil {
+                let url = folder.appendingPathComponent(path)
+                guard fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw CocoaError(.fileWriteUnknown) }
+                let handle = try FileHandle(forWritingTo: url); outputs[item.table] = handle
+                try handle.write(contentsOf: Data((header.joined(separator: ",") + "\n").utf8))
+            }
+            rowCounts[path, default: 0] += 1
+            try writeRow(item.values, header: header, path: path, handle: outputs[item.table]!, row: rowCounts[path]!)
+            if item.source >= 0 {
+                if item.index != (previous[item.source] ?? 0) + 1 { reordered.insert(item.source) }
+                previous[item.source] = item.index
+            }
         }
-        try output?.close()
-        let metadata: [String: Any] = ["export_schema": version, "time_zone": timeZone.identifier, "csv_files": outputFiles,
-            "columns": header, "sessions": sessionMetadata,
-            "notes": ["UTC/local row times are derived segment-start plus logical elapsed anchors, not sampled wall-clock observations.",
-                "source_* columns and source_record_json preserve original values; metadata files preserve original UTF-8 text.",
-                "Historical non_work normalizes to unknown only in activity_context; original context and source payloads remain intact.",
-                "coverage_eligible marks durable bounds only; it does not imply observed work. Normal phase is separate from Work intent.",
-                "Interval continuation rows reference the original row and contain no repeated measurements. Intervals use [start,end).",
-                "Missing answers are blank. Requested prompts do not prove delivery. No activity is inferred through gaps.",
-                "Project/task names are private historical snapshots. Display cells may have a spreadsheet-protection apostrophe; source_record_json retains original text."]]
-        try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .prettyPrinted]).write(to: folder.appendingPathComponent("metadata.json"), options: .atomic)
+        for handle in outputs.values { try handle.close() }; outputs = [:]
+        if !reordered.isEmpty {
+            let reader = try TimelineRecords(sortedURL); var orders: [Int: [Int]] = [:]
+            while let line = try reader.next() {
+                let parts = line.split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false)
+                let item = try JSONDecoder().decode(Spool.self, from: Data(parts[4].utf8))
+                if reordered.contains(item.source) { orders[item.source, default: []].append(item.index) }
+            }
+            for (source, values) in orders { csvSources[source]["order"] = values }
+        }
+        let sessionsURL = folder.appendingPathComponent("sessions.csv")
+        guard fm.createFile(atPath: sessionsURL.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw CocoaError(.fileWriteUnknown) }
+        let sessionOutput = try FileHandle(forWritingTo: sessionsURL); defer { try? sessionOutput.close() }
+        try sessionOutput.write(contentsOf: Data((sessionColumns.joined(separator: ",") + "\n").utf8))
+        for (index, row) in sessionRows.enumerated() { try writeRow(row, header: sessionColumns, path: "sessions.csv", handle: sessionOutput, row: index + 1) }
+        try sessionOutput.close()
+        let metadata: [String: Any] = ["export_schema": version, "time_zone": timeZone.identifier, "columns": columns,
+            "files": rowCounts, "identities": lookups, "csv_sources": csvSources, "documents": documents,
+            "json_logs": logs, "json_records": records, "cross_day": crossDay, "escaped_cells": escaped, "folder_names": folderNames,
+            "numeric_csv_fields": numericFields.sorted(),
+            "notes": ["Elapsed values stay on each recording's logical clock. Day grouping uses anchor_unix_s + elapsed - elapsed_origin_s in the export timezone.",
+                "Phase work means normal intervention phase, not declared Work. Context/project/task changes are in changes.csv.",
+                "Original bounds remain on interval rows. cross_day references do not duplicate measurements. Intervals are [start,end).",
+                "Durable bounds are in sessions.csv. Uncheckpointed tails remain present but must not receive work credit. Missing observations are not filled.",
+                "CSV source columns/constants and lookup identities reconstruct every original field; decimal trailing zeros are formatting only.",
+                "JSON moves place scalar values in changes.csv or sessions.csv. remaining_json retains all other fields with exact numeric tokens; collections/logs preserve record order.",
+                "escaped_cells lists spreadsheet-protection apostrophes to remove when reconstructing text. Row numbers exclude headers.",
+                "CSV source order is chronological unless order maps emitted rows back to their original one-based record indices. No per-event JSON copies or summary rows are stored."]]
+        try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: folder.appendingPathComponent("metadata.json"), options: .atomic)
     }
 }
