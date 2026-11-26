@@ -266,7 +266,7 @@ import Foundation
                 let session = source["session"] as! String, name = source["file"] as! String, table = source["table"] as! String
                 let header = source["header"] as! [String], mapping = source["columns"] as! [String: String]
                 let constants = source["constants"] as! [String: [String: String]]
-                var rows = try category(table).filter { $0["session"] == session && (table != "changes.csv" || $0["kind"] == "check_in_action") }
+                var rows = try category(table).filter { $0["session"] == session && (table != "changes.csv" || Int($0["detail"] ?? "") == nil) }
                 if let order = source["order"] as? [Int] { rows = zip(order, rows).sorted { $0.0 < $1.0 }.map { $0.1 } }
                 let data = original(session, name)
                 let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("source-csv-\(UUID()).csv")
@@ -285,8 +285,7 @@ import Foundation
                             value = constant["session_column"].map { key in sessions.first { $0["session"] == session }![key]! } ?? lookup(constant["reference"]!, constant["lookup"]!)
                         } else {
                             let cell = row[mapping[field]!]!
-                            let domain = ["break_id": "break", "reference_break_id": "break", "check_in_id": "check_in", "prompt_id": "prompt",
-                                          "session_id": "session_id", "question_version": "protocol"][field]
+                            let domain = (metadata["identity_csv_fields"] as! [String: String])[field]
                             value = domain.map { lookup(cell, $0) } ?? cell
                         }
                         let sourceValue = parsed[index + 1][column]
