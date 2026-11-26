@@ -23,6 +23,7 @@ struct AccountTests {
         var reads = 0
         var signupConfirmed = false
         var failProfile = false
+        var retryAfterHeader: String?
         var statusOverride: Int?
         let transport: AccountAPI.Transport = { request in
             requests.append(request)
@@ -44,7 +45,7 @@ struct AccountTests {
             } else if request.url!.path == "/auth/v1/token" || request.url!.path == "/auth/v1/verify" {
                 data = try JSONEncoder().encode(session)
             }
-            return (data, HTTPURLResponse(url: request.url!, statusCode: statusOverride ?? status, httpVersion: nil, headerFields: nil)!)
+            return (data, HTTPURLResponse(url: request.url!, statusCode: statusOverride ?? status, httpVersion: nil, headerFields: retryAfterHeader.map { ["Retry-After": $0] })!)
         }
         let controller = AccountController(configuration: config, transport: transport,
             readCredential: { reads += 1; return stored }, writeCredential: { stored = $0 }, defaults: preferences)
@@ -90,10 +91,17 @@ struct AccountTests {
         stored = try JSONEncoder().encode(StoredAccount(origin: config.origin.absoluteString, session: session))
         await controller.restore()
         precondition(controller.session?.user.id == owner && reads == 2)
-        statusOverride = 429
+        statusOverride = 429; retryAfterHeader = "120"
         let api = AccountAPI(configuration: config, transport: transport)
         do { _ = try await api.signIn(email: "test@example.invalid", password: "test-password"); preconditionFailure("Expected quota failure") }
-        catch { precondition(!error.localizedDescription.contains("test-password")) }
+        catch {
+            precondition(!error.localizedDescription.contains("test-password"))
+            precondition((error as? AccountFailure)?.statusCode == 429 && (error as? AccountFailure)?.retryAfter == 120)
+        }
+        let totals = AccountNetworkMetrics.shared.snapshot()
+        precondition(totals["auth/v1/token"]?.failures == 1)
+        precondition(totals.keys.allSatisfy { !$0.contains(owner.uuidString) && !$0.contains("test-password") })
+        retryAfterHeader = nil
         statusOverride = nil
         await controller.deleteAccount()
         precondition(controller.session == nil && stored == nil)
