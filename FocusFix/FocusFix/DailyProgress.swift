@@ -52,8 +52,8 @@ struct DailyProgress: Codable, Equatable {
 
     // Merge an authoritative delta into the last SERVER snapshot, never the optimistic
     // local progress with unacknowledged events already applied.
-    func mergingServerDays(_ incoming: DailyProgress, removed: [String]) -> DailyProgress {
-        var result = incoming
+    func mergingServerDays(_ incoming: DailyProgress, removed: [String], includesMetadata: Bool = true) -> DailyProgress {
+        var result = includesMetadata ? incoming : self
         result.days = days
         for key in removed { result.days.removeValue(forKey: key) }
         for (key, day) in incoming.days { result.days[key] = day }
