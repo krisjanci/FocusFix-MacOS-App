@@ -20,9 +20,8 @@ struct MouseSummary {
     var secondsSinceLastBreak: Double? = nil
     // Serialize one mouse interval's totals without including cursor coordinates.
     var csv: String {
-        [csvNumber(start), csvNumber(end),
-         csvNumber(distance), String(events), secondsSinceMovement.map(csvNumber) ?? "", activityPhase,
-         secondsSinceLastBreak.map(csvNumber) ?? ""]
+        [DailyTimeline.roundedNumber(csvNumber(start), places: 0), DailyTimeline.roundedNumber(csvNumber(end), places: 0),
+         csvNumber(distance), String(events), secondsSinceMovement.map { DailyTimeline.roundedNumber(csvNumber($0), places: 2) } ?? ""]
             .joined(separator: ",") + "\n"
     }
 }
@@ -107,6 +106,8 @@ final class RecordingWriter {
     private let studyLog: FileHandle
     private var eventBuffer = ""
     private var mouseBuffer = ""
+    private var coverage = ObservedCoverage()
+    private var coverageDirty = false
     private var breakBuffer = ""
     private let studyConfiguration: StudyCheckInConfiguration?
     private let surveyOptions: SurveyOptions
@@ -140,8 +141,8 @@ final class RecordingWriter {
         try Data().write(to: reminderURL)
         let studyURL = folder.appendingPathComponent("study_check_ins.jsonl")
         try Data().write(to: studyURL)
-        try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise,activity_phase,seconds_since_last_break\n".utf8).write(to: eventURL)
-        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n".utf8).write(to: mouseURL)
+        try Data("elapsed_seconds,event_type,is_repeat,key_hold_seconds,scroll_delta_x,scroll_delta_y,scroll_precise\n".utf8).write(to: eventURL)
+        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement\n".utf8).write(to: mouseURL)
         try Data(BreakLogEntry.header.utf8).write(to: breakURL)
         try Data(SurveyEntry.header.utf8).write(to: surveyURL)
         try Data(SurveyPromptEntry.header.utf8).write(to: promptURL)
@@ -159,6 +160,7 @@ final class RecordingWriter {
         try surveyPrompts.seekToEnd()
         try ResearchCaptureManifest(recordingID: contract.recordingID, segmentID: contract.segmentID, capturedAtUTC: startedAt, identity: researchIdentity).save(to: folder)
         try contract.save(to: folder)
+        try coverage.save(to: folder)
         try metadata(startedAt: startedAt, duration: nil, reason: "recording")
         try assignments.select(.none, at: contract.elapsedOrigin)
         try assignments.save(to: folder)
@@ -169,12 +171,20 @@ final class RecordingWriter {
                activityPhase: String = "work", secondsSinceLastBreak: Double? = nil) throws {
         eventBuffer += [csvNumber(time), type, repeated.map { $0 ? "1" : "0" } ?? "",
             hold.map(csvNumber) ?? "", scrollX.map(csvNumber) ?? "", scrollY.map(csvNumber) ?? "",
-            precise.map { $0 ? "1" : "0" } ?? "", activityPhase,
-            secondsSinceLastBreak.map(csvNumber) ?? ""].joined(separator: ",") + "\n"
+            precise.map { $0 ? "1" : "0" } ?? ""].joined(separator: ",") + "\n"
         if eventBuffer.utf8.count >= 64_000 { try flush() }
     }
     // Add mouse-summary CSV rows to the pending write buffer.
-    func append(_ summaries: [MouseSummary]) { mouseBuffer += summaries.map(\.csv).joined() }
+    func append(_ summaries: [MouseSummary]) {
+        mouseBuffer += summaries.map(\.csv).joined()
+        for row in summaries {
+            coverage.append(start: row.start, end: row.end, phase: InterventionPhase(legacyPhase: row.activityPhase))
+        }
+        if !summaries.isEmpty { coverageDirty = true }
+    }
+    private func saveCoverage() throws {
+        if coverageDirty { try coverage.save(to: folder); coverageDirty = false }
+    }
     // Write and synchronize a break transition so it survives a later interruption.
     func logBreak(_ entry: BreakLogEntry) throws {
         if let record = entry.record {
@@ -245,6 +255,7 @@ final class RecordingWriter {
     func checkpoint(at time: Double) throws {
         try flush()
         try events.synchronize(); try mouse.synchronize()
+        try saveCoverage()
         var snapshot = contract
         try snapshot.observe(through: time)
         try snapshot.save(to: folder)
@@ -258,6 +269,7 @@ final class RecordingWriter {
         try breaks.synchronize()
         try surveys.synchronize()
         try surveyPrompts.synchronize()
+        try saveCoverage()
         var finalContract = contract
         try finalContract.finish(at: duration)
         try finalContract.save(to: folder)
@@ -293,7 +305,8 @@ final class RecordingWriter {
             "context_file": "context_intervals.json",
             "elapsed_origin_seconds": contract.elapsedOrigin,
             "elapsed_basis": "logical recording monotonic elapsed; segment duration subtracts elapsed_origin_seconds",
-            "legacy_phase_semantics": "activity_phase=work means normal intervention phase, not a user-declared work label",
+            "coverage_file": ObservedCoverage.filename,
+            "measurement_precision": "Movement bounds: nearest whole second; movement idle: at most two decimals; ties away from zero. Exact observed coverage is stored separately for app calculations. Input/movement phase and since-break columns are omitted.",
             "tags": tags, "tag_colors": tagColors,
             "conditions": try JSONSerialization.jsonObject(with: JSONEncoder().encode(conditions)),
             "survey_options": surveyOptions.metadata,
@@ -305,7 +318,7 @@ final class RecordingWriter {
             "fatigue_scale": "0 = Not tired; 10 = Extremely tired",
             "productivity_question": SurveyEntry.productivityQuestion,
             "productivity_scale": "0 = Not productive; 10 = Extremely productive",
-            "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks and during_work timed check-ins. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Open check-in sheets and break setup are marked check_in; exclude them from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores must not be relabelled as productivity.",
+            "survey_logging": "Optional custom ratings, not NASA-TLX or objective productivity. Fatigue before session; fatigue and self-reported productivity before breaks and during_work timed check-ins. Only labels and scale endpoints are displayed, with no explicit recall window. Negative shown_elapsed_seconds means before recording. Open check-in sheets and break setup have check_in coverage intervals; exclude them from work predictors. Skipped/cancelled ratings are blank, not zero. Version 1 workload scores must not be relabelled as productivity.",
             "started_at_utc": ISO8601DateFormatter().string(from: startedAt), "status": reason,
             "timestamp_basis": "continuous monotonic main-queue processing time within logical recording; subtract elapsed_origin_seconds for segment-relative time; passive input callbacks are queued without disk I/O; capture gaps are not filled",
             "capture_method": "passive CGEventTap with Input Monitoring permission; NSWorkspace activation events; no event modification",
