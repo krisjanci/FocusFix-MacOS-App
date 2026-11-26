@@ -43,7 +43,7 @@ import Foundation
         // Raw tail is preserved, but cannot be credited as durable activity.
         let eventsURL = writer.folder.appendingPathComponent("events.csv")
         let handle = try FileHandle(forWritingTo: eventsURL); try handle.seekToEnd()
-        try handle.write(contentsOf: Data("5.000000,key_down,0,,,,,work,5.000000\n".utf8)); try handle.close()
+        try handle.write(contentsOf: Data("5.000000,key_down,0,,,,\n".utf8)); try handle.close()
         let originalEvents = try Data(contentsOf: eventsURL)
         try Data("UTF-8 notes, 第二行\n".utf8).write(to: writer.folder.appendingPathComponent("notes.txt"))
         let originalFirst = try snapshot(writer.folder)
@@ -60,6 +60,7 @@ import Foundation
         let oldSurvey = SurveyEntry.header.replacingOccurrences(of: "productivity_0_10", with: "workload_0_10") +
             "legacy,check-old,old-protocol,during_work,answered,,2026-11-26T00:00:00Z,2026-11-26T00:00:00Z,0.000000,0.000000,0,7\n"
         try oldSurvey.write(to: legacyFolder.appendingPathComponent("surveys.csv"), atomically: true, encoding: .utf8)
+        try Data("start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n0.49,0.4999,1.123456,1,0,work,0.4999\n0.5,0.51,2,2,0.005,check_in,0.51\n".utf8).write(to: legacyFolder.appendingPathComponent("mouse_movement.csv"))
         let originalLegacy = try snapshot(legacyFolder)
         let legacy = try SavedSession(folder: legacyFolder)
         let result = try SessionFiles.exportSelected([legacy, saved], to: destination, root: root, active: nil, timeZone: utc)
@@ -67,7 +68,7 @@ import Foundation
         try expect(rootFiles == ["2026-11-25", "2026-11-26", "metadata.json", "sessions.csv"])
         let exported = try ExportReader(result.folder)
         try exported.verify(["first": originalFirst, "legacy": originalLegacy])
-        try expect(exported.metadata["export_schema"] as? String == "focusfix.daily_tables.v2")
+        try expect(exported.metadata["export_schema"] as? String == "focusfix.daily_tables.v3")
         try expect(exported.metadata["time_zone"] as? String == "GMT")
         let inputRows = try exported.category("inputs.csv")
         try expect(inputRows.count == 6 && inputRows.filter { $0["elapsed_s"] == "0.25" }.count == 2)
@@ -77,10 +78,12 @@ import Foundation
         let lookup = exported.sessions.first { $0["session_id"] == "first" }!
         try expect(lookup["observed_through_s"] == "4" && lookup["elapsed_origin_s"] == "0")
         let movement = try exported.category("movement.csv")
-        try expect(movement.count == 1 && movement[0]["start_s"] == "0" && movement[0]["end_s"] == "4")
+        try expect(movement.count == 3 && movement[0]["start_s"] == "0" && movement[0]["end_s"] == "4")
         try expect(movement[0]["distance_points"] == "123.125" && movement[0]["since_movement_s"] == "")
-        try expect(movement[0]["phase"] == "work") // Phase remains independent from intent.
-        try expect(!fm.fileExists(atPath: result.folder.appendingPathComponent("2026-11-26/movement.csv").path))
+        try expect(movement[0]["phase"] == nil && movement[0]["since_break_s"] == nil)
+        try expect(movement[1]["start_s"] == "0" && movement[1]["end_s"] == "0" && movement[1]["since_movement_s"] == "0")
+        try expect(movement[2]["start_s"] == "1" && movement[2]["end_s"] == "1" && movement[2]["since_movement_s"] == "0.01")
+        try expect(inputRows.allSatisfy { $0["phase"] == nil && $0["since_break_s"] == nil })
         let cross = exported.metadata["cross_day"] as! [[String: Any]]
         try expect(cross.contains { ($0["days"] as? [String])?.contains("2026-11-26") == true })
         try expect(!(try exported.category("changes.csv")).contains { $0["kind"] == "interval_continuation" })
@@ -110,6 +113,12 @@ import Foundation
         try expect(DailyTimeline.cell("one\r\ntwo") == "\"one\r\ntwo\"")
         try expect(DailyTimeline.compactNumber("0.1234567890123456789000") == "0.1234567890123456789")
         try expect(DailyTimeline.compactNumber("-0.000000") == "-0" && DailyTimeline.compactNumber("1e-30") == "1e-30")
+        for (value, places, expected) in [("8.995604", 0, "9"), ("0.499999999999999999", 0, "0"),
+            ("0.5", 0, "1"), ("-0.5", 0, "-1"), ("0.004999999", 2, "0"), ("0.005", 2, "0.01"),
+            ("-0.005", 2, "-0.01"), ("0.000001", 2, "0"), ("1.2e-7", 2, "0"), ("5e-3", 2, "0.01"),
+            ("9.999", 2, "10"), ("", 2, ""), ("1.20", 2, "1.2")] {
+            try expect(DailyTimeline.roundedNumber(value, places: places) == expected)
+        }
         // DST clock reversal does not reverse event order or split the local day.
         let dstStart = ISO8601DateFormatter().date(from: "2026-11-01T05:59:59Z")!
         let dst = try RecordingWriter(root: root, id: "dst", startedAt: dstStart)
@@ -189,7 +198,7 @@ import Foundation
         try Data("elapsed_seconds,event_type\n1,\"unterminated".utf8).write(to: legacyFolder.appendingPathComponent("events.csv"))
         fails { _ = try SessionFiles.exportSelected([saved, legacy], to: destination, root: root, active: nil) }
         try expect(try fm.contentsOfDirectory(atPath: destination.path).sorted() == beforeFailure)
-        print("PASS: every CSV/JSON field reconstructs exactly in value, daily merging, precision, short references, no empty files, stable ordering, DST and failure cleanup")
+        print("PASS: retained CSV/JSON fields reconstruct, approved reductions, daily merging, precision, short references, no empty files, stable ordering, DST and failure cleanup")
     }
     static func snapshot(_ folder: URL) throws -> [String: Data] {
         var result: [String: Data] = [:]
@@ -274,12 +283,13 @@ import Foundation
                 defer { try? FileManager.default.removeItem(at: temporary) }
                 let reader = try TimelineRecords(temporary)
                 let expected = try TimelineRecords.cells(reader.next(csv: true)!)
-                try expect(expected == header)
+                let omitted: Set<String> = ["inputs.csv", "movement.csv"].contains(table) ? ["activity_phase", "seconds_since_last_break"] : []
+                try expect(expected.filter { !omitted.contains($0) } == header)
                 var parsed = [expected]
                 while let line = try reader.next(csv: true) { if !line.isEmpty { parsed.append(try TimelineRecords.cells(line)) } }
                 try expect(rows.count == parsed.count - 1 && rows.count == source["records"] as! Int)
                 for (index, row) in rows.enumerated() {
-                    for (column, field) in header.enumerated() {
+                    for (column, field) in expected.enumerated() where !omitted.contains(field) {
                         let value: String
                         if let constant = constants[field] {
                             value = constant["session_column"].map { key in sessions.first { $0["session"] == session }![key]! } ?? lookup(constant["reference"]!, constant["lookup"]!)
@@ -290,7 +300,9 @@ import Foundation
                         }
                         let sourceValue = parsed[index + 1][column]
                         let numeric = Set(metadata["numeric_csv_fields"] as! [String]).contains(field)
-                        try expect(value == (numeric ? DailyTimeline.compactNumber(sourceValue) : sourceValue))
+                        let roundedPlaces: Int? = table == "movement.csv" ? (["start_seconds", "end_seconds"].contains(field) ? 0 : (field == "seconds_since_last_movement" ? 2 : nil)) : nil
+                        let expectedValue = roundedPlaces.map { DailyTimeline.roundedNumber(sourceValue, places: $0) } ?? (numeric ? DailyTimeline.compactNumber(sourceValue) : sourceValue)
+                        try expect(value == expectedValue)
                     }
                 }
                 accounted[session, default: []].insert(name)
