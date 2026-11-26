@@ -383,7 +383,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             tracker.reconcileProgress()
-            Task { await SocialController.shared.refresh() }
+            Task { await SocialController.shared.automaticRefresh() }
             tracker.refreshNotificationPermission()
             tracker.refreshInputPermission()
         }
