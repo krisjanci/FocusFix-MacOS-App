@@ -50,6 +50,8 @@ run_test RecordingContractTests
 run_test SocialProgressTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift"
 run_test SocialControllerTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
     "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
+run_test SocialSyncScalingTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
+    "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
 run_test RecordingEfficiencyTests "$source_dir/DailyProgress.swift" "$source_dir/SocialProgress.swift" \
     "$source_dir/SocialController.swift" "$source_dir/GroupPresentation.swift" "$source_dir/UserProfile.swift" "$source_dir/AccountAPI.swift" "$source_dir/AccountController.swift"
 run_test GroupPresentationTests "$source_dir/GroupPresentation.swift" "$source_dir/SocialProgress.swift" "$source_dir/DailyProgress.swift"
