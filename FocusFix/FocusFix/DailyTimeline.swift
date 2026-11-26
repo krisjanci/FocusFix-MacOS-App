@@ -260,7 +260,7 @@ nonisolated enum DailyTimeline {
                 let through = saved.recordingContract?.observedThrough ?? saved.duration ?? origin
                 let names = try SessionStorage.names(in: readable)
                 if names.contains(WorkAssignmentJournal.filename) { _ = try WorkAssignmentJournal.load(from: readable) }
-                var sessionRow = ["session": reference, "anchor_unix_s": String(saved.startedAt.timeIntervalSince1970)]
+                var sessionRow = ["session": reference, "anchor_unix_s": compactNumber(String(saved.startedAt.timeIntervalSince1970))]
                 func emit(table: String, source: Int, index: Int, values: [String: String], at elapsed: Double,
                           span: (Double, Double)? = nil) throws {
                     let date = saved.startedAt.addingTimeInterval(elapsed - origin)
@@ -318,7 +318,7 @@ nonisolated enum DailyTimeline {
                 }
                 if sessionRow["session_id"] == nil { sessionRow["session_id"] = input.id }
                 if sessionRow["session_id"] != input.id { folderNames[reference] = input.id }
-                if sessionRow["elapsed_origin_s"] == nil { sessionRow["elapsed_origin_s"] = String(origin) }
+                if sessionRow["elapsed_origin_s"] == nil { sessionRow["elapsed_origin_s"] = compactNumber(String(origin)) }
                 sessionRows.append(sessionRow)
                 // CSV fields retain their own narrow schema. Only constant session/protocol fields move out.
                 for name in sourceNames where names.contains(name) {
@@ -387,7 +387,7 @@ nonisolated enum DailyTimeline {
                     let detail = records.count + 1
                     records.append(["remaining_json": node.encoded(), "moves": moves])
                     row["detail"] = String(detail)
-                    let finish = end.flatMap { original.at($0)?.scalar?.text }.flatMap(Double.init)
+                    let finish = end.flatMap { original.at($0)?.scalar?.text }.flatMap(Double.init) ?? (end == nil ? nil : through)
                     try emit(table: "changes.csv", source: -1, index: detail, values: row, at: elapsed, span: finish.map { (elapsed, $0) })
                     return detail
                 }
