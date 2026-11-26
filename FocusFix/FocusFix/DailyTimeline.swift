@@ -187,7 +187,7 @@ nonisolated enum DailyTimeline {
         var unsigned = negative ? String(value.dropFirst()) : value
         if let separator = unsigned.firstIndex(where: { $0 == "e" || $0 == "E" }) {
             let mantissa = String(unsigned[..<separator])
-            guard let exponent = Int(unsigned[unsigned.index(after: separator)...]), abs(exponent) <= 400,
+            guard let exponent = Int(unsigned[unsigned.index(after: separator)...]), (-400...400).contains(exponent),
                   mantissa.range(of: #"^[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil else { return value }
             let digits = mantissa.replacingOccurrences(of: ".", with: "")
             let wholeCount = mantissa.firstIndex(of: ".").map { mantissa.distance(from: mantissa.startIndex, to: $0) } ?? mantissa.count
