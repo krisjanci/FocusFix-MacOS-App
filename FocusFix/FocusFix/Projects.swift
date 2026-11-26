@@ -12,6 +12,7 @@ nonisolated struct CompletedTaskWork: Codable, Equatable {
 nonisolated struct ProjectTask: Codable, Identifiable, Equatable {
     var id = UUID()
     var title: String
+    var createdAt: Date?
     var completedAt: Date?
     var completedWork: CompletedTaskWork?
     var description: String?
@@ -159,7 +160,7 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
     }
     @discardableResult func addTask(_ title: String, project: UUID) throws -> UUID {
         let id = UUID()
-        try edit(project) { $0.tasks.append(ProjectTask(id: id, title: try Self.title(title, limit: 200))) }
+        try edit(project) { $0.tasks.append(ProjectTask(id: id, title: try Self.title(title, limit: 200), createdAt: Date())) }
         return id
     }
     func renameTask(_ id: UUID, project: UUID, title: String) throws {
