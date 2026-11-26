@@ -23,7 +23,7 @@ enum QuickTourPhase: String, CaseIterable {
     }
     var caption: String {
         switch self {
-        case .start: return "Try Start work or the Work target chip."
+        case .start: return "Click Start work to begin."
         case .plan: return "Choose Add work target to plan."
         case .duration: return "Choose 30, 60, or 90 minutes."
         case .confirmStart: return "Click Start when ready."
