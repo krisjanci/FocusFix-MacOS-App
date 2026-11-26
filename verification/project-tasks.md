@@ -84,5 +84,5 @@ The preview recorder is intentionally synthetic. Real input permissions, account
 
 ## Subtle header depth — 2026-11-25
 
-- Selected project headings now have a full-width, slightly deeper shade of the existing project tint above the task list. Task popup headings group the task title and project name on the same deeper header surface. A small neutral shade preserves each project's hue, with 3.5% shading in light mode and 8% in dark mode.
+- Selected project headings now have a full-width, slightly deeper shade of the existing project tint above the task list. Task popup headings group the task title and project name on the same deeper header surface. A small neutral shade preserves each project's hue, with 5.5% shading in light mode and 12% in dark mode after the spacing refinement. Both title areas include 24 points of bottom padding for even separation from the content below.
 - Native preview screenshots verified both header surfaces in light and dark appearances. The native app and isolated preview builds passed; no behavioral or storage changes were made. Each changed file was committed separately.
