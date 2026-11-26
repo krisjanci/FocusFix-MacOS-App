@@ -553,6 +553,13 @@ private struct ProjectTaskDetails: View {
 
     private var project: WorkProject? { store.projects.first { $0.id == projectID } }
     private var task: ProjectTask? { project?.tasks.first { $0.id == taskID } }
+    private func headerDate(_ date: Date?) -> String {
+        guard let date else { return "" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M/d/yyyy"
+        return formatter.string(from: date)
+    }
     private var worked: String {
         if let completed = task?.completedWork {
             return completed.seconds.map(ProjectWorkTotals.duration) ?? "Saving…"
@@ -587,6 +594,9 @@ private struct ProjectTaskDetails: View {
             }.font(.title3.weight(.semibold))
             if let titleError { Text(titleError).font(.caption).foregroundStyle(.red) }
             Text(project?.name ?? "").font(.subheadline).foregroundStyle(.secondary)
+            Text("Created: \(headerDate(task?.createdAt))   Completed: \(headerDate(task?.completedAt))")
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 24)
@@ -610,6 +620,18 @@ private struct ProjectTaskDetails: View {
                 Slider(value: $estimate, in: 0.5...3, step: 0.5) { Text("Predicted Focus Sessions") }
                     onEditingChanged: { editing in editingEstimate = editing; if !editing { save() } }
                     .labelsHidden().accessibilityValue("\(estimate.formatted()) Focus Sessions")
+                    .tint(estimate <= 1.5 ? .green : .red)
+                    .background {
+                        GeometryReader { geometry in
+                            HStack(spacing: 0) {
+                                Color.green.opacity(0.16).frame(width: geometry.size.width * 0.4)
+                                Color.red.opacity(0.13)
+                            }
+                            .clipShape(Capsule())
+                        }
+                        .frame(height: 14).padding(.horizontal, 8)
+                        .allowsHitTesting(false)
+                    }
                 HStack { Text("0.5 FS"); Spacer(); Text("3 FS") }.font(.caption).foregroundStyle(.secondary)
                 Text("1 Focus Session = 1 hour of focused work").font(.caption).foregroundStyle(.secondary)
             }
