@@ -68,7 +68,8 @@ struct GroupsView: View {
                 .font(.callout).padding(20).frame(width: 320).fixedSize(horizontal: false, vertical: true)
         }
         .onChange(of: social.userID) { _, _ in showingChat = false }
-        .task { social.start(); await social.refresh() }
+        .background(GroupSyncVisibility().frame(width: 0, height: 0))
+        .task { social.start() }
     }
     private var accessCard: some View {
         GroupAccessCard(state: social.accessState, pending: social.pendingConfirmation, notice: social.notice,
