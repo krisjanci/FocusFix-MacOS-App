@@ -55,7 +55,14 @@ try {
     const changed = await rpc({ ...base, progressRevision: hiddenWrite.state.progressRevision });
     assert.equal(changed.state.groupsIncluded, true);
     assert(changed.state.groups.every(g => g.members.every(m => m.photo === undefined)), 'Known photos retransmitted');
-    results.scenarios.push({ members, historyDays: days, thumbnailBytes: 4096, legacy: size(legacy), compactCold: size(cold), compactUnchanged: size(warm), compactHiddenWork: size(hiddenWrite), compactChangedScores: size(changed) });
+    const fourHour = await rpc({ ...base, progressRevision: changed.state.progressRevision,
+      segments: [{ ownerID: users[0], segmentID: randomUUID(), contractVersion: 2, revision: 1,
+        startedAt: now - 14400, observedThrough: now, intervals: [{ start: now - 14400, end: now }] }],
+      events: [1, 2].map(i => ({ id: randomUUID(), kind: 'break', seconds: 60, at: now - i * 3600 })) });
+    const profileCold = (await db.query('select public.account_profile_state()::text state')).rows[0].state;
+    const profileWarm = (await db.query('select public.account_profile_state($1)::text state', [JSON.parse(profileCold).version])).rows[0].state;
+    assert(!profileWarm.includes('profile'), 'Unchanged private photo retransmitted');
+    results.scenarios.push({ members, historyDays: days, thumbnailBytes: 4096, legacy: size(legacy), compactCold: size(cold), compactUnchanged: size(warm), compactHiddenWork: size(hiddenWrite), compactChangedScores: size(changed), fourHourVisibleWork: size(fourHour), privateProfileColdBytes: Buffer.byteLength(profileCold), privateProfileWarmBytes: Buffer.byteLength(profileWarm) });
     await db.exec('rollback');
   }
   if (process.argv.includes('--storage')) {
