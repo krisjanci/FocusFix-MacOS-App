@@ -99,3 +99,29 @@ begin
 end;
 $$;
 rollback;
+
+-- Conditional own-profile reads never expose another account's private image.
+begin;
+do $$
+declare a uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); initial jsonb; answer jsonb;
+begin
+ insert into auth.users(id) values(a),(b);
+ insert into public.account_profiles(user_id,profile) values(a,'{"name":"A","symbol":"leaf.fill","color":"teal","photo":"PRIVATE_A"}'),
+ (b,'{"name":"B","symbol":"leaf.fill","color":"teal","photo":"PRIVATE_B"}');
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ initial:=public.account_profile_state();
+ if initial->>'unchanged'<>'false' or initial->'profile'->>'photo'<>'PRIVATE_A' then raise exception 'Initial private profile failed'; end if;
+ answer:=public.account_profile_state(initial->>'version');
+ if answer->>'unchanged'<>'true' or answer ? 'profile' then raise exception 'Unchanged profile retransmitted'; end if;
+ update public.account_profiles set profile=profile-'photo' where user_id=a;
+ answer:=public.account_profile_state(initial->>'version');
+ if answer->>'unchanged'<>'false' or answer->'profile' ? 'photo' then raise exception 'Private photo revocation failed'; end if;
+ perform set_config('request.jwt.claim.sub',b::text,true);
+ answer:=public.account_profile_state(initial->>'version');
+ if answer::text like '%PRIVATE_A%' or answer->'profile'->>'photo'<>'PRIVATE_B' then raise exception 'Private profile isolation failed'; end if;
+ delete from public.account_profiles where user_id=b;
+ answer:=public.account_profile_state();
+ if answer->'profile'<>'null'::jsonb or answer->>'unchanged'<>'false' then raise exception 'Removed profile not cleared'; end if;
+ if has_function_privilege('anon','public.account_profile_state(text)','execute') then raise exception 'Anonymous private profile access'; end if;
+end $$;
+rollback;
