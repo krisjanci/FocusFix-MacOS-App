@@ -40,9 +40,13 @@ nonisolated struct ContextRevision: Codable, Hashable {
 }
 
 nonisolated struct RecordingContract: Codable, Hashable {
-    static let schemaVersion = 11
-    static let format = "focusfix.recording.v11"
-    static let requiredCapabilities = ["context_intervals_v1", "independent_intervention_phase", "monotonic_elapsed_v1"]
+    static let schemaVersion = 12
+    static let format = "focusfix.recording.v12"
+    static let requiredCapabilities = ["context_intervals_v1", "independent_intervention_phase", "monotonic_elapsed_v1", "observed_coverage_v1", "reduced_movement_precision_v1"]
+    static func supported(format: String) -> Bool { ["focusfix.recording.v11", Self.format].contains(format) }
+    static func capabilities(for version: Int) -> [String] {
+        version == 11 ? ["context_intervals_v1", "independent_intervention_phase", "monotonic_elapsed_v1"] : requiredCapabilities
+    }
     let format: String
     let recordingID: UUID
     let segmentID: UUID
@@ -91,7 +95,7 @@ nonisolated struct RecordingContract: Codable, Hashable {
     enum Invalid: Error { case contract, bounds, overlap, revision, finalized }
 
     func validate() throws {
-        guard TimeZone(identifier: scoringTimeZone) != nil, format == Self.format, observedThrough.isFinite, elapsedOrigin.isFinite, elapsedOrigin >= 0, observedThrough >= elapsedOrigin else { throw Invalid.contract }
+        guard TimeZone(identifier: scoringTimeZone) != nil, Self.supported(format: format), observedThrough.isFinite, elapsedOrigin.isFinite, elapsedOrigin >= 0, observedThrough >= elapsedOrigin else { throw Invalid.contract }
         var previousEnd = elapsedOrigin
         var ids = Set<UUID>()
         for (index, item) in intervals.enumerated() {
