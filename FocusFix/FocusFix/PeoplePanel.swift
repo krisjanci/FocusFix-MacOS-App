@@ -25,10 +25,11 @@ struct GroupAccessCard: View {
                 Text("Progress sync enabled").font(.caption)
             case .enabled:
                 Label("Progress sync enabled", systemImage: "checkmark.circle.fill").font(.caption.weight(.medium))
+                Text("Shared progress updates every 4 hours. Refresh groups to update now.").font(.caption)
                 if pending { Text("Recent progress is waiting to sync.").font(.caption) }
             case .offline:
                 Label("Progress sync enabled · Retry needed", systemImage: "arrow.triangle.2.circlepath").font(.callout.weight(.medium))
-                Text("Your pending progress is kept on this Mac. Showing the latest groups available this launch.")
+                Text("Your pending progress is kept on this Mac. Showing your most recently saved groups.")
                 Button("Retry sync", action: retry).buttonPressFeedback()
             case .unavailable:
                 Label("Group progress unavailable", systemImage: "exclamationmark.circle").font(.headline)
