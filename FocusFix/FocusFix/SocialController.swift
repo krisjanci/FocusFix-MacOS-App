@@ -15,10 +15,24 @@ final class SocialController: ObservableObject {
     @Published private(set) var selection = GroupSelection()
     @Published private(set) var hasLoadedGroups = false
     @Published private(set) var syncFailed = false
+    static let automaticRefreshInterval: TimeInterval = 4 * 60 * 60
+    private struct DisplayCache: Codable {
+        let identity: String
+        let nextRefresh: Date
+        let groups: [SocialGroup]
+        let invitations: [GroupInvitation]
+        let groupVersion: String?
+        let loaded: Bool
+        let inboxLoaded: Bool?
+    }
+    private let now: () -> Date
+    private var hasLoadedInvitations = false
+    private var nextScheduledRefresh = Date.distantPast
     private let selectionDefaults: UserDefaults?
     private let account: AccountController
     private let storageDirectory: URL?
-    init(account: AccountController, storageDirectory: URL? = nil, selectionDefaults: UserDefaults? = .standard) {
+    init(account: AccountController, storageDirectory: URL? = nil, selectionDefaults: UserDefaults? = .standard, now: @escaping () -> Date = Date.init) {
+        self.now = now
         self.account = account; self.storageDirectory = storageDirectory; self.selectionDefaults = selectionDefaults
         // The incoming session is used synchronously: old members disappear before a new account renders.
         account.$session.sink { [weak self] incoming in
@@ -50,7 +64,7 @@ final class SocialController: ObservableObject {
     func setGroupViewVisible(_ id: UUID, visible: Bool) {
         if visible {
             guard groupReaders.insert(id).inserted else { return }
-            if !hasLoadedGroups || Date().timeIntervalSince(lastGroupRead) >= 2 {
+            if !hasLoadedGroups || now() >= nextScheduledRefresh {
                 needsGroupRead = true
                 Task { await automaticRefresh() }
             }
@@ -58,19 +72,44 @@ final class SocialController: ObservableObject {
     }
 
     @discardableResult
-    func automaticRefresh(at date: Date = Date()) async -> Bool {
+    func automaticRefresh(at date: Date? = nil) async -> Bool {
+        let date = date ?? now()
         alignAccount()
+        await account.refreshProfileIfDue()
         guard !busy, date >= nextAutomaticSyncAt, account.session != nil else { return false }
+        // A local timer checks the deadline; it does not poll the server every tick.
+        // Initial panel loading is a read, never an early flush of queued recordings.
+        if !groupReaders.isEmpty && (ledger == nil ? !hasLoadedInvitations : !hasLoadedGroups) && date < nextScheduledRefresh {
+            return await refresh(sendProgress: false, advanceSchedule: false)
+        }
+        guard date >= nextScheduledRefresh else { return false }
         let pending = ledger?.pending.isEmpty == false || ledger?.declaredWorkPending?.isEmpty == false
         guard !groupReaders.isEmpty || pending else { return false }
-        return await refresh(includeGroups: !groupReaders.isEmpty)
+        // Drain the revisions present when this cycle began, including long offline queues.
+        // New in-flight revisions remain queued for the next cycle instead of extending this one forever.
+        let token = generation
+        let work = ledger?.declaredWorkPending ?? [:]
+        let events = Set(ledger?.pending.map(\.id) ?? [])
+        var previousCount = Int.max
+        repeat {
+            let remainingWork = Set((ledger?.declaredWorkPending ?? [:]).filter { work[$0.key] == $0.value && $0.value.ready }.keys)
+            let remainingEvents = Set(ledger?.pending.map(\.id) ?? []).intersection(events)
+            let count = remainingWork.count + remainingEvents.count
+            if count >= previousCount { return false } // A server that did not acknowledge must not spin.
+            previousCount = count
+            guard await refresh(includeGroups: !groupReaders.isEmpty, advanceSchedule: false,
+                allowedWork: remainingWork, allowedEvents: remainingEvents), generation == token, !syncFailed else { return false }
+            let outstanding = (ledger?.declaredWorkPending ?? [:]).contains { work[$0.key] == $0.value && $0.value.ready }
+                || (ledger?.pending.contains { events.contains($0.id) } ?? false)
+            if !outstanding { scheduleNextRefresh(); return true }
+        } while true
     }
 
     private func failed(_ error: Error) {
         failures = min(failures + 1, 8)
         let exponential = min(3600, 30 * pow(2, Double(failures - 1)))
         let delay = max(min(3600, exponential * Double.random(in: 0.8...1.2)), (error as? AccountFailure)?.retryAfter ?? 0)
-        nextAutomaticSyncAt = Date().addingTimeInterval(delay)
+        nextAutomaticSyncAt = now().addingTimeInterval(delay)
     }
 
     private func succeeded() {
@@ -117,13 +156,13 @@ final class SocialController: ObservableObject {
         generation = UUID(); identitySince = Date(); identity = nil; file = nil
         ledger = nil; persistedLedger = nil; declaredWorkSyncVersion = 0; groups = []; invitations = []; selection = GroupSelection(); notice = nil; invitationNotice = nil
         busy = false; inFlight = []; pendingConfirmation = false; hasLoadedGroups = false; syncFailed = false
-        repairedWorkOutbox = false
+        repairedWorkOutbox = false; hasLoadedInvitations = false
         groupVersion = nil; photos = [:]; lastGroupRead = .distantPast
         needsGroupRead = !groupReaders.isEmpty
-        succeeded()
+        succeeded(); nextScheduledRefresh = .distantPast
     }
     func retry() async {
-        repairedWorkOutbox = false
+        repairedWorkOutbox = false; hasLoadedInvitations = false
         groupVersion = nil // Manual retry repairs an evicted/incomplete group cache.
         if !enabled { identity = nil; alignAccount() }
         await refresh()
@@ -136,6 +175,8 @@ final class SocialController: ObservableObject {
             let name = Data(key.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
             let url = root.appendingPathComponent("FocusFix/Social/\(name).json")
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            let display = url.appendingPathExtension("display")
+            if FileManager.default.fileExists(atPath: display.path) { try FileManager.default.removeItem(at: display) }
             let journal = workJournal(for: url)
             if FileManager.default.fileExists(atPath: journal.path) { try FileManager.default.removeItem(at: journal) }
             selectionDefaults?.removeObject(forKey: selectionKey(key))
@@ -155,6 +196,7 @@ final class SocialController: ObservableObject {
             let root = try storageDirectory ?? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let name = Data(key.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
             file = root.appendingPathComponent("FocusFix/Social/\(name).json")
+            loadDisplayCache(key: key)
             if let file, FileManager.default.fileExists(atPath: file.path) {
                 ledger = try JSONDecoder().decode(SocialLedger.self, from: Data(contentsOf: file))
                 persistedLedger = ledger
@@ -162,6 +204,44 @@ final class SocialController: ObservableObject {
                 pendingConfirmation = true
             }
         } catch { ledger = nil; notice = "Group progress could not be opened. Your existing file has been kept." }
+    }
+
+    // Separate from the durable outbox: a damaged display cache cannot erase unsent work.
+    private func loadDisplayCache(key: String) {
+        nextScheduledRefresh = now().addingTimeInterval(Self.automaticRefreshInterval)
+        guard let url = file?.appendingPathExtension("display"),
+              let info = try? url.resourceValues(forKeys: [.fileSizeKey, .isSymbolicLinkKey]),
+              info.isSymbolicLink != true, (info.fileSize ?? Int.max) <= 64 * 1024 * 1024,
+              let data = try? Data(contentsOf: url),
+              let cache = try? JSONDecoder().decode(DisplayCache.self, from: data), cache.identity == key,
+              cache.nextRefresh.timeIntervalSince1970.isFinite,
+              cache.nextRefresh <= now().addingTimeInterval(Self.automaticRefreshInterval),
+              cache.groups.count <= 20,
+              cache.groups.allSatisfy({ $0.members.count <= 50 && $0.members.allSatisfy { ($0.photo?.count ?? 0) <= 32768 } }) else {
+            persistDisplayCache(); return
+        }
+        nextScheduledRefresh = cache.nextRefresh
+        groups = cache.groups; invitations = cache.invitations; groupVersion = cache.groupVersion
+        hasLoadedGroups = cache.loaded; hasLoadedInvitations = cache.inboxLoaded == true
+        for group in groups { for member in group.members {
+            if let version = member.photoVersion, let data = member.photo { photos[member.id] = (version, data) }
+        } }
+        selection.reconcile(groups: groups)
+    }
+    private func persistDisplayCache() {
+        guard let identity, let url = file?.appendingPathExtension("display") else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+            let cache = DisplayCache(identity: identity, nextRefresh: nextScheduledRefresh, groups: groups,
+                invitations: invitations, groupVersion: groupVersion, loaded: hasLoadedGroups, inboxLoaded: hasLoadedInvitations)
+            try JSONEncoder().encode(cache).write(to: url, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } catch { notice = "The cloud refresh schedule could not be saved. Your work remains in its local queue." }
+    }
+    private func scheduleNextRefresh() {
+        nextScheduledRefresh = now().addingTimeInterval(Self.automaticRefreshInterval)
+        persistDisplayCache()
     }
 
     func enable() async {
@@ -276,12 +356,12 @@ final class SocialController: ObservableObject {
     }
 
     @discardableResult
-    func refresh(action: String = "sync", fields: [String: String] = [:], includeGroups: Bool = true) async -> Bool {
+    func refresh(action: String = "sync", fields: [String: String] = [:], includeGroups: Bool = true, sendProgress: Bool = true, advanceSchedule: Bool = true, allowedWork: Set<String>? = nil, allowedEvents: Set<UUID>? = nil) async -> Bool {
         alignAccount()
         if ledger == nil { return await refreshInvitations() }
         guard !busy, let current = ledger, let api = account.api else { return false }
         let token = generation; busy = true
-        let batch = Array(current.pending.prefix(200)); inFlight = Set(batch.map(\.id))
+        let batch = sendProgress ? Array(current.pending.filter { allowedEvents?.contains($0.id) ?? true }.prefix(200)) : []; inFlight = Set(batch.map(\.id))
         ledger?.submitted.formUnion(inFlight)
         persist() // A lost response must never allow a submitted summary to be edited on retry.
         if includeGroups { needsGroupRead = false }
@@ -297,7 +377,7 @@ final class SocialController: ObservableObject {
             guard generation == token else { return false }
             await repairWorkOutbox(token: token)
             guard generation == token else { return false }
-            let segments = Array((ledger?.declaredWorkPending ?? [:]).values.filter(\.ready)
+            let segments = Array((sendProgress ? (ledger?.declaredWorkPending ?? [:]) : [:]).values.filter { $0.ready && (allowedWork?.contains($0.segmentID.uuidString) ?? true) }
                 .sorted { $0.segmentID.uuidString < $1.segmentID.uuidString }.prefix(50))
             var payload: [String: Any] = fields
             // Old servers ignore these additive fields and retain the tested legacy path.
@@ -336,12 +416,13 @@ final class SocialController: ObservableObject {
             }
             ledger?.progress.reconcile(at: Date(), calendar: calendar)
             invitations = state.invitations ?? []
+            hasLoadedInvitations = state.invitations != nil
             invitationNotice = state.invitations == nil ? "Invitations are temporarily unavailable. Refresh to retry." : nil
             syncFailed = false; notice = nil
             declaredWorkSyncVersion = state.declaredWorkSyncVersion ?? 0
             persist()
             succeeded()
-            if state.socialSyncVersion != 2 && declaredWorkSyncVersion >= 1 {
+            if sendProgress && state.socialSyncVersion != 2 && declaredWorkSyncVersion >= 1 {
                 do { try await syncDeclaredWork(api: api, session: session, token: token) }
                 catch {
                     guard generation == token else { return false }
@@ -351,6 +432,7 @@ final class SocialController: ObservableObject {
             }
             pendingConfirmation = ledger?.pending.isEmpty == false || ledger?.declaredWorkPending?.isEmpty == false
             persist()
+            if !syncFailed && advanceSchedule { scheduleNextRefresh() } else { persistDisplayCache() }
             return true
         } catch {
             guard generation == token else { return false }
@@ -465,7 +547,8 @@ final class SocialController: ObservableObject {
                 body: body, token: session.access_token)
             guard generation == token, account.session?.user.id == session.user.id else { return false }
             invitations = try JSONDecoder().decode([GroupInvitation].self, from: data)
-            invitationNotice = nil; succeeded()
+            hasLoadedInvitations = true
+            invitationNotice = nil; succeeded(); scheduleNextRefresh()
             return true
         } catch {
             if generation == token {
