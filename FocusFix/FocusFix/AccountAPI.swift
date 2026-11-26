@@ -115,6 +115,11 @@ nonisolated struct DevelopmentServerConsent: Codable, Equatable {
     let policy_version: String
     let withdrawn_at: String?
 }
+nonisolated struct AccountProfileState: Codable {
+    var version: String?
+    var unchanged: Bool
+    var profile: UserProfile?
+}
 nonisolated struct AccountProfileRow: Codable {
     let user_id: UUID
     let profile: UserProfile
@@ -260,6 +265,21 @@ nonisolated struct AccountAPI {
             query: [URLQueryItem(name: "user_id", value: "eq.\(session.user.id.uuidString.lowercased())"),
                     URLQueryItem(name: "select", value: "user_id,profile")])
         return try JSONDecoder().decode([AccountProfileRow].self, from: data).first?.profile.validated()
+    }
+    func profileState(session: AccountSession, version: String?) async throws -> AccountProfileState {
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["p_version": version as Any? ?? NSNull()])
+            let data = try await request(path: "rest/v1/rpc/account_profile_state", body: body, token: session.access_token)
+            var state = try JSONDecoder().decode(AccountProfileState.self, from: data)
+            state.profile = try state.profile?.validated()
+            guard !state.unchanged || (version != nil && state.version == version && state.profile == nil) else {
+                throw AccountFailure(message: "Your profile cache needs a fresh check.")
+            }
+            return state
+        } catch let failure as AccountFailure where failure.statusCode == 404 {
+            // Compatibility until the new migration is deployed; never mask permission or server errors.
+            return AccountProfileState(version: nil, unchanged: false, profile: try await profile(session: session))
+        }
     }
     func saveProfile(_ profile: UserProfile, session: AccountSession) async throws {
         let row = AccountProfileRow(user_id: session.user.id, profile: try profile.validated())
