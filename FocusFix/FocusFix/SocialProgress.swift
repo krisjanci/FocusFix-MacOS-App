@@ -27,6 +27,7 @@ struct SocialMember: Codable, Identifiable {
     var workStreakRank: Int? = nil
     var workStreakFrozen: Bool? = nil
     var photo: Data? = nil
+    var photoVersion: String? = nil
 }
 struct SocialGroup: Codable, Identifiable {
     static let capacity = 50
@@ -34,7 +35,7 @@ struct SocialGroup: Codable, Identifiable {
     let name: String
     let owner: UUID
     let code: String?
-    let members: [SocialMember]
+    var members: [SocialMember]
     var description: String? = nil
 }
 struct GroupInvitation: Codable, Identifiable {
@@ -49,6 +50,13 @@ struct SocialState: Codable {
     let groups: [SocialGroup]
     var invitations: [GroupInvitation]? = nil
     var declaredWorkSyncVersion: Int? = nil
+    var socialSyncVersion: Int? = nil
+    var progressRevision: Int64? = nil
+    var progressIsDelta: Bool? = nil
+    var removedDays: [String]? = nil
+    var groupsIncluded: Bool? = nil
+    var groupVersion: String? = nil
+    var acknowledgedWork: [DeclaredWorkAcknowledgement]? = nil
 }
 
 struct DeclaredWorkInterval: Codable, Equatable {
@@ -88,6 +96,9 @@ struct SocialLedger: Codable {
     var timezone: String
     var activatedAt: Double = Date().timeIntervalSince1970
     var progress = DailyProgress()
+    // Persist together: a cursor is only valid with its authoritative server base.
+    var serverProgress: DailyProgress? = nil
+    var progressRevision: Int64? = nil
     var pending: [SocialEvent] = []
     var submitted: Set<UUID> = []
     // These replacement totals must never be sent to the increment-only legacy RPC.
@@ -137,7 +148,12 @@ struct SocialLedger: Codable {
     mutating func accept(_ state: SocialState, sent: Set<UUID>) {
         pending.removeAll { sent.contains($0.id) }
         submitted.subtract(sent)
-        timezone = state.timezone; progress = state.progress
+        timezone = state.timezone
+        if state.progressIsDelta == true, let base = serverProgress {
+            serverProgress = base.mergingServerDays(state.progress, removed: state.removedDays ?? [])
+        } else { serverProgress = state.progress }
+        progressRevision = state.socialSyncVersion == 2 ? state.progressRevision : nil
+        progress = serverProgress ?? state.progress
         for event in pending { apply(event) }
     }
 }
