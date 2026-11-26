@@ -27,7 +27,7 @@ import Foundation
         // Measured with this same fixture using v1 at source f99fe15, before replacement.
         // UUID contents vary, but their serialized lengths and fixture measurements do not.
         let wideBytes = 7_108_139
-        precondition(DailyTimeline.version == "focusfix.daily_tables.v2")
+        precondition(DailyTimeline.version == "focusfix.daily_tables.v3")
         precondition(bytes < wideBytes / 4, "All narrow CSVs plus both lookup files must beat the wide export by at least 75%")
         precondition(count == 5, "Inputs, movement, changes and the two shared files; no empty break/check-in tables")
         let day = result.folder.appendingPathComponent("2026-11-25")
@@ -36,9 +36,12 @@ import Foundation
             return try TimelineRecords.cells(reader.next(csv: true)!)
         }
         let inputHeader = try header("inputs.csv"), movementHeader = try header("movement.csv"), changeHeader = try header("changes.csv")
-        precondition(inputHeader.count == 10 && movementHeader.count == 8)
+        precondition(inputHeader.count == 8 && movementHeader.count == 6)
         precondition(changeHeader.count == 7 && !changeHeader.contains("recorded_session") && !changeHeader.contains("due_s"),
                      "Empty prompt source headers must not create empty columns in the changes table")
+        let previousNarrowBytes = 312_981 // Same fixture measured before v3, including all lookup/metadata files.
+        precondition(bytes < previousNarrowBytes, "Reduced exports must include coverage metadata and still beat v2")
+        print(String(format: "SIZE previous narrow export: %d -> %d bytes (%.2f%% smaller)", previousNarrowBytes, bytes, 100 * (1 - Double(bytes) / Double(previousNarrowBytes))))
         print(String(format: "SIZE total uncompressed export: %d -> %d bytes (%.2f%% smaller)", wideBytes, bytes, 100 * (1 - Double(bytes) / Double(wideBytes))))
         print("SIZE \(DailyTimeline.version): \(bytes) bytes across \(count) files; \(Date().timeIntervalSince(before)) seconds")
     }
