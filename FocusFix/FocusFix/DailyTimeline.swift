@@ -220,6 +220,7 @@ nonisolated enum DailyTimeline {
         if table == "movement.csv" {
             if ["start_seconds", "end_seconds"].contains(field) { return roundedNumber(value, places: 0) }
             if field == "seconds_since_last_movement" { return roundedNumber(value, places: 2) }
+            if field == "distance_screen_points" { return roundedNumber(value, places: 1) }
         }
         return numericFields.contains(field) ? compactNumber(value) : value
     }
@@ -555,7 +556,7 @@ nonisolated enum DailyTimeline {
             "numeric_csv_fields": numericFields.sorted(), "identity_csv_fields": identityFields,
             "notes": ["Elapsed values stay on each recording's logical clock. Day grouping uses anchor_unix_s + elapsed - elapsed_origin_s in the export timezone.",
                 "Inputs and movement omit phase and since-break values. Context/project/task changes are in changes.csv. Exact observation coverage, when recorded, remains once in document metadata.",
-                "Movement bounds are rounded to whole seconds and idle measurements to at most two decimals, ties away from zero. Historical grouping and cross_day references use original bounds. Other interval bounds remain unchanged; intervals are [start,end).",
+                "Movement bounds are rounded to whole seconds, distances to the nearest 0.1 screen point and idle measurements to at most two decimals, ties away from zero. Historical grouping and cross_day references use original bounds. Other interval bounds remain unchanged; intervals are [start,end).",
                 "Durable bounds are in sessions.csv. Uncheckpointed tails remain present but must not receive work credit. Missing observations are not filled.",
                 "CSV source columns/constants and lookup identities reconstruct retained fields. Omitted input/movement phase and since-break values and discarded movement precision are not retained.",
                 "JSON moves place scalar values in changes.csv or sessions.csv. remaining_json retains all other fields with exact numeric tokens; collections/logs preserve record order.",
