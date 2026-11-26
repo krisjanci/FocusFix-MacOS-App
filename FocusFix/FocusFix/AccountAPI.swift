@@ -121,6 +121,8 @@ nonisolated struct AccountProfileRow: Codable {
 }
 nonisolated struct AccountFailure: LocalizedError {
     let message: String
+    var statusCode: Int? = nil
+    var retryAfter: TimeInterval? = nil
     var errorDescription: String? { message }
 }
 
@@ -128,6 +130,27 @@ nonisolated final class AccountNoRedirects: NSObject, URLSessionTaskDelegate, @u
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+}
+
+// In-memory endpoint totals only: never request/response bodies, tokens, user IDs or URLs.
+// Counts decoded body bytes, not Supabase billing or encrypted wire bytes.
+nonisolated final class AccountNetworkMetrics: @unchecked Sendable {
+    struct Total { var requests = 0; var failures = 0; var responseBytes = 0 }
+    static let shared = AccountNetworkMetrics()
+    private let lock = NSLock()
+    private var totals: [String: Total] = [:]
+    func record(path: String, bytes: Int, failed: Bool) {
+        let parts = path.split(separator: "/")
+        let count = parts.starts(with: ["rest", "v1", "rpc"]) ? 4 : 3
+        let endpoint = parts.prefix(count).joined(separator: "/")
+        lock.lock(); defer { lock.unlock() }
+        var total = totals[endpoint] ?? Total()
+        total.requests += 1; total.failures += failed ? 1 : 0; total.responseBytes += bytes
+        totals[endpoint] = total
+    }
+    func snapshot() -> [String: Total] {
+        lock.lock(); defer { lock.unlock() }; return totals
+    }
 }
 
 nonisolated struct AccountAPI {
@@ -140,13 +163,19 @@ nonisolated struct AccountAPI {
         self.transport = transport
     }
 
-    static func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    // Reuse TLS connections while keeping credentials/cookies and disk caching disabled.
+    private static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 180
         config.httpShouldSetCookies = false
-        let session = URLSession(configuration: config, delegate: AccountNoRedirects(), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+        config.urlCache = nil
+        config.urlCredentialStorage = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config, delegate: AccountNoRedirects(), delegateQueue: nil)
+    }()
+
+    static func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AccountFailure(message: "The account service did not respond.") }
         return (data, http)
@@ -163,7 +192,13 @@ nonisolated struct AccountAPI {
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let (data, response) = try await transport(request)
+        let data: Data, response: HTTPURLResponse
+        do { (data, response) = try await transport(request) }
+        catch {
+            AccountNetworkMetrics.shared.record(path: path, bytes: 0, failed: true)
+            throw error
+        }
+        AccountNetworkMetrics.shared.record(path: path, bytes: data.count, failed: !(200..<300).contains(response.statusCode))
         guard (200..<300).contains(response.statusCode) else {
             // Do not surface raw server responses: they may echo identifiers or request contents.
             let message: String
@@ -173,7 +208,18 @@ nonisolated struct AccountAPI {
             case 402, 429: message = "The free service limit was reached. Try later; your local data is kept."
             default: message = "The account service is unavailable (\(response.statusCode)). Your local data is kept."
             }
-            throw AccountFailure(message: message)
+            var delay: TimeInterval?
+            if let header = response.value(forHTTPHeaderField: "Retry-After") {
+                if let seconds = Double(header), seconds.isFinite { delay = max(0, seconds) }
+                else {
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+                    delay = formatter.date(from: header).map { max(0, $0.timeIntervalSinceNow) }
+                }
+            }
+            throw AccountFailure(message: message, statusCode: response.statusCode, retryAfter: delay)
         }
         return data
     }
