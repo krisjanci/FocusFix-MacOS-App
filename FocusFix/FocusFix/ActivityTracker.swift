@@ -1537,8 +1537,8 @@ final class ActivityTracker: ObservableObject {
     func exportSavedSessions(_ selected: [SavedSession]?) async throws -> (folder: URL, count: Int)? {
         let panel = NSOpenPanel()
         panel.title = selected == nil ? "Export all saved sessions" : "Export selected sessions"
-        panel.message = selected.map { "Combines \($0.count) selected sessions into one activity CSV per day." }
-            ?? "Combines saved sessions into one activity CSV per day. The current recording is skipped."
+        panel.message = selected.map { "Combines \($0.count) selected sessions into narrow CSV tables grouped by day." }
+            ?? "Combines saved sessions into narrow CSV tables grouped by day. The current recording is skipped."
         panel.prompt = "Export here"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
