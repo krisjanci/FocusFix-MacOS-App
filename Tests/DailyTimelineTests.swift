@@ -134,6 +134,36 @@ import Foundation
         let emptyExport = try SessionFiles.export(SavedSession(folder: noRows), to: destination, root: root, active: nil)
         try expect(try fm.contentsOfDirectory(atPath: emptyExport.path).sorted() == ["metadata.json", "sessions.csv"])
         try ExportReader(emptyExport).verify(["no-rows": snapshot(noRows)])
+        // Unknown columns, changing protocol/session fields, text that looks numeric and formula protection.
+        let unusual = root.appendingPathComponent("unusual")
+        try fm.createDirectory(at: unusual, withIntermediateDirectories: false)
+        try Data("{\"schema_version\":5,\"session_id\":\"=formula-id\",\"status\":\"test\",\"duration_seconds\":3}".utf8).write(to: unusual.appendingPathComponent("session.json"))
+        let unusualRows = [["elapsed_seconds", "event_type", "session_id", "question_version", "elapsed_s", "tag", "unknown,header"],
+                           ["1.230000000000000000000", "key_down", "001", "q-first", "untouched", "0001.0000", "=formula"],
+                           ["2.000000", "key_up", "002", "q-second", "also untouched", "line one\r\nline two", "'literal"]]
+        try (unusualRows.map { $0.map { value in
+            // This fixture writes original text without export-time spreadsheet protection.
+            "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }.joined(separator: ",") }.joined(separator: "\r\n") + "\r\n").write(to: unusual.appendingPathComponent("events.csv"), atomically: true, encoding: .utf8)
+        try Data("unrecognised log; preserved verbatim\r\n".utf8).write(to: unusual.appendingPathComponent("future.jsonl"))
+        let unusualOriginal = try snapshot(unusual)
+        _ = try SessionStorage.compact(unusual, force: true)
+        let unusualSaved = try SavedSession(folder: unusual)
+        let unusualA = try SessionFiles.export(unusualSaved, to: destination, root: root, active: nil)
+        let unusualB = try SessionFiles.export(unusualSaved, to: destination, root: root, active: nil)
+        try expect(try snapshotTree(unusualA) == snapshotTree(unusualB))
+        let unusualReader = try ExportReader(unusualA)
+        try unusualReader.verify(["unusual": unusualOriginal])
+        let unusualInput = try unusualReader.category("inputs.csv")
+        try expect(unusualInput[0]["elapsed_s"] == "1.23" && unusualInput[0]["tag"] == "0001.0000")
+        try expect(unusualInput[1]["tag"] == "line one\r\nline two")
+        try expect(unusualReader.sessions[0]["session_id"] == "=formula-id")
+        // Empty strings, null and missing JSON properties are reconstructed distinctly.
+        var emptyAssignment = try DailyExportJSON.parse(String(decoding: originalFirst[WorkAssignmentJournal.filename]!, as: UTF8.self))
+        emptyAssignment.set(["changes"], to: .array([.object(["elapsed": .number("0"), "assignment": .object(["projectName": .string(""), "taskTitle": .literal("null")])])]))
+        // The original lexical JSON parser also rejects malformed/duplicate fields instead of dropping them.
+        fails { _ = try DailyExportJSON.parse("{\"a\":1,\"a\":2}") }
+        fails { _ = try DailyExportJSON.parse("{\"a\":01}") }
         let beforeFailure = try fm.contentsOfDirectory(atPath: destination.path).sorted()
         fails { _ = try SessionFiles.exportSelected([saved, saved], to: destination, root: root, active: nil) }
         fails { _ = try SessionFiles.exportSelected([saved], to: destination, root: root, active: saved.folder) }
@@ -220,9 +250,15 @@ import Foundation
                 let constants = source["constants"] as! [String: [String: String]]
                 var rows = try category(table).filter { $0["session"] == session && (table != "changes.csv" || $0["kind"] == "check_in_action") }
                 if let order = source["order"] as? [Int] { rows = zip(order, rows).sorted { $0.0 < $1.0 }.map { $0.1 } }
-                let expected = try TimelineRecords.cells(String(data: original(session, name), encoding: .utf8)!.components(separatedBy: .newlines)[0])
+                let data = original(session, name)
+                let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("source-csv-\(UUID()).csv")
+                try data.write(to: temporary)
+                defer { try? FileManager.default.removeItem(at: temporary) }
+                let reader = try TimelineRecords(temporary)
+                let expected = try TimelineRecords.cells(reader.next(csv: true)!)
                 try expect(expected == header)
-                let parsed = try RecordingCoverage.csv(String(data: original(session, name), encoding: .utf8)!.replacingOccurrences(of: "\r\n", with: "\n"))
+                var parsed = [expected]
+                while let line = try reader.next(csv: true) { if !line.isEmpty { parsed.append(try TimelineRecords.cells(line)) } }
                 try expect(rows.count == parsed.count - 1 && rows.count == source["records"] as! Int)
                 for (index, row) in rows.enumerated() {
                     for (column, field) in header.enumerated() {
