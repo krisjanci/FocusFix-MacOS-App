@@ -50,6 +50,8 @@ import Foundation
         let pending = SessionFiles.pendingRoot(in: root)
         let first = try RecordingWriter(root: pending, id: UUID().uuidString, startedAt: midnight, mode: .automatic)
         try first.event(time: 1, type: "left_click_down")
+        first.append([MouseSummary(start: 0.125, end: 1.125, distance: 1, events: 1, secondsSinceMovement: 0.0049),
+                      MouseSummary(start: 1.125, end: 1.5, distance: 0, events: 0, secondsSinceMovement: nil, activityPhase: "check_in")])
         try first.checkpoint(at: 2)
         // A written but uncheckpointed tail is explicitly outside recovery eligibility.
         try first.event(time: 3, type: "left_click_up"); try first.flush()
@@ -58,6 +60,10 @@ import Foundation
         let saved = try SessionFiles.list(in: root)
         precondition(saved.count == 1 && saved[0].duration == 2)
         precondition(saved[0].recordingContract?.observedThrough == 2)
+        let recoveredCoverage = try RecordingCoverage.load(session: saved[0])
+        precondition(recoveredCoverage.unknown == 1 && recoveredCoverage.checkInOrAwaitingReturn == 0.375 && recoveredCoverage.unavailable == 0.625)
+        let checkpointCoverage = try JSONDecoder().decode(ObservedCoverage.self, from: SessionStorage.data(ObservedCoverage.filename, in: saved[0].folder))
+        precondition(checkpointCoverage.intervals.count == 2 && checkpointCoverage.intervals.last?.end == 1.5)
         let count = try SessionFiles.recoverPending(in: root)
         precondition(count == 0)
         let context = saved[0].recordingContract!.intervals[0]
@@ -82,6 +88,23 @@ import Foundation
         precondition(finalizedCount == 1)
         let finalizedSessions = try SessionFiles.list(in: halfFinishedRoot)
         precondition(finalizedSessions.first?.duration == 2)
+        // Interrupted v11 recordings still recover without being upgraded or requiring the new sidecar.
+        let oldRoot = root.appendingPathComponent("legacy-recovery")
+        let oldWriter = try RecordingWriter(root: SessionFiles.pendingRoot(in: oldRoot), id: "old", startedAt: midnight)
+        try oldWriter.checkpoint(at: 2)
+        let oldMetadataURL = oldWriter.folder.appendingPathComponent("session.json")
+        var oldMetadata = try JSONSerialization.jsonObject(with: Data(contentsOf: oldMetadataURL)) as! [String: Any]
+        oldMetadata["schema_version"] = 11; oldMetadata["recording_format"] = "focusfix.recording.v11"
+        oldMetadata["required_capabilities"] = RecordingContract.capabilities(for: 11)
+        try JSONSerialization.data(withJSONObject: oldMetadata).write(to: oldMetadataURL)
+        let oldContractURL = oldWriter.folder.appendingPathComponent("context_intervals.json")
+        let oldContractText = try String(contentsOf: oldContractURL, encoding: .utf8).replacingOccurrences(of: "focusfix.recording.v12", with: "focusfix.recording.v11")
+        try oldContractText.write(to: oldContractURL, atomically: true, encoding: .utf8)
+        try FileManager.default.removeItem(at: oldWriter.folder.appendingPathComponent(ObservedCoverage.filename))
+        let oldRecovered = try SessionFiles.recoverPending(in: oldRoot)
+        precondition(oldRecovered == 1)
+        let oldSessions = try SessionFiles.list(in: oldRoot)
+        precondition(oldSessions.first?.schemaVersion == 11 && oldSessions.first?.recordingContract?.format == "focusfix.recording.v11")
         // A damaged pending entry must not stop independent checkpoint recovery.
         for reverse in [false, true] {
             let mixed = root.appendingPathComponent("mixed-\(reverse)")
