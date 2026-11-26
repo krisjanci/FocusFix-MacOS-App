@@ -184,7 +184,18 @@ nonisolated enum DailyTimeline {
     static func roundedNumber(_ value: String, places: Int) -> String {
         guard !value.isEmpty else { return value }
         let negative = value.first == "-"
-        let unsigned = negative ? String(value.dropFirst()) : value
+        var unsigned = negative ? String(value.dropFirst()) : value
+        if let separator = unsigned.firstIndex(where: { $0 == "e" || $0 == "E" }) {
+            let mantissa = String(unsigned[..<separator])
+            guard let exponent = Int(unsigned[unsigned.index(after: separator)...]), abs(exponent) <= 400,
+                  mantissa.range(of: #"^[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil else { return value }
+            let digits = mantissa.replacingOccurrences(of: ".", with: "")
+            let wholeCount = mantissa.firstIndex(of: ".").map { mantissa.distance(from: mantissa.startIndex, to: $0) } ?? mantissa.count
+            let split = wholeCount + exponent
+            if split <= 0 { unsigned = "0." + String(repeating: "0", count: -split) + digits }
+            else if split >= digits.count { unsigned = digits + String(repeating: "0", count: split - digits.count) }
+            else { let index = digits.index(digits.startIndex, offsetBy: split); unsigned = String(digits[..<index]) + "." + digits[index...] }
+        }
         let parts = unsigned.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count <= 2, !parts[0].isEmpty,
               parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } }) else { return value }
