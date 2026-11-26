@@ -57,6 +57,8 @@ struct SocialState: Codable {
     var groupsIncluded: Bool? = nil
     var groupVersion: String? = nil
     var acknowledgedWork: [DeclaredWorkAcknowledgement]? = nil
+    var progressMetadataVersion: String? = nil
+    var progressMetadataIncluded: Bool? = nil
 }
 
 struct DeclaredWorkInterval: Codable, Equatable {
@@ -92,13 +94,14 @@ struct DeclaredWorkPending: Codable, Equatable {
     var ready: Bool { startedAt != nil && observedThrough != nil && intervals != nil && (revision ?? 0) > 0 }
 }
 
-struct SocialLedger: Codable {
+struct SocialLedger: Codable, Equatable {
     var timezone: String
     var activatedAt: Double = Date().timeIntervalSince1970
     var progress = DailyProgress()
     // Persist together: a cursor is only valid with its authoritative server base.
     var serverProgress: DailyProgress? = nil
     var progressRevision: Int64? = nil
+    var progressMetadataVersion: String? = nil
     var pending: [SocialEvent] = []
     var submitted: Set<UUID> = []
     // These replacement totals must never be sent to the increment-only legacy RPC.
@@ -150,9 +153,10 @@ struct SocialLedger: Codable {
         submitted.subtract(sent)
         timezone = state.timezone
         if state.progressIsDelta == true, let base = serverProgress {
-            serverProgress = base.mergingServerDays(state.progress, removed: state.removedDays ?? [])
+            serverProgress = base.mergingServerDays(state.progress, removed: state.removedDays ?? [], includesMetadata: state.progressMetadataIncluded != false)
         } else { serverProgress = state.progress }
         progressRevision = state.socialSyncVersion == 2 ? state.progressRevision : nil
+        progressMetadataVersion = state.socialSyncVersion == 2 ? state.progressMetadataVersion : nil
         progress = serverProgress ?? state.progress
         for event in pending { apply(event) }
     }
