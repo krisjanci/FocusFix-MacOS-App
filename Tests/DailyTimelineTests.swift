@@ -188,6 +188,20 @@ import Foundation
         try expect(unusualInput[0]["elapsed_s"] == "1.23" && unusualInput[0]["tag"] == "0001.0000")
         try expect(unusualInput[1]["tag"] == "line one\r\nline two")
         try expect(unusualReader.sessions[0]["session_id"] == "=formula-id")
+        // Group historical measurements by their original start before rounding across midnight.
+        let midnight = root.appendingPathComponent("midnight")
+        try fm.createDirectory(at: midnight, withIntermediateDirectories: false)
+        try Data("{\"schema_version\":5,\"started_at_utc\":\"2026-11-25T23:59:58Z\",\"status\":\"test\",\"duration_seconds\":3}".utf8).write(to: midnight.appendingPathComponent("session.json"))
+        let midnightCSV = "start_seconds,end_seconds,distance_screen_points,movement_events,seconds_since_last_movement,activity_phase,seconds_since_last_break\n2.01,2.02,2,2,0.004,check_in,2.02\n1.99,2.01,1,1,,work,2.01\n"
+        try midnightCSV.write(to: midnight.appendingPathComponent("mouse_movement.csv"), atomically: true, encoding: .utf8)
+        let midnightExport = try SessionFiles.exportSelected([SavedSession(folder: midnight)], to: destination, root: root, active: nil, timeZone: utc)
+        let beforeMidnight = try rows(midnightExport.folder.appendingPathComponent("2026-11-25/movement.csv"))
+        let afterMidnight = try rows(midnightExport.folder.appendingPathComponent("2026-11-26/movement.csv"))
+        try expect(beforeMidnight.count == 1 && beforeMidnight[0]["start_s"] == "2" && beforeMidnight[0]["end_s"] == "2" && beforeMidnight[0]["distance_points"] == "1")
+        try expect(afterMidnight.count == 1 && afterMidnight[0]["start_s"] == "2" && afterMidnight[0]["since_movement_s"] == "0")
+        try ExportReader(midnightExport.folder).verify(["midnight": snapshot(midnight)])
+        let reducedMetadata = try String(contentsOf: midnightExport.folder.appendingPathComponent("metadata.json"), encoding: .utf8)
+        try expect(!reducedMetadata.contains("1.99") && !reducedMetadata.contains("2.01") && !reducedMetadata.contains("0.004"))
         // The original lexical JSON parser also rejects malformed/duplicate fields instead of dropping them.
         fails { _ = try DailyExportJSON.parse("{\"a\":1,\"a\":2}") }
         fails { _ = try DailyExportJSON.parse("{\"a\":01}") }
