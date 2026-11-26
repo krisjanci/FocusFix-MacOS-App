@@ -155,7 +155,7 @@ nonisolated indirect enum DailyExportJSON {
 }
 
 nonisolated enum DailyTimeline {
-    static let version = "focusfix.daily_tables.v2"
+    static let version = "focusfix.daily_tables.v3"
     static let sessionColumns = ["session", "session_id", "recording_id", "segment_id", "start_utc", "end_utc",
         "anchor_unix_s", "mode", "elapsed_origin_s", "observed_through_s", "duration_s", "status", "schema_version"]
     static let csvTables = ["events.csv": "inputs.csv", "mouse_movement.csv": "movement.csv", "breaks.csv": "breaks.csv",
@@ -179,6 +179,38 @@ nonisolated enum DailyTimeline {
         let source: Int
         let index: Int
         let values: [String: String]
+    }
+    // Round decimal text directly: do not introduce binary floating-point tie errors.
+    static func roundedNumber(_ value: String, places: Int) -> String {
+        guard !value.isEmpty else { return value }
+        let negative = value.first == "-"
+        let unsigned = negative ? String(value.dropFirst()) : value
+        let parts = unsigned.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= 2, !parts[0].isEmpty,
+              parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } }) else { return value }
+        let fraction = parts.count == 2 ? String(parts[1]) : ""
+        let kept = String(fraction.prefix(places)) + String(repeating: "0", count: max(0, places - fraction.count))
+        var digits = Array((String(parts[0]) + kept).utf8)
+        if fraction.count > places, fraction[fraction.index(fraction.startIndex, offsetBy: places)] >= "5" {
+            var index = digits.count - 1
+            while digits[index] == 57 { digits[index] = 48; index -= 1; if index < 0 { break } }
+            if index < 0 { digits.insert(49, at: 0) } else { digits[index] += 1 }
+        }
+        var text = String(decoding: digits, as: UTF8.self)
+        if places > 0 { text.insert(".", at: text.index(text.endIndex, offsetBy: -places)) }
+        text = compactNumber(text)
+        while text.count > 1 && text.first == "0" && text.dropFirst().first != "." { text.removeFirst() }
+        return negative && text.contains(where: { $0 >= "1" && $0 <= "9" }) ? "-" + text : text
+    }
+    private static func discarded(_ field: String, table: String) -> Bool {
+        ["inputs.csv", "movement.csv"].contains(table) && ["activity_phase", "seconds_since_last_break"].contains(field)
+    }
+    private static func reducedValue(_ value: String, field: String, table: String) -> String {
+        if table == "movement.csv" {
+            if ["start_seconds", "end_seconds"].contains(field) { return roundedNumber(value, places: 0) }
+            if field == "seconds_since_last_movement" { return roundedNumber(value, places: 2) }
+        }
+        return numericFields.contains(field) ? compactNumber(value) : value
     }
     // Lexical trimming retains arbitrarily precise decimals, signed zero and exponents.
     static func compactNumber(_ value: String) -> String {
@@ -350,7 +382,7 @@ nonisolated enum DailyTimeline {
                         }
                     }
                     var constantMetadata: [String: Any] = [:], mapping: [String: String] = [:]
-                    for field in header {
+                    for field in header where !discarded(field, table: table) {
                         if let value = constants[field] {
                             if field == "session_id", value == sessionRow["session_id"] { constantMetadata[field] = ["session_column": "session_id"] }
                             else { constantMetadata[field] = ["lookup": domain(field)!, "reference": identity(value, domain(field)!)] }
@@ -359,7 +391,7 @@ nonisolated enum DailyTimeline {
                         }
                     }
                     let source = csvSources.count
-                    csvSources.append(["session": reference, "file": name, "table": table, "header": header, "columns": mapping,
+                    csvSources.append(["session": reference, "file": name, "table": table, "header": header.filter { !discarded($0, table: table) }, "columns": mapping,
                                        "constants": constantMetadata, "records": count])
                     let reader = try TimelineRecords(url); _ = try reader.next(csv: true); var index = 0
                     while let line = try reader.next(csv: true) {
@@ -373,7 +405,7 @@ nonisolated enum DailyTimeline {
                         if table == "changes.csv" { row["kind"] = "check_in_action" }
                         for field in header where mapping[field] != nil {
                             let value = fields[field]!
-                            row[mapping[field]!] = domain(field).map { identity(value, $0) } ?? (numericFields.contains(field) ? compactNumber(value) : value)
+                            row[mapping[field]!] = domain(field).map { identity(value, $0) } ?? reducedValue(value, field: field, table: table)
                         }
                         let at = try finite(fields["elapsed_seconds"] ?? fields["answered_elapsed_seconds"] ?? fields["start_seconds"])
                         let start = fields["start_seconds"].flatMap(Double.init), end = fields["end_seconds"].flatMap(Double.init)
@@ -511,10 +543,10 @@ nonisolated enum DailyTimeline {
             "json_logs": logs, "json_records": records, "cross_day": crossDay, "escaped_cells": escaped, "folder_names": folderNames,
             "numeric_csv_fields": numericFields.sorted(), "identity_csv_fields": identityFields,
             "notes": ["Elapsed values stay on each recording's logical clock. Day grouping uses anchor_unix_s + elapsed - elapsed_origin_s in the export timezone.",
-                "Phase work means normal intervention phase, not declared Work. Context/project/task changes are in changes.csv.",
-                "Original bounds remain on interval rows. cross_day references do not duplicate measurements. Intervals are [start,end).",
+                "Inputs and movement omit phase and since-break values. Context/project/task changes are in changes.csv. Exact observation coverage, when recorded, remains once in document metadata.",
+                "Movement bounds are rounded to whole seconds and idle measurements to at most two decimals, ties away from zero. Historical grouping and cross_day references use original bounds. Other interval bounds remain unchanged; intervals are [start,end).",
                 "Durable bounds are in sessions.csv. Uncheckpointed tails remain present but must not receive work credit. Missing observations are not filled.",
-                "CSV source columns/constants and lookup identities reconstruct every original field; decimal trailing zeros are formatting only.",
+                "CSV source columns/constants and lookup identities reconstruct retained fields. Omitted input/movement phase and since-break values and discarded movement precision are not retained.",
                 "JSON moves place scalar values in changes.csv or sessions.csv. remaining_json retains all other fields with exact numeric tokens; collections/logs preserve record order.",
                 "escaped_cells lists spreadsheet-protection apostrophes to remove when reconstructing text. Row numbers exclude headers.",
                 "CSV source order is chronological unless order maps emitted rows back to their original one-based record indices. No per-event JSON copies or summary rows are stored."]]
