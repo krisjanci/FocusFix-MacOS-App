@@ -95,7 +95,12 @@ final class SocialController: ObservableObject {
             let remainingWork = Set((ledger?.declaredWorkPending ?? [:]).filter { work[$0.key] == $0.value && $0.value.ready }.keys)
             let remainingEvents = Set(ledger?.pending.map(\.id) ?? []).intersection(events)
             let count = remainingWork.count + remainingEvents.count
-            if count >= previousCount { return false } // A server that did not acknowledge must not spin.
+            if count >= previousCount {
+                syncFailed = true
+                notice = "The service did not confirm all progress. It is saved on this Mac for retry."
+                failed(AccountFailure(message: "Progress acknowledgement missing."))
+                return false
+            }
             previousCount = count
             guard await refresh(includeGroups: !groupReaders.isEmpty, advanceSchedule: false,
                 allowedWork: remainingWork, allowedEvents: remainingEvents), generation == token, !syncFailed else { return false }
