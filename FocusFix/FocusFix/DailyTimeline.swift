@@ -505,10 +505,11 @@ nonisolated enum DailyTimeline {
         try sessionOutput.write(contentsOf: Data((sessionColumns.joined(separator: ",") + "\n").utf8))
         for (index, row) in sessionRows.enumerated() { try writeRow(row, header: sessionColumns, path: "sessions.csv", handle: sessionOutput, row: index + 1) }
         try sessionOutput.close()
+        let identityFields = Dictionary(uniqueKeysWithValues: ["break_id", "reference_break_id", "check_in_id", "prompt_id", "question_version", "session_id"].map { ($0, domain($0)!) })
         let metadata: [String: Any] = ["export_schema": version, "time_zone": timeZone.identifier, "columns": columns,
             "files": rowCounts, "identities": lookups, "csv_sources": csvSources, "documents": documents,
             "json_logs": logs, "json_records": records, "cross_day": crossDay, "escaped_cells": escaped, "folder_names": folderNames,
-            "numeric_csv_fields": numericFields.sorted(),
+            "numeric_csv_fields": numericFields.sorted(), "identity_csv_fields": identityFields,
             "notes": ["Elapsed values stay on each recording's logical clock. Day grouping uses anchor_unix_s + elapsed - elapsed_origin_s in the export timezone.",
                 "Phase work means normal intervention phase, not declared Work. Context/project/task changes are in changes.csv.",
                 "Original bounds remain on interval rows. cross_day references do not duplicate measurements. Intervals are [start,end).",
