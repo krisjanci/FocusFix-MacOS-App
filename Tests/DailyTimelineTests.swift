@@ -79,8 +79,9 @@ import Foundation
         try expect(lookup["observed_through_s"] == "4" && lookup["elapsed_origin_s"] == "0")
         let movement = try exported.category("movement.csv")
         try expect(movement.count == 3 && movement[0]["start_s"] == "0" && movement[0]["end_s"] == "4")
-        try expect(movement[0]["distance_points"] == "123.125" && movement[0]["since_movement_s"] == "")
+        try expect(movement[0]["distance_points"] == "123.1" && movement[0]["since_movement_s"] == "")
         try expect(movement[0]["phase"] == nil && movement[0]["since_break_s"] == nil)
+        try expect(movement[1]["distance_points"] == "1.1" && movement[2]["distance_points"] == "2")
         try expect(movement[1]["start_s"] == "0" && movement[1]["end_s"] == "0" && movement[1]["since_movement_s"] == "0")
         try expect(movement[2]["start_s"] == "1" && movement[2]["end_s"] == "1" && movement[2]["since_movement_s"] == "0.01")
         try expect(inputRows.allSatisfy { $0["phase"] == nil && $0["since_break_s"] == nil })
@@ -116,6 +117,8 @@ import Foundation
         for (value, places, expected) in [("8.995604", 0, "9"), ("0.499999999999999999", 0, "0"),
             ("0.5", 0, "1"), ("-0.5", 0, "-1"), ("0.004999999", 2, "0"), ("0.005", 2, "0.01"),
             ("-0.005", 2, "-0.01"), ("0.000001", 2, "0"), ("1.2e-7", 2, "0"), ("5e-3", 2, "0.01"),
+            ("1.149999999999999999", 1, "1.1"), ("1.15", 1, "1.2"), ("9.95", 1, "10"),
+            ("0.049", 1, "0"), ("5e-2", 1, "0.1"), ("-1.15", 1, "-1.2"), ("", 1, ""),
             ("9.999", 2, "10"), ("", 2, ""), ("1.20", 2, "1.2")] {
             try expect(DailyTimeline.roundedNumber(value, places: places) == expected)
         }
@@ -314,7 +317,7 @@ import Foundation
                         }
                         let sourceValue = parsed[index + 1][column]
                         let numeric = Set(metadata["numeric_csv_fields"] as! [String]).contains(field)
-                        let roundedPlaces: Int? = table == "movement.csv" ? (["start_seconds", "end_seconds"].contains(field) ? 0 : (field == "seconds_since_last_movement" ? 2 : nil)) : nil
+                        let roundedPlaces: Int? = table == "movement.csv" ? (["start_seconds", "end_seconds"].contains(field) ? 0 : (field == "seconds_since_last_movement" ? 2 : (field == "distance_screen_points" ? 1 : nil))) : nil
                         let expectedValue = roundedPlaces.map { DailyTimeline.roundedNumber(sourceValue, places: $0) } ?? (numeric ? DailyTimeline.compactNumber(sourceValue) : sourceValue)
                         try expect(value == expectedValue)
                     }
