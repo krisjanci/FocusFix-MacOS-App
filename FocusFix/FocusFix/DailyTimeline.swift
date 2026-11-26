@@ -302,7 +302,7 @@ nonisolated enum DailyTimeline {
                 // Session fields have one owner; other JSON documents refer to this lookup.
                 let sessionMoves = ["session.json": ["session_id": "session_id", "recording_id": "recording_id", "segment_id": "segment_id",
                     "started_at_utc": "start_utc", "ended_at_utc": "end_utc", "recording_mode": "mode", "duration_seconds": "duration_s",
-                    "status": "status", "schema_version": "schema_version"],
+                    "status": "status", "schema_version": "schema_version", "elapsed_origin_seconds": "elapsed_origin_s"],
                     "context_intervals.json": ["recordingID": "recording_id", "segmentID": "segment_id", "mode": "mode",
                         "elapsedOrigin": "elapsed_origin_s", "observedThrough": "observed_through_s"],
                     "research_eligibility.json": ["recordingID": "recording_id", "segmentID": "segment_id", "capturedAtUTC": "anchor_unix_s"]]
@@ -356,7 +356,6 @@ nonisolated enum DailyTimeline {
                             else { constantMetadata[field] = ["lookup": domain(field)!, "reference": identity(value, domain(field)!)] }
                         } else {
                             mapping[field] = fieldColumn(field, table: table)
-                            addColumn(mapping[field]!, table: table)
                         }
                     }
                     let source = csvSources.count
