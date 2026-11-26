@@ -49,7 +49,8 @@ import Combine
         }
         let account = AccountController(configuration: config, transport: transport, readCredential: { nil }, writeCredential: { _ in }, defaults: nil)
         await account.authenticate(email: "fixture@example.invalid", password: "fixture", create: false)
-        let social = SocialController(account: account, storageDirectory: root, selectionDefaults: nil)
+        var clock = Date()
+        let social = SocialController(account: account, storageDirectory: root, selectionDefaults: nil, now: { clock })
         _ = await social.automaticRefresh()
         precondition(calls.isEmpty, "Hidden idle app polled")
         await social.enable()
@@ -63,6 +64,20 @@ import Combine
                 startedAt: start, observedThrough: start + 3600, intervals: [.init(start: start, end: start + seconds)])
         }
         stage(3600)
+        clock = clock.addingTimeInterval(3600)
+        _ = await social.automaticRefresh()
+        precondition(calls.count == before, "Work uploaded before the four-hour deadline")
+        // A one-hour launch does not reset the saved deadline or lose the pending work.
+        let shortLaunch = SocialController(account: account, storageDirectory: root, selectionDefaults: nil, now: { clock })
+        _ = await shortLaunch.automaticRefresh()
+        precondition(calls.count == before && shortLaunch.ledger?.declaredWorkPending?.isEmpty == false
+            && shortLaunch.groups.first?.members.first?.photo == remotePhoto, "Relaunch lost its cached thumbnail or queue")
+        clock = clock.addingTimeInterval(3 * 3600 + 1)
+        _ = await shortLaunch.automaticRefresh()
+        precondition(calls.count == before + 1 && shortLaunch.ledger?.declaredWorkPending?.isEmpty == true,
+            "Relaunch rearmed the deadline instead of uploading overdue work")
+        // Continue with the original instance, whose pending revision is idempotent.
+        calls.removeLast()
         _ = await social.automaticRefresh()
         precondition(calls.count == before + 1 && calls.last?["includeGroups"] as? Bool == false)
         precondition(social.ledger?.declaredWorkPending?.isEmpty == true, "Atomic acknowledgement failed")
@@ -87,6 +102,7 @@ import Combine
         social.setGroupViewVisible(window, visible: true)
         social.setGroupViewVisible(panel, visible: false)
         let visibleCount = calls.count
+        clock = clock.addingTimeInterval(4 * 3600 + 1)
         _ = await social.automaticRefresh()
         precondition(calls.count == visibleCount + 1 && calls.last?["includeGroups"] as? Bool == true)
         social.setGroupViewVisible(window, visible: false)
@@ -103,19 +119,31 @@ import Combine
         _ = await social.refresh()
         precondition(social.ledger?.declaredWorkPending?.isEmpty == true)
         // The cursor and authoritative base survive relaunch together.
-        let restored = SocialController(account: account, storageDirectory: root, selectionDefaults: nil)
+        let restored = SocialController(account: account, storageDirectory: root, selectionDefaults: nil, now: { clock })
         _ = await restored.refresh()
+        precondition(calls.last?["groupVersion"] as? String == version, "Relaunch discarded the group cache")
         precondition(calls.last?["progressRevision"] != nil && calls.last?["progressMetadataVersion"] as? String == "metadata-1"
             && restored.ledger?.progress.days[today]?.workSeconds == 3600)
         stage(600); status = 429
         _ = await social.refresh()
-        precondition(social.nextAutomaticSyncAt.timeIntervalSinceNow > 119)
+        precondition(social.nextAutomaticSyncAt.timeIntervalSince(clock) > 119)
         let failures = calls.count
         _ = await social.automaticRefresh()
         precondition(calls.count == failures && social.ledger?.declaredWorkPending?.isEmpty == false)
         status = 200
         _ = await social.refresh()
         precondition(social.ledger?.declaredWorkPending?.isEmpty == true)
+        // More than one upload batch from an offline period drains in the same due cycle.
+        for _ in 0..<51 {
+            social.stageDeclaredWork(segmentID: UUID(), days: [today: 60], capturedOwner: owner,
+                capturedOrigin: config.origin.absoluteString, startedAt: start, observedThrough: start + 3600,
+                intervals: [.init(start: start, end: start + 60)])
+        }
+        clock = clock.addingTimeInterval(4 * 3600 + 1)
+        let backlogCalls = calls.count
+        _ = await social.automaticRefresh()
+        precondition(calls.count == backlogCalls + 2 && social.ledger?.declaredWorkPending?.isEmpty == true,
+            "Offline backlog was delayed by another four hours per batch")
         await account.signOut()
         precondition(social.groups.isEmpty)
         active = other
