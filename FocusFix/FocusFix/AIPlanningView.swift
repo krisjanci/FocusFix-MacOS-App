@@ -3,6 +3,7 @@ import AppKit
 
 struct AIPlanningButton: View {
     let action: () -> Void
+    var availability: () -> String? = { AIPlanning.unavailableReason }
     @Environment(\.scenePhase) private var scenePhase
     @State private var reason = AIPlanning.unavailableReason
     @State private var showingInfo = false
@@ -23,7 +24,7 @@ struct AIPlanningButton: View {
                 .accessibilityLabel("Try with AI")
                 .help(reason ?? "Describe your work to create an editable plan")
             if reason != nil {
-                Button { reason = AIPlanning.unavailableReason; showingInfo = true } label: {
+                Button { reason = availability(); showingInfo = true } label: {
                     Image(systemName: "info.circle").foregroundStyle(.gray).font(.system(size: 14))
                         .frame(width: 24, height: 26).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("How to enable Apple Intelligence")
@@ -36,13 +37,13 @@ struct AIPlanningButton: View {
                                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
                             }
                             Link("Apple Intelligence setup guide", destination: URL(string: "https://support.apple.com/121115")!)
-                            Button("Check again") { reason = AIPlanning.unavailableReason; if reason == nil { showingInfo = false } }
+                            Button("Check again") { reason = availability(); if reason == nil { showingInfo = false } }
                         }.padding(20).frame(width: 330)
                     }
             }
         }
-        .task { reason = AIPlanning.unavailableReason }
-        .onChange(of: scenePhase) { _, value in if value == .active { reason = AIPlanning.unavailableReason } }
+        .task { reason = availability() }
+        .onChange(of: scenePhase) { _, value in if value == .active { reason = availability() } }
     }
 }
 
@@ -70,8 +71,9 @@ struct AIPlanningSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: preview ? "checklist" : "mic.fill").foregroundStyle(teal)
                 Text(preview ? "Review your plan" : "Try with AI").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .lineLimit(1).minimumScaleFactor(0.85)
                 Spacer()
-                Text(preview ? "2 of 2" : "1 of 2").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                Text(preview ? "2 of 2" : "1 of 2").font(.caption.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
             }
             Text(subtitle).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
@@ -159,8 +161,8 @@ struct AIPlanningSheet: View {
             if project == nil {
                 Text("Project title").font(.callout.weight(.medium))
                 TextField("Project title", text: $title).textFieldStyle(.roundedBorder)
+                Text("Project color").font(.caption).foregroundStyle(.secondary)
                 ProjectColorChooser(selection: $color, inline: true)
-                    .accessibilityLabel("Project color")
             }
             HStack {
                 Text("Tasks · \(tasks.count)").font(.callout.weight(.medium))
