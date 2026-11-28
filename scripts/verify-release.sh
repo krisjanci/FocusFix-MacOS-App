@@ -45,11 +45,14 @@ python3 - "$release_check_dir/entitlements.plist" "$release_app/Contents/Info.pl
 import plistlib, sys
 with open(sys.argv[1], 'rb') as stream:
     entitlements = plistlib.load(stream)
-required = {'com.apple.security.app-sandbox', 'com.apple.security.files.user-selected.read-write'}
+required = {'com.apple.security.app-sandbox', 'com.apple.security.files.user-selected.read-write',
+            'com.apple.security.device.audio-input'}
 if not all(entitlements.get(key) is True for key in required):
-    sys.exit('Not ready: sandbox and user-selected export access required')
+    sys.exit('Not ready: sandbox, user-selected export access and voice-planning microphone access required')
 with open(sys.argv[2], 'rb') as stream:
     info = plistlib.load(stream)
+if not info.get('NSMicrophoneUsageDescription', '').strip():
+    sys.exit('Not ready: voice planning requires a microphone usage explanation')
 if info.get('FocusFixAccountURL'):
     required.add('com.apple.security.network.client')
     if entitlements.get('com.apple.security.network.client') is not True:
