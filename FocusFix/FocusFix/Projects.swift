@@ -124,6 +124,35 @@ nonisolated struct WorkProject: Codable, Identifiable, Equatable {
         try save(projects + [project]); return project.id
     }
 
+    // Commit the reviewed AI draft in one atomic catalog write. Retrying a failed
+    // save cannot leave a new empty project or a partially imported checklist.
+    @discardableResult func savePlan(projectID: UUID?, name: String, color: String, tasks: [ProjectTask]) throws -> UUID {
+        guard !tasks.isEmpty, tasks.count <= 30 else {
+            throw SessionTags.TagError("Keep 1–30 tasks in this plan.")
+        }
+        let createdAt = Date()
+        let tasks = try tasks.map { draft in
+            try ProjectTask.validateEstimate(draft.estimate)
+            return ProjectTask(title: try Self.title(draft.title, limit: 200), createdAt: createdAt,
+                               description: draft.description, predictedFocusSessions: draft.estimate)
+        }
+        var values = projects
+        let id: UUID
+        if let projectID {
+            guard let index = values.firstIndex(where: { $0.id == projectID }) else {
+                throw SessionTags.TagError("This project no longer exists. Your draft has not been saved.")
+            }
+            values[index].tasks.append(contentsOf: tasks)
+            id = projectID
+        } else {
+            let project = WorkProject(name: try Self.title(name, limit: 40), color: try SessionTags.color(color), tasks: tasks)
+            values.append(project)
+            id = project.id
+        }
+        try save(values)
+        return id
+    }
+
     func editProject(_ id: UUID, name: String, color: String) throws {
         try edit(id) {
             let name = try Self.title(name, limit: 40)
