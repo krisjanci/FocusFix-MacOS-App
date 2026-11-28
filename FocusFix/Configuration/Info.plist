@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>FocusFix uses the microphone only when you choose Start speaking to turn your work plan into an editable project or tasks. Audio is transcribed on your Mac and deleted afterward.</string>
     <!-- Public client settings only: use a project in a Free-plan organization. -->
     <key>FocusFixAccountURL</key>
     <string>https://ltgyhstpbiocuxvyjpcb.supabase.co</string>
