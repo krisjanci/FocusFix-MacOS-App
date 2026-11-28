@@ -27,6 +27,7 @@ struct ProjectsView: View {
     @State private var projectsExpansion = ChecklistExpansion(size: 8)
     @State private var tasksExpansion = ChecklistExpansion(size: 7)
     @State private var showingTaskEntry = false
+    @State private var showingAIPlan = false
     @State private var newTaskScrollTarget: UUID?
     @FocusState private var newTaskFocused: Bool
     @FocusState private var renameFocus: UUID?
@@ -93,6 +94,18 @@ struct ProjectsView: View {
                 ProjectTaskDetails(store: store, tracker: tracker, projectID: project.id, task: task)
             }
         }
+        .sheet(isPresented: $showingAIPlan) {
+            if #available(macOS 26.0, *) {
+                AIPlanningSheet(store: store, project: project,
+                    initialText: project == nil ? projectName : newTask,
+                    initialColor: project?.color ?? projectColor.tagHex) { id in
+                    selectedProject = id; projectEditor = false; projectName = ""
+                    cancelTaskEntry(); editingList = false
+                    let count = store.projects.first { $0.id == id }?.tasks.count ?? 0
+                    tasksExpansion.reveal(itemAt: count - 1, total: count)
+                }
+            }
+        }
         .onExitCommand(perform: cancelEditingOrGoBack)
         .confirmationDialog("Delete project and its tasks? Recorded work will be kept.", isPresented: Binding(
             get: { deletion != nil }, set: { if !$0 { deletion = nil } }), titleVisibility: .visible) {
@@ -147,6 +160,7 @@ struct ProjectsView: View {
     private var projectForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Project name", text: $projectName).textFieldStyle(.roundedBorder).onSubmit(saveProject)
+            AIPlanningButton(action: beginAIPlan)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text("Project color").font(.callout)
@@ -230,7 +244,7 @@ struct ProjectsView: View {
                     if projectsExpansion.isExpanded {
                         centeredListButton("chevron.up", width: 36, lighter: true, label: "Show fewer projects") { collapseProjects() }
                     }
-                    centeredListButton("plus", label: "New project", action: beginNewProject)
+                    centeredListButton("plus", ai: true, label: "New project", action: beginNewProject)
                 }
             }.scrollIndicators(.automatic)
         }
@@ -296,8 +310,9 @@ struct ProjectsView: View {
                                 Button { addTask(project) } label: { Image(systemName: "plus") }.accessibilityLabel("Save new task")
                                     .disabled(newTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
+                            AIPlanningButton(action: beginAIPlan)
                         } else {
-                            centeredListButton("plus", label: "Add task") { showingTaskEntry = true }
+                            centeredListButton("plus", ai: true, label: "Add task") { showingTaskEntry = true }
                         }
                     }
                 }.scrollIndicators(.automatic)
@@ -308,7 +323,7 @@ struct ProjectsView: View {
         }
     }
 
-    private func centeredListButton(_ symbol: String, width: CGFloat = 108, lighter: Bool = false,
+    private func centeredListButton(_ symbol: String, width: CGFloat = 108, lighter: Bool = false, ai: Bool = false,
                                     label: String, action: @escaping () -> Void) -> some View {
         HStack {
             Spacer(minLength: 0)
@@ -323,8 +338,15 @@ struct ProjectsView: View {
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 5))
             }.buttonStyle(.plain).buttonPressFeedback().accessibilityLabel(label).help(label)
+            if ai { AIPlanningButton(action: beginAIPlan) }
             Spacer(minLength: 0)
         }
+    }
+
+    private func beginAIPlan() {
+        guard finishRename() else { return }
+        if let reason = AIPlanning.unavailableReason { error = reason; return }
+        showingAIPlan = true
     }
 
     private func beginNewProject() {
