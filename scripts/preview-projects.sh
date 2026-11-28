@@ -14,11 +14,12 @@ contents = pathlib.Path(sys.argv[1])
     'CFBundleName': 'FocusFix Projects Preview',
     'CFBundlePackageType': 'APPL',
     'NSHighResolutionCapable': True,
+    'NSMicrophoneUsageDescription': 'Record a synthetic work plan for the isolated AI planning preview.',
 }))
 PY
 source_dir=FocusFix/FocusFix
 sources=()
-for name in SessionStorage DailyTimeline SavedSession SessionConditions ReminderEligibility StudyCheckIns ResearchArchiveContract RecordingCoverage SessionTags SessionTagViews Projects ChecklistPage ChecklistReordering ChecklistReorderRow ProjectColorChooser ProjectsView TaskPopupLayout WorkAssignments RecordingContract ButtonPressFeedback ButtonPressGeometry; do
+for name in SessionStorage DailyTimeline SavedSession SessionConditions ReminderEligibility StudyCheckIns ResearchArchiveContract RecordingCoverage SessionTags SessionTagViews Projects AIPlanning AIPlanningSpeech AIPlanningView ChecklistPage ChecklistReordering ChecklistReorderRow ProjectColorChooser ProjectsView TaskPopupLayout WorkAssignments RecordingContract ButtonPressFeedback ButtonPressGeometry; do
     sources+=("$source_dir/$name.swift")
 done
 xcrun swiftc -module-cache-path "$preview_root/module-cache" "${sources[@]}" \
