@@ -11,6 +11,7 @@ Updated November 10, 2026. The public app is a personal product, separate from t
 - Run `bash scripts/test.sh`, `npm test`, and `npm run test:database` in `supabase`. Build the exact release revision and run the release content check.
 - Test a signed build on a fresh Mac, including first-launch consent, Input Monitoring, automatic and manual recording, pause, sleep/lock/idle, local review/export/deletion, account sign-in, approved sharing, withdrawal, and hosted deletion. Use synthetic recordings and a disposable service for the cloud path. See [manual qualification](MANUAL-QUALIFICATION.md).
 - Confirm source/license rights, accessibility, privacy language, support flow, system requirements, screenshots, and final install instructions.
+- Verify optional **Try with AI** on an Apple Intelligence-enabled Mac running macOS 26 or later, plus the disabled info guidance on older or ineligible Macs. Test microphone allow/deny, model download, stop/cancel, editable preview, and atomic save. Match privacy/support language to on-device speech and AI processing; voice audio and transcripts are not uploaded. The signed app needs the audio-input entitlement and microphone usage description. See `verification/ai-planning.md`.
 
 ## Website distribution
 
