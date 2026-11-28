@@ -195,7 +195,7 @@ struct AIPlanningSheet: View {
                 let plan = try await AIPlanning.generate(transcript: speech.transcript, projectName: project?.name)
                 try Task.checkCancellation()
                 title = plan.title
-                tasks = plan.tasks.map { ProjectTask(title: $0.title, predictedFocusSessions: Double($0.halfHours) / 2) }
+                tasks = plan.tasks.map { ProjectTask(title: $0.title, predictedFocusSessions: Double($0.focusSessions) ?? 1) }
                 preview = true
             } catch is CancellationError { } catch { self.error = error.localizedDescription }
         }
