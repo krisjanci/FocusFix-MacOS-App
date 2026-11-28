@@ -70,6 +70,7 @@ struct ProjectsPreview: View {
     @State private var panel = false
     @State private var tasks = true
     @State private var showingGuide = false
+    @State private var showingAISetup = false
     @State private var browsedProjectTint: String?
     var body: some View {
         HStack(spacing: 0) {
@@ -108,7 +109,22 @@ struct ProjectsPreview: View {
                     ProjectsView(store: PreviewProjects.store, tracker: tracker, close: { tasks = false }, reduceMotionOverride: reducedMotion)
                         .opacity(tasks ? 1 : 0).allowsHitTesting(tasks).accessibilityHidden(!tasks).disabled(!tasks)
                 }
-                HStack { Button("Groups") { panel.toggle() }; Spacer(); Button("Analytics") { panel.toggle() } }
+                HStack {
+                    Button("Groups") { panel.toggle() }
+                    Spacer()
+                    Menu("Preview") {
+                        Button("Toggle appearance") { dark.toggle() }
+                        Button("AI unavailable state") { showingAISetup = true }
+                    }.fixedSize()
+                    Button("Analytics") { panel.toggle() }
+                }
+                .sheet(isPresented: $showingAISetup) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Unavailable-state fixture").font(.headline)
+                        AIPlanningButton(action: {}, availability: { "Apple Intelligence is turned off. Open System Settings → Apple Intelligence & Siri and turn on Apple Intelligence." })
+                        Button("Close") { showingAISetup = false }
+                    }.padding(24).frame(width: 380)
+                }
             }.padding(30).frame(width: 490)
                 .background {
                     ZStack {
