@@ -73,8 +73,21 @@ import Speech
                 isBusy = false; status = ""; analyzer = nil; self.transcriber = nil; removeAudio()
             }
         }
+        do {
+            let text = try await transcribeFile(url, using: transcriber)
+            try check(token)
+            guard !text.isEmpty else { throw SessionTags.TagError("No speech was detected. Try again or type your plan below.") }
+            transcript = [transcript.trimmingCharacters(in: .whitespacesAndNewlines), text].filter { !$0.isEmpty }.joined(separator: "\n")
+        } catch {
+            if operation == token { self.error = error.localizedDescription }
+        }
+    }
+
+    // Shared by microphone capture and the synthetic-audio integration check.
+    func transcribeFile(_ url: URL, using transcriber: SpeechTranscriber) async throws -> String {
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         self.analyzer = analyzer
+        defer { self.analyzer = nil }
         let results = Task { () throws -> String in
             var parts: [String] = []
             for try await result in transcriber.results {
@@ -86,14 +99,18 @@ import Speech
         do {
             let file = try AVAudioFile(forReading: url)
             try await analyzer.start(inputAudioFile: file, finishAfterFile: true)
-            let text = try await results.value
-            try check(token)
-            guard !text.isEmpty else { throw SessionTags.TagError("No speech was detected. Try again or type your plan below.") }
-            transcript = [transcript.trimmingCharacters(in: .whitespacesAndNewlines), text].filter { !$0.isEmpty }.joined(separator: "\n")
+            return try await withTaskCancellationHandler {
+                let text = try await results.value
+                try Task.checkCancellation()
+                return text
+            } onCancel: {
+                results.cancel()
+                Task { await analyzer.cancelAndFinishNow() }
+            }
         } catch {
             results.cancel()
             await analyzer.cancelAndFinishNow()
-            if operation == token { self.error = error.localizedDescription }
+            throw error
         }
     }
 
